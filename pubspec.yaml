@@ -1,0 +1,49 @@
+name: logopedy
+description: "Aplicatie logopedica"
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.9.2
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_bloc: ^9.0.0
+  equatable: ^2.0.5
+  get_it: ^8.2.0
+  dio: ^5.7.0
+  flutter_secure_storage: ^9.2.2
+  connectivity_plus: ^7.0.0
+  formz: ^0.8.0
+  intl: ^0.20.2
+  google_fonts: ^6.2.1
+  cupertino_icons: ^1.0.8
+  audioplayers: ^5.2.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+  flutter_launcher_icons: ^0.14.4
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: assets/app_icon/app_icon.png   # ideal 1024×1024
+  remove_alpha_ios: true
+  # (opțional pentru Android 8+)
+  # adaptive_icon_foreground: assets/app_icon/fg.png
+  # adaptive_icon_background: "#FFFFFF"
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/images/logo_light.png
+    - assets/images/logo_dark.png
+    - assets/images/login_image.png
+    - assets/images/signup_image.png
+    - assets/images/forgot_password.png
+    - assets/images/reset_password.png
+    - assets/images/applause.gif
+    - assets/images/
+    - assets/audio/
