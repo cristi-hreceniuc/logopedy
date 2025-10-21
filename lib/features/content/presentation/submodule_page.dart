@@ -1,7 +1,9 @@
-// lib/features/content/presentation/submodule_page.dart
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:get_it/get_it.dart';
+
 import '../../../core/network/dio_client.dart';
+import '../../profiles/selected_profile_cubit.dart';
 import '../content_repository.dart';
 import '../models/dtos.dart';
 import 'lesson_player_page.dart';
@@ -14,7 +16,8 @@ class SubmodulePage extends StatefulWidget {
     required this.title,
   });
 
-  final int profileId, submoduleId;
+  final int profileId;
+  final int submoduleId;
   final String title;
 
   @override
@@ -39,23 +42,25 @@ class _SubmodulePageState extends State<SubmodulePage> {
 
   @override
   Widget build(BuildContext context) {
+    final activePid = context.watch<SelectedProfileCubit>().state;
+
     return Scaffold(
       appBar: AppBar(title: Text(widget.title)),
       body: FutureBuilder<SubmoduleDto>(
         future: _f,
         builder: (c, s) {
-          if (!s.hasData) {
-            return const Center(child: CircularProgressIndicator());
-          }
+          if (!s.hasData) return const Center(child: CircularProgressIndicator());
           final sub = s.data!;
           return ListView.separated(
             padding: const EdgeInsets.all(16),
+            itemCount: sub.lessons.length,
+            separatorBuilder: (_, __) => const Divider(height: 1),
             itemBuilder: (_, i) {
               final l = sub.lessons[i];
-
+              // dacă ai LessonLiteWithStatus, l.status există; altfel fallback: prima deblocată
               final isLocked = (l is LessonLiteWithStatus)
                   ? l.status == 'LOCKED'
-                  : i > 0; // fallback dacă încă folosești LessonLiteDto simplu
+                  : i > 0;
 
               return ListTile(
                 leading: Icon(isLocked ? Icons.lock_outline : Icons.play_circle_fill),
@@ -70,32 +75,22 @@ class _SubmodulePageState extends State<SubmodulePage> {
                     return;
                   }
 
+                  // Folosește profile-ul ACTIV din cubit (nu hardcodat)
+                  final pid = activePid ?? widget.profileId;
                   final changed = await Navigator.of(context).push<bool>(
                     MaterialPageRoute(
                       builder: (_) => LessonPlayerPage(
-                        profileId: widget.profileId,
+                        profileId: pid,
                         lessonId: l.id,
                         title: l.title,
                       ),
                     ),
                   );
 
-                  // dacă player-ul a avansat progresul, refacem lista
-                  if (changed == true && mounted) {
-                    _refresh();
-                  }
-
-                  if (l.status == 'LOCKED') {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Deblochează întâi lecția anterioară.')),
-                    );
-                    return;
-                  }
+                  if (changed == true && mounted) _refresh();
                 },
               );
             },
-            separatorBuilder: (_, __) => const Divider(height: 1),
-            itemCount: sub.lessons.length,
           );
         },
       ),

@@ -25,6 +25,16 @@ class _ModulesPageState extends State<ModulesPage> {
     _f = repo.modules(widget.profileId);
   }
 
+  @override
+  void didUpdateWidget(ModulesPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.profileId != widget.profileId) {
+      setState(() {
+        _f = repo.modules(widget.profileId);
+      });
+    }
+  }
+
   Future<void> _openModule(ModuleDto m) async {
     // 1) ia detaliile modulului (lista de submodule)
     late final ModuleDetailsDto md;

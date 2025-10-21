@@ -2,9 +2,10 @@
 import 'package:flutter/material.dart';
 import 'package:get_it/get_it.dart';
 import '../../../core/network/dio_client.dart';
-import '../../profiles/data/profiles_repository.dart';
+import '../../../core/state/active_profile.dart';
 import '../../profiles/models/profile_model.dart';
 import '../../profiles/presentation/profile_details_page.dart';
+import '../../profiles/profile_repository.dart';
 
 class ProfilesTab extends StatefulWidget {
   const ProfilesTab({super.key});
@@ -20,11 +21,11 @@ class _ProfilesTabState extends State<ProfilesTab> {
   @override
   void initState() {
     super.initState();
-    _f = repo.listProfiles();
+    _f = repo.list();
   }
 
   Future<void> _refresh() async {
-    setState(() { _f = repo.listProfiles(); });
+    setState(() { _f = repo.list(); });
     await _f;
   }
 
@@ -58,7 +59,7 @@ class _ProfilesTabState extends State<ProfilesTab> {
                 onPressed: () async {
                   final name = nameCtrl.text.trim();
                   if (name.isEmpty) return;
-                  final created = await repo.createProfile(name: name, avatarUri: avatarCtrl.text.trim().isEmpty ? null : avatarCtrl.text.trim());
+                  final created = await repo.create(name: name, avatarUri: avatarCtrl.text.trim().isEmpty ? null : avatarCtrl.text.trim());
                   if (!mounted) return;
                   Navigator.pop(ctx);
                   ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Profil creat')));
@@ -81,45 +82,50 @@ class _ProfilesTabState extends State<ProfilesTab> {
     return SafeArea(
       child: Scaffold(
         appBar: AppBar(title: const Text('Profile')),
-        body: FutureBuilder<List<ProfileCardDto>>(
-          future: _f,
-          builder: (c, s) {
-            if (s.connectionState != ConnectionState.done) {
-              return const Center(child: CircularProgressIndicator());
-            }
-            final items = s.data ?? [];
-            if (items.isEmpty) {
-              return Center(
-                child: Column(mainAxisSize: MainAxisSize.min, children: [
-                  Icon(Icons.group, size: 56, color: cs.outline),
-                  const SizedBox(height: 12),
-                  Text('Nu ai încă profile.', style: Theme.of(context).textTheme.titleLarge),
-                  const SizedBox(height: 6),
-                  Text('Adaugă un profil nou folosind butonul + de mai jos.',
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: cs.onSurface.withOpacity(.7))),
-                ]),
-              );
-            }
-
-            return RefreshIndicator(
-              onRefresh: _refresh,
-              child: GridView.builder(
-                padding: const EdgeInsets.all(16),
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2, mainAxisSpacing: 12, crossAxisSpacing: 12, childAspectRatio: 0.92
-                ),
-                itemCount: items.length,
-                itemBuilder: (_, i) {
-                  final p = items[i];
-                  return _ProfileCard(
-                    p: p,
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => ProfileDetailsPage(profile: p)),
-                    ),
+        body: ListenableBuilder(
+          listenable: GetIt.I<ActiveProfileService>(),
+          builder: (context, child) {
+            return FutureBuilder<List<ProfileCardDto>>(
+              future: _f,
+              builder: (c, s) {
+                if (s.connectionState != ConnectionState.done) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                final items = s.data ?? [];
+                if (items.isEmpty) {
+                  return Center(
+                    child: Column(mainAxisSize: MainAxisSize.min, children: [
+                      Icon(Icons.group, size: 56, color: cs.outline),
+                      const SizedBox(height: 12),
+                      Text('Nu ai încă profile.', style: Theme.of(context).textTheme.titleLarge),
+                      const SizedBox(height: 6),
+                      Text('Adaugă un profil nou folosind butonul + de mai jos.',
+                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: cs.onSurface.withOpacity(.7))),
+                    ]),
                   );
-                },
-              ),
+                }
+
+                return RefreshIndicator(
+                  onRefresh: _refresh,
+                  child: GridView.builder(
+                    padding: const EdgeInsets.all(16),
+                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 2, mainAxisSpacing: 12, crossAxisSpacing: 12, childAspectRatio: 0.92
+                    ),
+                    itemCount: items.length,
+                    itemBuilder: (_, i) {
+                      final p = items[i];
+                      return _ProfileCard(
+                        p: p,
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => ProfileDetailsPage(profile: p)),
+                        ),
+                      );
+                    },
+                  ),
+                );
+              },
             );
           },
         ),
@@ -141,27 +147,31 @@ class _ProfileCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final activeProfileId = GetIt.I<ActiveProfileService>().id;
+    final isActive = p.id == activeProfileId;
 
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(20),
-      child: Ink(
-        decoration: BoxDecoration(
-            color: cs.surface,
-            borderRadius: BorderRadius.circular(20),
-            boxShadow: [BoxShadow(color: cs.shadow.withOpacity(.04), blurRadius: 8, offset: const Offset(0,4))]
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Align(
-                alignment: Alignment.topRight,
-                child: p.premium
-                    ? Icon(Icons.star_rounded, color: cs.primary, size: 22)
-                    : const SizedBox(height: 22, width: 22),
-              ),
+      child: Stack(
+        children: [
+          Ink(
+            decoration: BoxDecoration(
+                color: cs.surface,
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [BoxShadow(color: cs.shadow.withOpacity(.04), blurRadius: 8, offset: const Offset(0,4))]
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Align(
+                    alignment: Alignment.topRight,
+                    child: p.premium
+                        ? Icon(Icons.star_rounded, color: cs.primary, size: 22)
+                        : const SizedBox(height: 22, width: 22),
+                  ),
               Center(
                 child: CircleAvatar(
                   radius: 32,
@@ -187,9 +197,31 @@ class _ProfileCard extends StatelessWidget {
               Text('${p.progressPercent}% complet',
                   textAlign: TextAlign.center,
                   style: Theme.of(context).textTheme.labelMedium?.copyWith(color: cs.onSurface.withOpacity(.7))),
-            ],
+                ],
+              ),
+            ),
           ),
-        ),
+          if (isActive)
+            Positioned(
+              top: 8,
+              right: 8,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: cs.primary,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.check, size: 14, color: Colors.white),
+                    const SizedBox(width: 4),
+                    const Text('Activ', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 12)),
+                  ],
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }

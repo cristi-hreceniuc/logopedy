@@ -1,7 +1,10 @@
 import 'package:bloc/bloc.dart';
 import 'package:dio/dio.dart';
 import 'package:equatable/equatable.dart';
+import 'package:get_it/get_it.dart';
 
+import '../../../../../core/network/dio_client.dart';
+import '../../../../../core/storage/secure_storage.dart';
 import '../../domain/auth_repository.dart';
 import '../../../data/models/login_request.dart';
 import '../../../data/models/signup_request.dart';
@@ -16,6 +19,8 @@ class AuthCubit extends Cubit<AuthState> {
     emit(const AuthState.loading());
     final ok = await _repo.isSessionValid();
     emit(ok ? const AuthState.authenticated() : const AuthState.unauthenticated());
+    final pid = await GetIt.I<SecureStore>().readActiveProfileId();
+    GetIt.I<DioClient>().setActiveProfile(pid);
   }
 
   Future<void> login(String email, String password) async {

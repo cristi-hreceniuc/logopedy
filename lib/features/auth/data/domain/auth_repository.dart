@@ -1,5 +1,6 @@
 // lib/features/auth/data/domain/auth_repository.dart
 import 'package:dio/dio.dart';
+import 'package:logopedy/features/auth/data/models/user_dto.dart';
 import '../../../../core/storage/secure_storage.dart';
 import '../auth_api.dart';
 import '../models/login_request.dart';
@@ -7,6 +8,7 @@ import '../models/signup_request.dart';
 
 class AuthRepository {
   AuthRepository(this._api, this._store);
+
   final AuthApi _api;
   final SecureStore _store;
 
@@ -38,8 +40,23 @@ class AuthRepository {
   Future<void> logout() async => _store.clear();
 
   // compatibile cu flow-ul tău existent:
-  Future<void> signup(SignupRequest req) => Future.error(UnsupportedError('Implement signup on server'));
-  Future<void> forgot1(String email) => Future.error(UnsupportedError('Implement forgot1 on server'));
-  Future<void> resetPassword({required String email, required String token, required String password, required String confirmNewPassword}) =>
-      Future.error(UnsupportedError('Implement reset on server'));
+  Future<UserDto> signup(SignupRequest req) => _api.signup(req);
+
+  Future<void> forgot1(String email) async {
+    await _api.forgot1(email: email);
+  }
+
+  Future<void> resetPassword({
+    required String email,
+    required String token,
+    required String password,
+    required String confirmNewPassword,
+  }) async {
+    _api.resetPassword(
+      email: email,
+      token: token,
+      password: password,
+      confirmNewPassword: confirmNewPassword,
+    );
+  }
 }

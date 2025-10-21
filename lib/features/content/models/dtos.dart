@@ -195,6 +195,7 @@ class ProgressDto {
 
 class AdvanceResp {
   final int moduleId, submoduleId, lessonId, screenIndex;
+  final int? nextModuleId, nextSubmoduleId, nextLessonId;
   final bool endOfLesson, endOfSubmodule, endOfModule;
 
   AdvanceResp({
@@ -202,6 +203,9 @@ class AdvanceResp {
     required this.submoduleId,
     required this.lessonId,
     required this.screenIndex,
+    this.nextModuleId,
+    this.nextSubmoduleId,
+    this.nextLessonId,
     required this.endOfLesson,
     required this.endOfSubmodule,
     required this.endOfModule,
@@ -215,6 +219,9 @@ class AdvanceResp {
     submoduleId: j['next']?['submoduleId'] ?? j['nextSubmoduleId'] ?? 0,
     lessonId: j['next']?['lessonId'] ?? j['nextLessonId'] ?? 0,
     screenIndex: j['next']?['screenIndex'] ?? 0,
+    nextModuleId: j['next']?['moduleId'] ?? j['nextModuleId'],
+    nextSubmoduleId: j['next']?['submoduleId'] ?? j['nextSubmoduleId'],
+    nextLessonId: j['next']?['lessonId'] ?? j['nextLessonId'],
     endOfLesson: j['next']?['endOfLesson'] ?? false,
     endOfSubmodule: j['next']?['endOfSubmodule'] ?? false,
     endOfModule: j['next']?['endOfModule'] ?? false,

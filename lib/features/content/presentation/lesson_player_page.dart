@@ -24,6 +24,7 @@ class LessonPlayerPage extends StatefulWidget {
   State<LessonPlayerPage> createState() => _LessonPlayerPageState();
 }
 
+// ——— Cards comune ———
 class _TitleCard extends StatelessWidget {
   const _TitleCard(this.title, {super.key});
 
@@ -69,8 +70,45 @@ class _BodyCard extends StatelessWidget {
   }
 }
 
+// buton consistent jos
+Widget _primaryBottomButton(
+  BuildContext context,
+  String label,
+  VoidCallback onTap,
+) {
+  return FilledButton(
+    onPressed: onTap,
+    style: FilledButton.styleFrom(
+      minimumSize: const Size.fromHeight(56),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+    ),
+    child: Text(
+      label,
+      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+    ),
+  );
+}
+
+// helpers simple (dacă nu le ai deja în fișier)
 Widget _gap([double h = 12]) => SizedBox(height: h);
 
+String _s(Map? m, String k, [String fb = '']) {
+  final v = m?[k];
+  return v is String ? v : fb;
+}
+
+List _l(Map? m, String k) {
+  final v = m?[k];
+  return v is List ? v : const [];
+}
+
+List<String> _sxList(Map m, List<String> keys) {
+  for (final k in keys) {
+    final v = m[k];
+    if (v is List && v.isNotEmpty) return v.map((e) => '$e').toList();
+  }
+  return const [];
+}
 
 class _LessonPlayerPageState extends State<LessonPlayerPage> {
   late final ContentRepository _repo = ContentRepository(GetIt.I<DioClient>());
@@ -253,22 +291,186 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
     await _player.play(AssetSource(path), volume: 1.0);
   }
 
+  /// Check if a lesson exists by trying to load it
+  Future<bool> _lessonExists(int lessonId) async {
+    try {
+      await _repo.getLesson(widget.profileId, lessonId);
+      return true;
+    } catch (e) {
+      debugPrint('🎉 Lesson $lessonId does not exist: $e');
+      return false;
+    }
+  }
+
+  Future<void> _showCompletionDialog(bool endOfLesson, bool endOfSubmodule, bool endOfModule) async {
+    debugPrint('🎉 _showCompletionDialog() called - endOfLesson: $endOfLesson, endOfSubmodule: $endOfSubmodule, endOfModule: $endOfModule');
+    
+    // Determine which image and message to show
+    String imagePath;
+    String message;
+    
+    if (endOfModule) {
+      imagePath = 'assets/images/finish_module.png';
+      message = 'Excelent! Ai terminat modulul!';
+    } else if (endOfSubmodule) {
+      imagePath = 'assets/images/finish_submodule copy.png';
+      message = 'Felicitări! Ai terminat submodulul!';
+    } else if (endOfLesson) {
+      imagePath = 'assets/images/finish_lesson.png';
+      message = 'Bravo! Ai terminat lecția!';
+    } else {
+      // Fallback - show lesson completion
+      imagePath = 'assets/images/finish_lesson.png';
+      message = 'Bravo! Ai terminat lecția!';
+    }
+    
+    // Track if user tapped to close
+    bool userTapped = false;
+    
+    await showDialog(
+      context: context,
+      barrierDismissible: true, // Allow dismissing by tapping outside
+      builder: (_) {
+        debugPrint('🎉 Building completion dialog with image: $imagePath');
+        return Dialog(
+          elevation: 8,
+          backgroundColor: Colors.transparent,
+          insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+          child: GestureDetector(
+            onTap: () {
+              debugPrint('🎉 User tapped on dialog to close completion dialog');
+              userTapped = true;
+              Navigator.of(context).pop();
+            },
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: Colors.grey.shade300, width: 2),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.1),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Completion image based on level
+                  Image.asset(
+                    imagePath,
+                    width: 220,
+                    fit: BoxFit.contain,
+                    errorBuilder: (context, error, stackTrace) {
+                      debugPrint('🎉 Error loading $imagePath: $error');
+                      return Container(
+                        width: 220,
+                        height: 220,
+                        color: Colors.red.withOpacity(0.3),
+                        child: const Center(
+                          child: Text('Image Error', style: TextStyle(color: Colors.white)),
+                        ),
+                      );
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    message,
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: Colors.black87,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    'Apasă oriunde pentru a continua',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Colors.grey.shade600,
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+
+    // If user didn't tap, wait for 4 seconds total from when dialog was shown
+    if (!userTapped) {
+      debugPrint('🎉 User did not tap, waiting for auto-close...');
+      await Future.delayed(const Duration(seconds: 4));
+      if (Navigator.of(context).canPop()) {
+        debugPrint('🎉 Auto-closing completion dialog after 4 seconds');
+        Navigator.of(context).pop();
+      }
+    } else {
+      debugPrint('🎉 User tapped, dialog already closed');
+    }
+    
+    // Always consider any dialog dismissal as user interaction
+    userTapped = true;
+  }
+
+
   /// Lecțiile actuale au 1 singur ecran -> marcăm DONE și ieșim
   Future<void> _finishLesson() async {
     try {
-      await _repo.advance(
+      final resp = await _repo.advance(
         widget.profileId,
         lessonId: widget.lessonId,
         screenIndex: 0,
         done: true,
       );
       if (!mounted) return;
-      Navigator.of(context).maybePop(true);
+
+      // Debug: Log the response to see what flags are set
+      debugPrint('🎉 API Response: endOfLesson=${resp.endOfLesson}, endOfSubmodule=${resp.endOfSubmodule}, endOfModule=${resp.endOfModule}');
+      debugPrint('🎉 Current lesson data: moduleId=${resp.moduleId}, submoduleId=${resp.submoduleId}, lessonId=${resp.lessonId}, screenIndex=${resp.screenIndex}');
+      debugPrint('🎉 Next lesson data: nextModuleId=${resp.nextModuleId}, nextSubmoduleId=${resp.nextSubmoduleId}, nextLessonId=${resp.nextLessonId}');
+      
+      // arată GIF la final de lecție / submodul / modul (alege condiția dorită)
+      final shouldCelebrate = resp.endOfLesson || resp.endOfSubmodule || resp.endOfModule;
+      debugPrint('🎉 Should celebrate: $shouldCelebrate');
+      
+      // Always show completion dialog and navigate to next lesson
+      debugPrint('🎉 Showing completion dialog!');
+      await _showCompletionDialog(resp.endOfLesson, resp.endOfSubmodule, resp.endOfModule);
+
+      // Navigate to next lesson if available, otherwise go back to submodule
+      if (mounted) {
+        if (resp.nextLessonId != null && resp.nextLessonId! > 0) {
+          debugPrint('🎉 Attempting to navigate to next lesson: ${resp.nextLessonId}');
+          try {
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(
+                builder: (_) => LessonPlayerPage(
+                  profileId: widget.profileId,
+                  lessonId: resp.nextLessonId!,
+                  title: 'Lecția ${resp.nextLessonId}', // You might want to get the actual title
+                ),
+              ),
+            );
+            debugPrint('🎉 Successfully navigated to next lesson: ${resp.nextLessonId}');
+          } catch (e) {
+            debugPrint('🎉 Error navigating to next lesson ${resp.nextLessonId}: $e');
+            debugPrint('🎉 Going back to submodule due to navigation error');
+            Navigator.of(context).maybePop(true);
+          }
+        } else {
+          debugPrint('🎉 No next lesson data from API, going back to submodule');
+          // No fallback navigation - just go back to submodule
+          Navigator.of(context).maybePop(true);
+        }
+      }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(e.toString())));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
     }
   }
 

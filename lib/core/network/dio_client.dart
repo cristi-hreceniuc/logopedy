@@ -1,3 +1,4 @@
+// lib/core/network/dio_client.dart
 import 'package:dio/dio.dart';
 
 import '../config/app_config.dart';
@@ -6,7 +7,8 @@ import '../auth/token_manager.dart';
 
 /// Dio configurat cu:
 /// - Authorization: Bearer <token>
-/// - refresh automat pe 401 + retry (o singură dată)
+/// - X-Profile-Id: <id profil> (dacă există)
+/// - refresh automat pe 401 + retry
 class DioClient {
   DioClient(this._store)
       : dio = Dio(
@@ -19,18 +21,31 @@ class DioClient {
   ) {
     _tm = TokenManager(dio, _store);
 
+    // bootstrap profil salvat (dacă există)
+    _bootstrapProfileHeader();
+
     dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) async {
-          // nu atașa Bearer pentru rutele publice
+          // rute publice: fără bearer / profil
           if (_isPublic(options.path)) {
             return handler.next(options);
           }
 
+          // Bearer
           final token = await _tm.validAccessToken;
           if (token != null) {
             options.headers['Authorization'] = 'Bearer $token';
           }
+
+          // Profilul activ (dacă nu a fost setat manual, citim din storage)
+          final pid = _activeProfileId ?? await _store.readActiveProfileId();
+          if (pid != null) {
+            options.headers['X-Profile-Id'] = pid.toString();
+          } else {
+            options.headers.remove('X-Profile-Id');
+          }
+
           handler.next(options);
         },
         onError: (err, handler) async {
@@ -41,18 +56,24 @@ class DioClient {
               !alreadyRetried &&
               !_isRefresh(err.requestOptions.path) &&
               !_isPublic(err.requestOptions.path)) {
-            // încearcă refresh
             final ok = await _tm.refresh();
             if (ok) {
-              // marchează pentru a evita bucle
               err.requestOptions.extra['retried'] = true;
 
-              // reatașează Bearer (poate s-a schimbat)
+              // reatașează Bearer
               final token = await _store.readToken();
               if (token != null) {
                 err.requestOptions.headers['Authorization'] = 'Bearer $token';
               } else {
                 err.requestOptions.headers.remove('Authorization');
+              }
+
+              // reatașează profilul curent
+              final pid = _activeProfileId ?? await _store.readActiveProfileId();
+              if (pid != null) {
+                err.requestOptions.headers['X-Profile-Id'] = pid.toString();
+              } else {
+                err.requestOptions.headers.remove('X-Profile-Id');
               }
 
               final req = await _retry(err.requestOptions);
@@ -69,6 +90,26 @@ class DioClient {
   final Dio dio;
   final SecureStore _store;
   late final TokenManager _tm;
+
+  int? _activeProfileId; // <-- id-ul profilului curent în memorie
+
+  /// Apelează asta imediat după ce user-ul schimbă profilul.
+  void setActiveProfile(int? id) {
+    _activeProfileId = id;
+    if (id == null) {
+      dio.options.headers.remove('X-Profile-Id');
+    } else {
+      dio.options.headers['X-Profile-Id'] = id.toString();
+    }
+  }
+
+  Future<void> _bootstrapProfileHeader() async {
+    final pid = await _store.readActiveProfileId();
+    _activeProfileId = pid;
+    if (pid != null) {
+      dio.options.headers['X-Profile-Id'] = pid.toString();
+    }
+  }
 
   bool _isPublic(String path) {
     return path.startsWith(AppConfig.loginPath) ||
@@ -91,7 +132,6 @@ class DioClient {
       sendTimeout: o.sendTimeout,
       validateStatus: o.validateStatus,
     );
-
     return dio.request(
       o.path,
       data: o.data,

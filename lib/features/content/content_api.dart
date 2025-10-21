@@ -22,7 +22,9 @@ class ContentApi {
   }
 
   Future<Map<String,dynamic>> getLesson(int profileId, int lessonId) async {
+    final url = AppConfig.lessonPath(profileId, lessonId);
     final r = await _dio.get(AppConfig.lessonPath(profileId, lessonId));
+    print('[GET] $url');
     return r.data;
   }
 
@@ -35,6 +37,9 @@ class ContentApi {
     final r = await _dio.post(AppConfig.advancePath(profileId), data: {
       'lessonId': lessonId, 'screenIndex': screenIndex, 'done': done
     });
+    final url = AppConfig.advancePath(profileId);
+    print('[POST] $url body={lessonId:$lessonId, screenIndex:$screenIndex, done:$done}');
+    print('profileId: $profileId');
     return r.data;
   }
 }

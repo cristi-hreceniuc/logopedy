@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:get_it/get_it.dart';
+import 'package:logopedy/features/profiles/presentation/profile_picker_sheet.dart';
+import 'core/state/active_profile.dart';
 import 'core/theme/app_theme.dart';
 import 'features/home/home_shell.dart';
 import 'features/theme/theme_cubit.dart';
 import 'features/auth/data/presentation/cubit/auth_cubit.dart';
 import 'features/auth/data/presentation/pages/login_page.dart';
-import 'features/home/home_page.dart';
 
 class LogopedyApp extends StatelessWidget {
   const LogopedyApp({super.key});
@@ -23,13 +25,24 @@ class LogopedyApp extends StatelessWidget {
           home: BlocBuilder<AuthCubit, AuthState>(
             builder: (ctx, st) {
               if (st.loading) {
-                return const Scaffold(
-                  body: Center(child: CircularProgressIndicator()),
-                );
+                return const Scaffold(body: Center(child: CircularProgressIndicator()));
               }
-              return st.authenticated
-                  ? const HomeShell(profileId: 1)
-                  : const LoginPage();
+              if (!st.authenticated) {
+                return const LoginPage();
+              }
+
+              return ListenableBuilder(
+                listenable: GetIt.I<ActiveProfileService>(),
+                builder: (context, child) {
+                  final active = GetIt.I<ActiveProfileService>().id;
+
+                  if (active == null) {
+                    return const ProfilePickerSheet();
+                  }
+
+                  return HomeShell(profileId: active);
+                },
+              );
             },
           ),
         );

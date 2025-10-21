@@ -1,5 +1,5 @@
 class AppConfig {
-  static const String baseUrl = 'http://51.91.56.46:8080';
+  static const String baseUrl = 'https://logobeapp.actiunepentrusanatate.ro';
 
   // auth (le ai deja)
   static const String loginPath = '/api/v1/auth/login';
