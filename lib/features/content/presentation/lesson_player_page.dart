@@ -1,6 +1,7 @@
 // lib/features/content/presentation/lesson_player_page.dart
 import 'dart:async';
 import 'package:audioplayers/audioplayers.dart';
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:get_it/get_it.dart';
 
@@ -531,6 +532,28 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
       }
     } catch (e) {
       if (!mounted) return;
+      
+      // Handle server errors (500) when trying to advance past final lesson
+      if (e is DioException) {
+        final statusCode = e.response?.statusCode;
+        if (statusCode != null && statusCode >= 500 && statusCode < 600) {
+          // Server error - likely no next lesson available
+          debugPrint('🎉 Server error when advancing (status $statusCode) - treating as end of lessons');
+          
+          // Show completion dialog for finishing the lesson
+          if (!skipCompletionDialog) {
+            await _showCompletionDialog(true, false, false);
+          }
+          
+          // Navigate back to submodule
+          if (mounted) {
+            Navigator.of(context).maybePop(true);
+          }
+          return;
+        }
+      }
+      
+      // For other errors, show error message
       SnackBarUtils.showError(context, e.toString());
     }
   }

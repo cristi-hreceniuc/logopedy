@@ -47,3 +47,26 @@ ScreenType screenTypeFrom(dynamic v) {
     default: return ScreenType.unknown;
   }
 }
+
+extension LessonTypeExtension on LessonType {
+  String get romanianDescription {
+    switch (this) {
+      case LessonType.readText:
+        return 'Citește textul afișat';
+      case LessonType.readTextWithSub:
+        return 'Citește textul și urmează instrucțiunile';
+      case LessonType.imageWordSyllables:
+        return 'Asociază imaginea cu cuvântul și silabele';
+      case LessonType.readParagraph:
+        return 'Citește propozițiile cu atenție';
+      case LessonType.missingLetterPairs:
+        return 'Completează litera lipsă din cuvânt';
+      case LessonType.imageMissingLetter:
+        return 'Completează litera lipsă după imagine';
+      case LessonType.imageRevealWord:
+        return 'Dezvăluie cuvântul din imagine';
+      case LessonType.unknown:
+        return 'Tip de lecție necunoscut';
+    }
+  }
+}

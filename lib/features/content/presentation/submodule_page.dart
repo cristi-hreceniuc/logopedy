@@ -7,6 +7,7 @@ import '../../../core/utils/snackbar_utils.dart';
 import '../../profiles/selected_profile_cubit.dart';
 import '../content_repository.dart';
 import '../models/dtos.dart';
+import '../models/enums.dart';
 import 'lesson_player_page.dart';
 
 class SubmodulePage extends StatefulWidget {
@@ -260,7 +261,7 @@ class _SubmodulePageState extends State<SubmodulePage> {
                                         ),
                                         const SizedBox(height: 4),
                                         Text(
-                                          l.lessonType.name,
+                                          l.lessonType.romanianDescription,
                                           style: TextStyle(
                                             color: Colors.grey[600],
                                             fontSize: 13,
