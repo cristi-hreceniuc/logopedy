@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:get_it/get_it.dart';
 import '../../../core/network/dio_client.dart';
 import '../../../core/state/active_profile.dart';
+import '../../../core/utils/snackbar_utils.dart';
 import '../../profiles/models/profile_model.dart';
 import '../../profiles/presentation/profile_details_page.dart';
 import '../../profiles/profile_repository.dart';
@@ -36,40 +37,111 @@ class _ProfilesTabState extends State<ProfilesTab> {
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
+      backgroundColor: Colors.transparent,
       builder: (ctx) {
-        return Padding(
-          padding: EdgeInsets.only(
-            left:16,right:16,
-            top:16,
-            bottom: MediaQuery.of(ctx).viewInsets.bottom + 16,
+        return Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
           ),
-          child: Column(mainAxisSize: MainAxisSize.min, children: [
-            Text('Profil nou', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
-            const SizedBox(height: 12),
-            TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Nume profil')),
-            const SizedBox(height: 8),
-            TextField(controller: avatarCtrl, decoration: const InputDecoration(labelText: 'Avatar URL (opțional)')),
+          child: Padding(
+            padding: EdgeInsets.only(
+              left: 24,
+              right: 24,
+              top: 24,
+              bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Handle bar
+                Center(
+                  child: Container(
+                    width: 42,
+                    height: 4,
+                    margin: const EdgeInsets.only(bottom: 20),
+                    decoration: BoxDecoration(
+                      color: Colors.grey[300],
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                  ),
+                ),
+                Text(
+                  'Profil nou',
+                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    color: const Color(0xFF17406B),
+                  ),
+                ),
+                const SizedBox(height: 24),
+                TextField(
+                  controller: nameCtrl,
+                  decoration: InputDecoration(
+                    labelText: 'Nume profil',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                  ),
+                ),
             const SizedBox(height: 16),
-            SizedBox(
+                TextField(
+                  controller: avatarCtrl,
+                  decoration: InputDecoration(
+                    labelText: 'Avatar URL (opțional)',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 24),
+                Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFFEA2233).withOpacity(0.3),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: SizedBox(
               width: double.infinity,
               child: FilledButton(
                 onPressed: () async {
                   final name = nameCtrl.text.trim();
                   if (name.isEmpty) return;
-                  final created = await repo.create(name: name, avatarUri: avatarCtrl.text.trim().isEmpty ? null : avatarCtrl.text.trim());
+                        await repo.create(
+                          name: name,
+                          avatarUri: avatarCtrl.text.trim().isEmpty
+                              ? null
+                              : avatarCtrl.text.trim(),
+                        );
                   if (!mounted) return;
                   Navigator.pop(ctx);
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Profil creat')));
+                        SnackBarUtils.showSuccess(context, 'Profil creat');
                   await _refresh();
                 },
+                      style: FilledButton.styleFrom(
+                        backgroundColor: const Color(0xFFEA2233),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        textStyle: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
                 child: const Text('Creează'),
               ),
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 8),
-          ]),
+          ),
         );
       },
     );
@@ -77,11 +149,22 @@ class _ProfilesTabState extends State<ProfilesTab> {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-
     return SafeArea(
+      child: Container(
+        color: const Color(0xFFF3F5F8),
       child: Scaffold(
-        appBar: AppBar(title: const Text('Profile')),
+          backgroundColor: Colors.transparent,
+          appBar: AppBar(
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            title: Text(
+              'Profile',
+              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                fontWeight: FontWeight.w800,
+                color: const Color(0xFF17406B),
+              ),
+            ),
+          ),
         body: ListenableBuilder(
           listenable: GetIt.I<ActiveProfileService>(),
           builder: (context, child) {
@@ -89,28 +172,77 @@ class _ProfilesTabState extends State<ProfilesTab> {
               future: _f,
               builder: (c, s) {
                 if (s.connectionState != ConnectionState.done) {
-                  return const Center(child: CircularProgressIndicator());
+                    return const Center(
+                      child: CircularProgressIndicator(
+                        valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFEA2233)),
+                      ),
+                    );
                 }
                 final items = s.data ?? [];
                 if (items.isEmpty) {
                   return Center(
-                    child: Column(mainAxisSize: MainAxisSize.min, children: [
-                      Icon(Icons.group, size: 56, color: cs.outline),
-                      const SizedBox(height: 12),
-                      Text('Nu ai încă profile.', style: Theme.of(context).textTheme.titleLarge),
-                      const SizedBox(height: 6),
-                      Text('Adaugă un profil nou folosind butonul + de mai jos.',
-                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: cs.onSurface.withOpacity(.7))),
-                    ]),
+                      child: Container(
+                        margin: const EdgeInsets.all(24),
+                        padding: const EdgeInsets.all(32),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(24),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.08),
+                              blurRadius: 16,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF2D72D2).withOpacity(0.1),
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(
+                                Icons.group_outlined,
+                                size: 56,
+                                color: const Color(0xFF2D72D2),
+                              ),
+                            ),
+                            const SizedBox(height: 20),
+                            Text(
+                              'Nu ai încă profile',
+                              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                                fontWeight: FontWeight.w700,
+                                color: const Color(0xFF17406B),
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Adaugă un profil nou folosind butonul de mai jos.',
+                              textAlign: TextAlign.center,
+                              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                color: Colors.grey[600],
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                   );
                 }
 
                 return RefreshIndicator(
                   onRefresh: _refresh,
+                    color: const Color(0xFFEA2233),
                   child: GridView.builder(
-                    padding: const EdgeInsets.all(16),
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
                     gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 2, mainAxisSpacing: 12, crossAxisSpacing: 12, childAspectRatio: 0.92
+                      crossAxisCount: 2,
+                      mainAxisSpacing: 16,
+                      crossAxisSpacing: 16,
+                      childAspectRatio: 0.88,
                     ),
                     itemCount: items.length,
                     itemBuilder: (_, i) {
@@ -129,10 +261,34 @@ class _ProfilesTabState extends State<ProfilesTab> {
             );
           },
         ),
-        floatingActionButton: FloatingActionButton.extended(
+          floatingActionButton: Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFFEA2233).withOpacity(0.3),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: FloatingActionButton.extended(
           onPressed: _showCreateSheet,
-          icon: const Icon(Icons.add),
-          label: const Text('Profil nou'),
+              backgroundColor: const Color(0xFFEA2233),
+              foregroundColor: Colors.white,
+              icon: const Icon(Icons.add_rounded),
+              label: const Text(
+                'Profil nou',
+                style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 15,
+                ),
+              ),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+            ),
+          ),
         ),
       ),
     );
@@ -146,83 +302,263 @@ class _ProfileCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
     final activeProfileId = GetIt.I<ActiveProfileService>().id;
     final isActive = p.id == activeProfileId;
 
-    return InkWell(
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(24),
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.08),
+                blurRadius: 16,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
       child: Stack(
         children: [
-          Ink(
-            decoration: BoxDecoration(
-                color: cs.surface,
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: [BoxShadow(color: cs.shadow.withOpacity(.04), blurRadius: 8, offset: const Offset(0,4))]
-            ),
-            child: Padding(
+              Padding(
               padding: const EdgeInsets.all(12),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
+                  mainAxisSize: MainAxisSize.min,
                 children: [
+                    // Premium badge
                   Align(
                     alignment: Alignment.topRight,
                     child: p.premium
-                        ? Icon(Icons.star_rounded, color: cs.primary, size: 22)
-                        : const SizedBox(height: 22, width: 22),
-                  ),
+                          ? Container(
+                              padding: const EdgeInsets.all(5),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFEA2233).withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Icon(
+                                Icons.star_rounded,
+                                color: const Color(0xFFEA2233),
+                                size: 18,
+                              ),
+                            )
+                          : const SizedBox(height: 28, width: 28),
+                    ),
+                    const SizedBox(height: 4),
+                    // Avatar
               Center(
-                child: CircleAvatar(
-                  radius: 32,
-                  backgroundColor: cs.primary.withOpacity(.1),
-                  backgroundImage: (p.avatarUri != null && p.avatarUri!.isNotEmpty)
-                      ? NetworkImage(p.avatarUri!)
-                      : null,
-                  child: (p.avatarUri == null || p.avatarUri!.isEmpty)
-                      ? Icon(Icons.person, color: cs.primary, size: 32)
-                      : null,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(p.name, textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
-              const Spacer(),
-              LinearProgressIndicator(
-                value: (p.totalLessons==0) ? 0 : (p.completedLessons / p.totalLessons),
-                borderRadius: BorderRadius.circular(10),
-                minHeight: 8,
-              ),
-              const SizedBox(height: 6),
-              Text('${p.progressPercent}% complet',
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.labelMedium?.copyWith(color: cs.onSurface.withOpacity(.7))),
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          Container(
+                            width: 60,
+                            height: 60,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              gradient: LinearGradient(
+                                colors: [
+                                  const Color(0xFFEA2233),
+                                  const Color(0xFF2D72D2),
+                                ],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: const Color(0xFFEA2233).withOpacity(0.3),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 3),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Container(
+                            width: 56,
+                            height: 56,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: Colors.white,
+                            ),
+                            child: ClipOval(
+                              child: (p.avatarUri != null &&
+                                      p.avatarUri!.isNotEmpty)
+                                  ? Image.network(
+                                      p.avatarUri!,
+                                      fit: BoxFit.cover,
+                                      errorBuilder: (_, __, ___) => Icon(
+                                        Icons.person_rounded,
+                                        color: const Color(0xFFEA2233),
+                                        size: 30,
+                                      ),
+                                    )
+                                  : Icon(
+                                      Icons.person_rounded,
+                                      color: const Color(0xFFEA2233),
+                                      size: 30,
+                                    ),
+                            ),
+                          ),
                 ],
               ),
             ),
-          ),
-          if (isActive)
-            Positioned(
-              top: 8,
-              right: 8,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: cs.primary,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Row(
+                    const SizedBox(height: 10),
+                    // Name
+                    Text(
+                      p.name,
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: const Color(0xFF17406B),
+                        fontSize: 13,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    // Additional info
+                    if (p.age != null || p.gender != null) ...[
+                      const SizedBox(height: 6),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.check, size: 14, color: Colors.white),
-                    const SizedBox(width: 4),
-                    const Text('Activ', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 12)),
+                          if (p.age != null) ...[
+                            Icon(Icons.cake_outlined, size: 10, color: Colors.grey[600]),
+                            const SizedBox(width: 3),
+                            Flexible(
+                              child: Text(
+                                '${p.age} ani',
+                                style: TextStyle(
+                                  color: Colors.grey[600],
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                          if (p.age != null && p.gender != null)
+                            Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 4),
+                              child: Container(
+                                width: 2,
+                                height: 2,
+                                decoration: BoxDecoration(
+                                  color: Colors.grey[400],
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                            ),
+                          if (p.gender != null) ...[
+                            Icon(Icons.person_outline, size: 10, color: Colors.grey[600]),
+                            const SizedBox(width: 3),
+                            Flexible(
+                              child: Text(
+                                _getGenderLabel(p.gender!),
+                                style: TextStyle(
+                                  color: Colors.grey[600],
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ],
+                    const Spacer(),
+                    const SizedBox(height: 10),
+                    // Progress
+                    LinearProgressIndicator(
+                      value: (p.totalLessons == 0)
+                          ? 0
+                          : (p.completedLessons / p.totalLessons),
+                      borderRadius: BorderRadius.circular(8),
+                      minHeight: 7,
+                      backgroundColor: const Color(0xFFEA2233).withOpacity(0.1),
+                      valueColor: const AlwaysStoppedAnimation<Color>(
+                        Color(0xFFEA2233),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '${p.progressPercent}% complet',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: Colors.grey[600],
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+              // Active badge
+              if (isActive)
+                Positioned(
+                  top: 6,
+                  right: 6,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFFEA2233), Color(0xFFD21828)],
+                      ),
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFFEA2233).withOpacity(0.4),
+                          blurRadius: 6,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.check_circle_rounded,
+                          size: 12,
+                          color: Colors.white,
+                        ),
+                        SizedBox(width: 3),
+                        Text(
+                          'Activ',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 11,
+                          ),
+                        ),
                   ],
                 ),
               ),
             ),
         ],
+          ),
+        ),
       ),
     );
   }
+}
+
+String _getGenderLabel(String gender) {
+  final lowerGender = gender.toLowerCase();
+  if (lowerGender == 'male' || lowerGender == 'm' || lowerGender == 'masculin') {
+    return 'M';
+  } else if (lowerGender == 'female' || lowerGender == 'f' || lowerGender == 'feminin') {
+    return 'F';
+  } else if (lowerGender == 'other' || lowerGender == 'o' || lowerGender == 'altul') {
+    return 'Altul';
+  }
+  return gender;
 }

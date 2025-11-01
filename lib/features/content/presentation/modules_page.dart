@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:get_it/get_it.dart';
 import '../../../core/network/dio_client.dart';
+import '../../../core/utils/snackbar_utils.dart';
 import '../content_repository.dart';
 import '../models/dtos.dart';
 import '../models/modules_details_dto.dart';
@@ -35,6 +36,39 @@ class _ModulesPageState extends State<ModulesPage> {
     }
   }
 
+  Future<double> _getModuleProgress(ModuleDto module) async {
+    try {
+      final details = await repo.moduleDetails(widget.profileId, module.id);
+      if (details.submodules.isEmpty) return 0.0;
+
+      int completedSubmodules = 0;
+      for (final sub in details.submodules) {
+        try {
+          final submoduleData = await repo.submodule(widget.profileId, sub.id);
+          final totalLessons = submoduleData.lessons.length;
+          if (totalLessons == 0) continue;
+          
+          final completedLessons = submoduleData.lessons.where((l) =>
+            l is LessonLiteWithStatus && l.status == 'DONE'
+          ).length;
+          
+          if (completedLessons == totalLessons) {
+            completedSubmodules++;
+          }
+        } catch (e) {
+          // Skip submodules that can't be loaded
+          continue;
+        }
+      }
+
+      return details.submodules.isNotEmpty
+          ? completedSubmodules / details.submodules.length
+          : 0.0;
+    } catch (e) {
+      return 0.0;
+    }
+  }
+
   Future<void> _openModule(ModuleDto m) async {
     // 1) ia detaliile modulului (lista de submodule)
     late final ModuleDetailsDto md;
@@ -42,9 +76,7 @@ class _ModulesPageState extends State<ModulesPage> {
       md = await repo.moduleDetails(widget.profileId, m.id);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Nu pot încărca submodulele: $e')),
-      );
+      SnackBarUtils.showError(context, 'Nu pot încărca submodulele: $e');
       return;
     }
 
@@ -52,73 +84,18 @@ class _ModulesPageState extends State<ModulesPage> {
 
     // 2) dacă nu are submodule, anunță
     if (md.submodules.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Modulul nu are submodule disponibile.')),
-      );
+      SnackBarUtils.showInfo(context, 'Modulul nu are submodule disponibile.');
       return;
     }
 
-    // 3) arată un bottom sheet cu lista de submodule
-    final chosen = await showModalBottomSheet<SubmoduleLite>(
-      context: context,
-      useSafeArea: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (ctx) {
-        return Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const SizedBox(height: 12),
-            Container(
-              width: 42, height: 5,
-              decoration: BoxDecoration(
-                color: Theme.of(ctx).colorScheme.outlineVariant,
-                borderRadius: BorderRadius.circular(20),
-              ),
-            ),
-            const SizedBox(height: 8),
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Text(m.title,
-                  style: Theme.of(ctx).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
-            ),
-            Flexible(
-              child: ListView.separated(
-                shrinkWrap: true,
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                itemCount: md.submodules.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 8),
-                itemBuilder: (_, i) {
-                  final s = md.submodules[i];
-                  return ListTile(
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                    tileColor: Theme.of(ctx).colorScheme.surface,
-                    title: Text(s.title, style: const TextStyle(fontWeight: FontWeight.w700)),
-                    subtitle: (s.introText == null || s.introText!.isEmpty)
-                        ? null
-                        : Text(s.introText!),
-                    trailing: const Icon(Icons.chevron_right),
-                    onTap: () => Navigator.pop(ctx, s),
-                  );
-                },
-              ),
-            ),
-          ],
-        );
-      },
-    );
-
-    if (!mounted || chosen == null) return;
-
-    // 4) navighează către SubmodulePage cu submoduleId corect
+    // 3) navighează către o pagină de selecție submodule
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => SubmodulePage(
+        builder: (_) => _SubmoduleSelectionPage(
           profileId: widget.profileId,
-          submoduleId: chosen.id,
-          title: chosen.title,
+          moduleTitle: m.title,
+          submodules: md.submodules,
         ),
       ),
     );
@@ -126,42 +103,307 @@ class _ModulesPageState extends State<ModulesPage> {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-
     return Scaffold(
-      appBar: AppBar(title: const Text('Module')),
-      body: FutureBuilder<List<ModuleDto>>(
-        future: _f,
-        builder: (c, s) {
-          if (!s.hasData) return const Center(child: CircularProgressIndicator());
-          final modules = s.data!;
-          if (modules.isEmpty) return const Center(child: Text('Nu sunt module'));
-
-          return ListView.separated(
-            padding: const EdgeInsets.all(16),
-            itemCount: modules.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 12),
-            itemBuilder: (_, i) {
-              final m = modules[i];
-              return InkWell(
-                onTap: () => _openModule(m),
-                borderRadius: BorderRadius.circular(16),
-                child: Ink(
-                  decoration: BoxDecoration(
-                    color: cs.surface,
-                    borderRadius: BorderRadius.circular(16),
+      backgroundColor: const Color(0xFFF3F5F8),
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        title: Text(
+          'Module',
+          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+            fontWeight: FontWeight.w800,
+            color: const Color(0xFF17406B),
+          ),
+        ),
+      ),
+      body: SafeArea(
+        top: true,
+        bottom: true,
+        child: FutureBuilder<List<ModuleDto>>(
+            future: _f,
+            builder: (c, s) {
+              if (!s.hasData) {
+                return const Center(
+                  child: CircularProgressIndicator(
+                    valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFEA2233)),
                   ),
-                  child: ListTile(
-                    title: Text(m.title, style: const TextStyle(fontWeight: FontWeight.w700)),
-                    subtitle: m.introText == null ? null : Text(m.introText!),
-                    trailing: const Icon(Icons.chevron_right),
+                );
+              }
+              final modules = s.data!;
+              if (modules.isEmpty) {
+                return Center(
+                  child: Container(
+                    margin: const EdgeInsets.all(24),
+                    padding: const EdgeInsets.all(32),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(24),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.08),
+                          blurRadius: 16,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.menu_book_outlined, size: 48, color: Colors.grey[400]),
+                        const SizedBox(height: 12),
+                        Text(
+                          'Nu există module',
+                          style: TextStyle(
+                            color: Colors.grey[600],
+                            fontSize: 16,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }
+
+              return ListView.separated(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                itemCount: modules.length,
+                separatorBuilder: (_, __) => const SizedBox(height: 16),
+                itemBuilder: (_, i) {
+                  final m = modules[i];
+                  return FutureBuilder<double>(
+                    future: _getModuleProgress(m),
+                    builder: (context, progressSnapshot) {
+                      final progress = progressSnapshot.data ?? 0.0;
+
+                      return Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          onTap: () => _openModule(m),
+                          borderRadius: BorderRadius.circular(24),
+                          child: Container(
+                            padding: const EdgeInsets.all(20),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(24),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.08),
+                                  blurRadius: 16,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ],
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.all(12),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFF2D72D2).withOpacity(0.1),
+                                        borderRadius: BorderRadius.circular(16),
+                                      ),
+                                      child: Icon(
+                                        Icons.menu_book_rounded,
+                                        size: 28,
+                                        color: const Color(0xFF2D72D2),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 16),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            m.title,
+                                            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                                              fontWeight: FontWeight.w700,
+                                              color: const Color(0xFF17406B),
+                                            ),
+                                          ),
+                                          if (m.introText != null && m.introText!.isNotEmpty) ...[
+                                            const SizedBox(height: 6),
+                                            Text(
+                                              m.introText!,
+                                              style: TextStyle(
+                                                color: Colors.grey[600],
+                                                fontSize: 14,
+                                                fontWeight: FontWeight.w500,
+                                              ),
+                                              maxLines: 2,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ],
+                                        ],
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Icon(
+                                      Icons.chevron_right_rounded,
+                                      color: const Color(0xFF2D72D2),
+                                      size: 24,
+                                    ),
+                                  ],
+                                ),
+                                if (progress > 0 || progressSnapshot.connectionState == ConnectionState.done) ...[
+                                  const SizedBox(height: 16),
+                                  LinearProgressIndicator(
+                                    value: progress,
+                                    borderRadius: BorderRadius.circular(8),
+                                    minHeight: 8,
+                                    backgroundColor: const Color(0xFF2D72D2).withOpacity(0.1),
+                                    valueColor: const AlwaysStoppedAnimation<Color>(
+                                      Color(0xFF2D72D2),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    '${(progress * 100).round()}% complet',
+                                    style: TextStyle(
+                                      color: Colors.grey[600],
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  );
+                },
+              );
+            },
+          ),
+        ),
+    );
+  }
+}
+
+// Submodule Selection Page
+class _SubmoduleSelectionPage extends StatelessWidget {
+  final int profileId;
+  final String moduleTitle;
+  final List<SubmoduleLite> submodules;
+
+  const _SubmoduleSelectionPage({
+    required this.profileId,
+    required this.moduleTitle,
+    required this.submodules,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFFF3F5F8),
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        title: Text(
+          moduleTitle,
+          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+            fontWeight: FontWeight.w800,
+            color: const Color(0xFF17406B),
+          ),
+        ),
+      ),
+      body: SafeArea(
+        top: true,
+        bottom: true,
+        child: ListView.separated(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+            itemCount: submodules.length,
+            separatorBuilder: (_, __) => const SizedBox(height: 16),
+            itemBuilder: (_, i) {
+              final s = submodules[i];
+              return Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => SubmodulePage(
+                          profileId: profileId,
+                          submoduleId: s.id,
+                          title: s.title,
+                        ),
+                      ),
+                    );
+                  },
+                  borderRadius: BorderRadius.circular(20),
+                  child: Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(20),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.08),
+                          blurRadius: 12,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF2D72D2).withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: Icon(
+                            Icons.book_rounded,
+                            size: 28,
+                            color: const Color(0xFF2D72D2),
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                s.title,
+                                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                  color: const Color(0xFF17406B),
+                                ),
+                              ),
+                              if (s.introText != null && s.introText!.isNotEmpty) ...[
+                                const SizedBox(height: 6),
+                                Text(
+                                  s.introText!,
+                                  style: TextStyle(
+                                    color: Colors.grey[600],
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Icon(
+                          Icons.chevron_right_rounded,
+                          color: const Color(0xFF2D72D2),
+                          size: 24,
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               );
             },
-          );
-        },
-      ),
+          ),
+        ),
     );
   }
 }

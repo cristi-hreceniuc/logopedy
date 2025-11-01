@@ -7,20 +7,58 @@ class ProfileCardDto {
   final int progressPercent;
   final int completedLessons;
   final int totalLessons;
+  final DateTime? birthDate;
+  final String? gender;
+  final int? age;
 
   ProfileCardDto({
-    required this.id, required this.name, this.avatarUri,
-    required this.premium, required this.progressPercent,
-    required this.completedLessons, required this.totalLessons,
+    required this.id,
+    required this.name,
+    this.avatarUri,
+    required this.premium,
+    required this.progressPercent,
+    required this.completedLessons,
+    required this.totalLessons,
+    this.birthDate,
+    this.gender,
+    this.age,
   });
 
-  factory ProfileCardDto.fromJson(Map<String,dynamic> j) => ProfileCardDto(
-    id: j['id'], name: j['name'], avatarUri: j['avatarUri'],
-    premium: j['premium'] ?? false,
-    progressPercent: j['progressPercent'] ?? 0,
-    completedLessons: (j['completedLessons'] ?? 0) as int,
-    totalLessons: (j['totalLessons'] ?? 0) as int,
-  );
+  factory ProfileCardDto.fromJson(Map<String, dynamic> j) {
+    DateTime? birthDate;
+    if (j['birthDate'] != null) {
+      if (j['birthDate'] is String) {
+        birthDate = DateTime.tryParse(j['birthDate']);
+      } else if (j['birthDate'] is int) {
+        birthDate = DateTime.fromMillisecondsSinceEpoch(j['birthDate']);
+      }
+    }
+    
+    int? age;
+    if (birthDate != null) {
+      final today = DateTime.now();
+      age = today.year - birthDate.year;
+      if (today.month < birthDate.month || 
+          (today.month == birthDate.month && today.day < birthDate.day)) {
+        age--;
+      }
+    } else if (j['age'] != null) {
+      age = j['age'] is int ? j['age'] : int.tryParse(j['age'].toString());
+    }
+
+    return ProfileCardDto(
+      id: j['id'],
+      name: j['name'],
+      avatarUri: j['avatarUri'] ?? j['avatarUrl'],
+      premium: j['premium'] ?? false,
+      progressPercent: j['progressPercent'] ?? 0,
+      completedLessons: (j['completedLessons'] ?? 0) as int,
+      totalLessons: (j['totalLessons'] ?? 0) as int,
+      birthDate: birthDate,
+      gender: j['gender']?.toString() ?? j['sex']?.toString(),
+      age: age,
+    );
+  }
 }
 
 class LessonProgressDto {

@@ -15,4 +15,10 @@ class ProfilesRepository {
 
   Future<List<LessonProgressDto>> lessonProgress(int profileId) async =>
       (await _api.lessonProgress(profileId)).map((e)=>LessonProgressDto.fromJson(e)).toList().cast<LessonProgressDto>();
+
+  Future<ProfileCardDto> getProfileDetails(int profileId) async =>
+      ProfileCardDto.fromJson(await _api.getProfileDetails(profileId));
+
+  Future<void> deleteProfile(int profileId) async =>
+      await _api.deleteProfile(profileId);
 }

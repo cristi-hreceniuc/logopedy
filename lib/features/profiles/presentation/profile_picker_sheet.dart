@@ -69,20 +69,22 @@ class _ProfilePickerSheetState extends State<ProfilePickerSheet> {
                     itemBuilder: (_, i) {
                       final p = list[i];
                       final selected = p.id == activeId;
-                      return InkWell(
-                        borderRadius: BorderRadius.circular(20),
-                        onTap: () async {
-                          context.read<SelectedProfileCubit>().set(p.id);
-                          await GetIt.I<SecureStore>().saveActiveProfileId(p.id);
-                          GetIt.I<DioClient>().setActiveProfile(p.id);
-                          
-                          // Update the active profile service
-                          await GetIt.I<ActiveProfileService>().set(p.id);
+                      return Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(20),
+                          onTap: () async {
+                            context.read<SelectedProfileCubit>().set(p.id);
+                            await GetIt.I<SecureStore>().saveActiveProfileId(p.id);
+                            GetIt.I<DioClient>().setActiveProfile(p.id);
+                            
+                            // Update the active profile service
+                            await GetIt.I<ActiveProfileService>().set(p.id);
 
-                          if (!mounted) return;
-                          Navigator.pop(context, p); // returnează profilul selectat
-                        },
-                        child: Stack(
+                            if (!mounted) return;
+                            Navigator.pop(context, p); // returnează profilul selectat
+                          },
+                          child: Stack(
                           children: [
                             Card(
                               elevation: selected ? 1.5 : 0.5,
@@ -142,6 +144,7 @@ class _ProfilePickerSheetState extends State<ProfilePickerSheet> {
                                 ),
                               ),
                           ],
+                        ),
                         ),
                       );
                     },

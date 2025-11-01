@@ -211,19 +211,75 @@ class AdvanceResp {
     required this.endOfModule,
   });
 
-  factory AdvanceResp.fromJson(Map<String, dynamic> j) => AdvanceResp(
-    moduleId: j['next']?['moduleId'] ??
-        j['moduleId'] ??
-        j['nextModuleId'] ??
-        0,
-    submoduleId: j['next']?['submoduleId'] ?? j['nextSubmoduleId'] ?? 0,
-    lessonId: j['next']?['lessonId'] ?? j['nextLessonId'] ?? 0,
-    screenIndex: j['next']?['screenIndex'] ?? 0,
-    nextModuleId: j['next']?['moduleId'] ?? j['nextModuleId'],
-    nextSubmoduleId: j['next']?['submoduleId'] ?? j['nextSubmoduleId'],
-    nextLessonId: j['next']?['lessonId'] ?? j['nextLessonId'],
-    endOfLesson: j['next']?['endOfLesson'] ?? false,
-    endOfSubmodule: j['next']?['endOfSubmodule'] ?? false,
-    endOfModule: j['next']?['endOfModule'] ?? false,
-  );
+  factory AdvanceResp.fromJson(Map<String, dynamic> j) {
+    // Debug logging to understand the API response structure
+    print('🔍 AdvanceResp.fromJson received: $j');
+    
+    // Extract current lesson data
+    final currentModuleId = j['moduleId'] ?? 0;
+    final currentSubmoduleId = j['submoduleId'] ?? 0;
+    final currentLessonId = j['lessonId'] ?? 0;
+    final currentScreenIndex = j['screenIndex'] ?? 0;
+    
+    // Extract next lesson data - check multiple possible structures
+    final nextData = j['next'] as Map<String, dynamic>?;
+    final nextLessonData = j['nextLesson'] as Map<String, dynamic>?;
+    final nextModuleData = j['nextModule'] as Map<String, dynamic>?;
+    
+    // Try to get next lesson ID from various possible locations
+    int? nextLessonId = nextData?['lessonId'] ?? 
+                       nextData?['id'] ??
+                       nextLessonData?['id'] ??
+                       nextLessonData?['lessonId'] ??
+                       j['nextLessonId'] ??
+                       j['nextId'];
+    
+    // Try to get next module ID
+    int? nextModuleId = nextData?['moduleId'] ?? 
+                       nextModuleData?['id'] ??
+                       nextModuleData?['moduleId'] ??
+                       j['nextModuleId'];
+    
+    // Try to get next submodule ID
+    int? nextSubmoduleId = nextData?['submoduleId'] ?? 
+                          j['nextSubmoduleId'];
+    
+    // Extract flags - check multiple possible locations
+    final endOfLesson = nextData?['endOfLesson'] ?? 
+                       j['endOfLesson'] ?? 
+                       j['isEndOfLesson'] ?? 
+                       false;
+    final endOfSubmodule = nextData?['endOfSubmodule'] ?? 
+                          j['endOfSubmodule'] ?? 
+                          j['isEndOfSubmodule'] ?? 
+                          false;
+    final endOfModule = nextData?['endOfModule'] ?? 
+                       j['endOfModule'] ?? 
+                       j['isEndOfModule'] ?? 
+                       false;
+    
+    print('🔍 Parsed data - Current: module=$currentModuleId, submodule=$currentSubmoduleId, lesson=$currentLessonId');
+    print('🔍 Parsed data - Next: module=$nextModuleId, submodule=$nextSubmoduleId, lesson=$nextLessonId');
+    print('🔍 Parsed flags - endOfLesson=$endOfLesson, endOfSubmodule=$endOfSubmodule, endOfModule=$endOfModule');
+    
+    // If we don't have next lesson ID but we're not at the end, try to infer it
+    if (nextLessonId == null && !endOfSubmodule && !endOfModule) {
+      // Maybe the next lesson is just current lesson + 1?
+      nextLessonId = currentLessonId + 1;
+      print('🔍 Inferred next lesson ID: $nextLessonId');
+    }
+    
+    return AdvanceResp(
+      moduleId: currentModuleId,
+      submoduleId: currentSubmoduleId,
+      lessonId: currentLessonId,
+      screenIndex: currentScreenIndex,
+      nextModuleId: nextModuleId,
+      nextSubmoduleId: nextSubmoduleId,
+      nextLessonId: nextLessonId,
+      endOfLesson: endOfLesson,
+      endOfSubmodule: endOfSubmodule,
+      endOfModule: endOfModule,
+    );
+  }
 }

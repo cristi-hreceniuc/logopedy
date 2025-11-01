@@ -25,18 +25,32 @@ Future<void> _setupDI() async {
 }
 
 Future<void> main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  await _setupDI();
+  late final AuthCubit authCubit;
+  late final SelectedProfileCubit selectedProfileCubit;
+  
+  try {
+    WidgetsFlutterBinding.ensureInitialized();
+    await _setupDI();
 
-  // creează o singură instanță de AuthCubit din DI
-  final authCubit = sl<AuthCubit>();
-  await authCubit.checkSession(); // rulează o singură dată la boot
+    // creează o singură instanță de AuthCubit din DI
+    authCubit = sl<AuthCubit>();
+    await authCubit.checkSession(); // rulează o singură dată la boot
 
-  final selectedProfileCubit = SelectedProfileCubit();
-  final savedProfileId = await sl<SecureStore>().readActiveProfileId();
-  selectedProfileCubit.set(savedProfileId!);
-  final active = sl<ActiveProfileService>();
-  await active.load();
+    selectedProfileCubit = SelectedProfileCubit();
+    final savedProfileId = await sl<SecureStore>().readActiveProfileId();
+    
+    if (savedProfileId != null) {
+      selectedProfileCubit.set(savedProfileId);
+    }
+    
+    final active = sl<ActiveProfileService>();
+    await active.load();
+  } catch (e, stackTrace) {
+    // Log error for debugging but don't crash the app
+    debugPrint('Error in main(): $e');
+    debugPrint('Stack trace: $stackTrace');
+    rethrow;
+  }
 
   runApp(
     MultiBlocProvider(

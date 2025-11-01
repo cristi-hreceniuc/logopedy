@@ -1,6 +1,6 @@
 // lib/features/auth/data/domain/auth_repository.dart
-import 'package:dio/dio.dart';
 import 'package:logopedy/features/auth/data/models/user_dto.dart';
+import 'package:logopedy/features/auth/data/models/user_response_dto.dart';
 import '../../../../core/storage/secure_storage.dart';
 import '../auth_api.dart';
 import '../models/login_request.dart';
@@ -58,5 +58,14 @@ class AuthRepository {
       password: password,
       confirmNewPassword: confirmNewPassword,
     );
+  }
+
+  Future<void> deleteAccount() async {
+    await _api.deleteAccount();
+    await _store.clear(); // Clear session after deletion
+  }
+
+  Future<UserResponseDto> getCurrentUser() async {
+    return _api.getCurrentUser();
   }
 }

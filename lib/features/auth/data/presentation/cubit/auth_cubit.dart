@@ -84,6 +84,16 @@ class AuthCubit extends Cubit<AuthState> {
     emit(const AuthState.unauthenticated());
   }
 
+  Future<void> deleteAccount() async {
+    emit(const AuthState.loading());
+    try {
+      await _repo.deleteAccount();
+      emit(const AuthState.unauthenticated());
+    } on Exception catch (e) {
+      emit(AuthState.error(_niceError(e)));
+    }
+  }
+
   String _niceError(Object e) {
     if (e is DioException) {
       final data = e.response?.data;

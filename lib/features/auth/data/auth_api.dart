@@ -4,6 +4,7 @@ import 'models/login_request.dart';
 import 'models/login_response.dart';
 import 'models/signup_request.dart';
 import 'models/user_dto.dart';
+import 'models/user_response_dto.dart';
 
 class AuthApi {
   final Dio _dio;
@@ -49,5 +50,14 @@ class AuthApi {
       'password': password,
     }, options: Options(headers: {'Authorization': null}));
     return r.data as Map<String, dynamic>;
+  }
+
+  Future<void> deleteAccount() async {
+    await _dio.delete('/api/user/delete');
+  }
+
+  Future<UserResponseDto> getCurrentUser() async {
+    final res = await _dio.get('/api/v1/users/me');
+    return UserResponseDto.fromJson(res.data as Map<String, dynamic>);
   }
 }

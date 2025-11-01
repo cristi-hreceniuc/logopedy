@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../../../../../core/utils/snackbar_utils.dart';
 import '../../../data/models/signup_request.dart';
 import '../../../presentation/widgets/auth_ui.dart';
 import '../cubit/auth_cubit.dart';
@@ -29,9 +30,9 @@ class _RegisterPageState extends State<RegisterPage> {
     return BlocConsumer<AuthCubit, AuthState>(
       listener: (ctx, st) {
         if (st.error != null) {
-          ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text(st.error!)));
+          SnackBarUtils.showError(ctx, st.error!);
         } else if (st.signupOk) {
-          ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(content: Text('Cont creat. Te poți loga.')));
+          SnackBarUtils.showSuccess(ctx, 'Cont creat. Te poți loga.');
           Navigator.of(ctx).pop();
         }
       },

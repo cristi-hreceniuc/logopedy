@@ -20,4 +20,13 @@ class ProfilesApi {
     final r = await _dio.get('/api/profiles/$profileId/lessons-progress');
     return r.data as List;
   }
+
+  Future<Map<String, dynamic>> getProfileDetails(int profileId) async {
+    final r = await _dio.get('/api/profiles/$profileId');
+    return r.data as Map<String, dynamic>;
+  }
+
+  Future<void> deleteProfile(int profileId) async {
+    await _dio.delete('/api/profiles/$profileId');
+  }
 }

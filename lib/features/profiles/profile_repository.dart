@@ -21,6 +21,15 @@ class ProfilesRepository {
 
   Future<ProfileCardDto> create({required String name, String? avatarUri}) async {
     final r = await _dio.post('/api/profiles', data: {'name': name, 'avatarUri': avatarUri});
-    return ProfileCardDto.fromJson(r.data as Map<String,dynamic>);
+    return ProfileCardDto.fromJson(r.data as Map<String, dynamic>);
+  }
+
+  Future<void> delete(int profileId) async {
+    await _dio.delete('/api/profiles/$profileId');
+  }
+
+  Future<ProfileCardDto> getProfileDetails(int profileId) async {
+    final r = await _dio.get('/api/profiles/$profileId');
+    return ProfileCardDto.fromJson(r.data as Map<String, dynamic>);
   }
 }

@@ -1,9 +1,11 @@
 // lib/features/content/presentation/lesson_player_page.dart
+import 'dart:async';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import 'package:get_it/get_it.dart';
 
 import '../../../core/network/dio_client.dart';
+import '../../../core/utils/snackbar_utils.dart';
 import '../content_repository.dart';
 import '../models/dtos.dart';
 import '../models/enums.dart';
@@ -324,76 +326,113 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
       message = 'Bravo! Ai terminat lecția!';
     }
     
-    // Track if user tapped to close
-    bool userTapped = false;
+    // Use a timer for auto-dismiss after 4 seconds
+    Timer? autoCloseTimer;
     
     await showDialog(
       context: context,
-      barrierDismissible: true, // Allow dismissing by tapping outside
-      builder: (_) {
+      barrierDismissible: false, // Prevent dismissing by tapping outside
+      builder: (dialogContext) {
         debugPrint('🎉 Building completion dialog with image: $imagePath');
+        
+        // Start the 4-second auto-close timer
+        autoCloseTimer = Timer(const Duration(seconds: 4), () {
+          if (Navigator.of(dialogContext).canPop()) {
+            debugPrint('🎉 Auto-closing completion dialog after 4 seconds');
+            Navigator.of(dialogContext).pop();
+          }
+        });
+        
         return Dialog(
           elevation: 8,
           backgroundColor: Colors.transparent,
           insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
-          child: GestureDetector(
-            onTap: () {
-              debugPrint('🎉 User tapped on dialog to close completion dialog');
-              userTapped = true;
-              Navigator.of(context).pop();
-            },
-            child: Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
+          child: Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: Colors.grey.shade300, width: 2),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.1),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: () {
+                  debugPrint('🎉 User tapped on dialog to continue immediately');
+                  // Cancel the auto-close timer since user tapped
+                  autoCloseTimer?.cancel();
+                  Navigator.of(dialogContext).pop();
+                },
                 borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: Colors.grey.shade300, width: 2),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // Completion image based on level
-                  Image.asset(
-                    imagePath,
-                    width: 220,
-                    fit: BoxFit.contain,
-                    errorBuilder: (context, error, stackTrace) {
-                      debugPrint('🎉 Error loading $imagePath: $error');
-                      return Container(
-                        width: 220,
-                        height: 220,
-                        color: Colors.red.withOpacity(0.3),
-                        child: const Center(
-                          child: Text('Image Error', style: TextStyle(color: Colors.white)),
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Completion image based on level - wrapped to ensure taps work
+                      GestureDetector(
+                        onTap: () {
+                          debugPrint('🎉 User tapped on image to continue immediately');
+                          autoCloseTimer?.cancel();
+                          Navigator.of(dialogContext).pop();
+                        },
+                        child: Image.asset(
+                          imagePath,
+                          width: 220,
+                          fit: BoxFit.contain,
+                          errorBuilder: (context, error, stackTrace) {
+                            debugPrint('🎉 Error loading $imagePath: $error');
+                            return Container(
+                              width: 220,
+                              height: 220,
+                              color: Colors.red.withOpacity(0.3),
+                              child: const Center(
+                                child: Text('Image Error', style: TextStyle(color: Colors.white)),
+                              ),
+                            );
+                          },
                         ),
-                      );
-                    },
+                      ),
+                      const SizedBox(height: 16),
+                      GestureDetector(
+                        onTap: () {
+                          debugPrint('🎉 User tapped on message text to continue immediately');
+                          autoCloseTimer?.cancel();
+                          Navigator.of(dialogContext).pop();
+                        },
+                        child: Text(
+                          message,
+                          textAlign: TextAlign.center,
+                          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                            fontWeight: FontWeight.w700,
+                            color: Colors.black87,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      GestureDetector(
+                        onTap: () {
+                          debugPrint('🎉 User tapped on instruction text to continue immediately');
+                          autoCloseTimer?.cancel();
+                          Navigator.of(dialogContext).pop();
+                        },
+                        child: Text(
+                          'Apasă oriunde pentru a continua',
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: Colors.grey.shade600,
+                            fontStyle: FontStyle.italic,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 16),
-                  Text(
-                    message,
-                    textAlign: TextAlign.center,
-                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                      fontWeight: FontWeight.w700,
-                      color: Colors.black87,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    'Apasă oriunde pentru a continua',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Colors.grey.shade600,
-                      fontStyle: FontStyle.italic,
-                    ),
-                  ),
-                ],
+                ),
               ),
             ),
           ),
@@ -401,25 +440,14 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
       },
     );
 
-    // If user didn't tap, wait for 4 seconds total from when dialog was shown
-    if (!userTapped) {
-      debugPrint('🎉 User did not tap, waiting for auto-close...');
-      await Future.delayed(const Duration(seconds: 4));
-      if (Navigator.of(context).canPop()) {
-        debugPrint('🎉 Auto-closing completion dialog after 4 seconds');
-        Navigator.of(context).pop();
-      }
-    } else {
-      debugPrint('🎉 User tapped, dialog already closed');
-    }
-    
-    // Always consider any dialog dismissal as user interaction
-    userTapped = true;
+    // Cancel timer if it's still running (shouldn't happen, but safety check)
+    autoCloseTimer?.cancel();
+    debugPrint('🎉 Completion dialog dismissed, proceeding to next lesson');
   }
 
 
   /// Lecțiile actuale au 1 singur ecran -> marcăm DONE și ieșim
-  Future<void> _finishLesson() async {
+  Future<void> _finishLesson({bool skipCompletionDialog = false}) async {
     try {
       final resp = await _repo.advance(
         widget.profileId,
@@ -438,15 +466,32 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
       final shouldCelebrate = resp.endOfLesson || resp.endOfSubmodule || resp.endOfModule;
       debugPrint('🎉 Should celebrate: $shouldCelebrate');
       
-      // Always show completion dialog and navigate to next lesson
-      debugPrint('🎉 Showing completion dialog!');
-      await _showCompletionDialog(resp.endOfLesson, resp.endOfSubmodule, resp.endOfModule);
+      // Show completion dialog unless skipped
+      if (!skipCompletionDialog) {
+        debugPrint('🎉 Showing completion dialog!');
+        await _showCompletionDialog(resp.endOfLesson, resp.endOfSubmodule, resp.endOfModule);
+      }
 
       // Navigate to next lesson if available, otherwise go back to submodule
       if (mounted) {
-        if (resp.nextLessonId != null && resp.nextLessonId! > 0) {
+        // Check if we have valid next lesson data
+        final hasNextLesson = resp.nextLessonId != null && 
+                             resp.nextLessonId! > 0 && 
+                             resp.nextLessonId! != resp.lessonId; // Make sure it's actually different
+        
+        debugPrint('🎉 Navigation check - hasNextLesson: $hasNextLesson, nextLessonId: ${resp.nextLessonId}, currentLessonId: ${resp.lessonId}');
+        
+        if (hasNextLesson) {
           debugPrint('🎉 Attempting to navigate to next lesson: ${resp.nextLessonId}');
+          // Verify the lesson exists before navigating (to prevent 404 errors)
           try {
+            final lessonExists = await _lessonExists(resp.nextLessonId!);
+            if (!lessonExists) {
+              debugPrint('🎉 Lesson ${resp.nextLessonId} does not exist, going back to submodule');
+              Navigator.of(context).maybePop(true);
+              return;
+            }
+            
             Navigator.of(context).pushReplacement(
               MaterialPageRoute(
                 builder: (_) => LessonPlayerPage(
@@ -463,14 +508,15 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
             Navigator.of(context).maybePop(true);
           }
         } else {
-          debugPrint('🎉 No next lesson data from API, going back to submodule');
+          debugPrint('🎉 No valid next lesson data from API, going back to submodule');
+          debugPrint('🎉 Next lesson ID: ${resp.nextLessonId}, Current lesson ID: ${resp.lessonId}');
           // No fallback navigation - just go back to submodule
           Navigator.of(context).maybePop(true);
         }
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+      SnackBarUtils.showError(context, e.toString());
     }
   }
 
@@ -479,14 +525,33 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     return Scaffold(
-      appBar: AppBar(title: Text(widget.title)),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : _error != null
-          ? _ErrorView(message: _error!, onRetry: _load)
-          : _data == null || _data!.screens.isEmpty
-          ? const _EmptyView()
-          : _renderScreen(_data!.screens.first, cs),
+      backgroundColor: const Color(0xFFF3F5F8),
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        title: Text(
+          widget.title,
+          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+            fontWeight: FontWeight.w800,
+            color: const Color(0xFF17406B),
+          ),
+        ),
+      ),
+      body: SafeArea(
+        top: true,
+        bottom: true,
+        child: _loading
+            ? const Center(
+                child: CircularProgressIndicator(
+                  valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFEA2233)),
+                ),
+              )
+            : _error != null
+                ? _ErrorView(message: _error!, onRetry: _load)
+                : _data == null || _data!.screens.isEmpty
+                    ? const _EmptyView()
+                    : _renderScreen(_data!.screens.first, cs),
+      ),
     );
   }
 
@@ -505,81 +570,79 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
             'Următorul',
           );
 
-          return SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                children: [
-                  // Conținutul în card, centrat și aerisit
-                  Expanded(
-                    child: Center(
-                      child: ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 680),
-                        child: Card(
-                          elevation: 3,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(20),
+          return Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              children: [
+                // Conținutul în card, centrat și aerisit
+                Expanded(
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 680),
+                      child: Card(
+                        elevation: 3,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 20,
+                            vertical: 24,
                           ),
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 20,
-                              vertical: 24,
-                            ),
-                            child: SingleChildScrollView(
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  if (title.isNotEmpty) ...[
-                                    Text(
-                                      title,
-                                      textAlign: TextAlign.center,
-                                      // titlu mare (aceeași familie de font din app theme)
-                                      style: Theme.of(context)
-                                          .textTheme
-                                          .titleLarge
-                                          ?.copyWith(
-                                            fontSize: 28,
-                                            fontWeight: FontWeight.w800,
-                                          ),
-                                    ),
-                                    const SizedBox(height: 16),
-                                  ],
+                          child: SingleChildScrollView(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                if (title.isNotEmpty) ...[
                                   Text(
-                                    text,
+                                    title,
                                     textAlign: TextAlign.center,
-                                    // corp mărit și lizibil
-                                    style: Theme.of(context).textTheme.bodyLarge
-                                        ?.copyWith(fontSize: 20, height: 1.45),
+                                    // titlu mare (aceeași familie de font din app theme)
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .titleLarge
+                                        ?.copyWith(
+                                          fontSize: 28,
+                                          fontWeight: FontWeight.w800,
+                                        ),
                                   ),
+                                  const SizedBox(height: 16),
                                 ],
-                              ),
+                                Text(
+                                  text,
+                                  textAlign: TextAlign.center,
+                                  // corp mărit și lizibil
+                                  style: Theme.of(context).textTheme.bodyLarge
+                                      ?.copyWith(fontSize: 20, height: 1.45),
+                                ),
+                              ],
                             ),
                           ),
                         ),
                       ),
                     ),
                   ),
+                ),
 
-                  // Butonul mare jos, consistent cu restul aplicației
-                  const SizedBox(height: 12),
-                  FilledButton(
-                    onPressed: _finishLesson,
-                    style: FilledButton.styleFrom(
-                      minimumSize: const Size.fromHeight(56),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(28),
-                      ),
-                    ),
-                    child: Text(
-                      next,
-                      style: const TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w700,
-                      ),
+                // Butonul mare jos, consistent cu restul aplicației
+                const SizedBox(height: 12),
+                FilledButton(
+                  onPressed: _finishLesson,
+                  style: FilledButton.styleFrom(
+                    minimumSize: const Size.fromHeight(56),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(28),
                     ),
                   ),
-                ],
-              ),
+                  child: Text(
+                    next,
+                    style: const TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
             ),
           );
         }
@@ -628,81 +691,79 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
             'Următorul',
           );
 
-          return SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  if (title.isNotEmpty)
-                    Text(
-                      title,
-                      textAlign: TextAlign.center,
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontSize: 26,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  const SizedBox(height: 12),
-
-                  if (text.isNotEmpty)
-                    Text(
-                      text,
-                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                        fontSize: 18,
-                        height: 1.45,
-                      ),
-                    ),
-
-                  if (subtitle.isNotEmpty || bullets.isNotEmpty) ...[
-                    const SizedBox(height: 16),
-                    if (subtitle.isNotEmpty)
-                      Text(
-                        subtitle,
-                        style: Theme.of(context).textTheme.titleMedium
-                            ?.copyWith(fontWeight: FontWeight.w700),
-                      ),
-                    if (bullets.isNotEmpty) ...[
-                      const SizedBox(height: 8),
-                      ...bullets.map(
-                        (e) => Padding(
-                          padding: const EdgeInsets.only(bottom: 8),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text('•  '),
-                              Expanded(
-                                child: Text(
-                                  e,
-                                  style: Theme.of(context).textTheme.bodyLarge,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ],
-
-                  const Spacer(),
-                  FilledButton(
-                    onPressed: _finishLesson,
-                    style: FilledButton.styleFrom(
-                      minimumSize: const Size.fromHeight(56),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(28),
-                      ),
-                    ),
-                    child: Text(
-                      next,
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
-                      ),
+          return Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (title.isNotEmpty)
+                  Text(
+                    title,
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontSize: 26,
+                      fontWeight: FontWeight.w800,
                     ),
                   ),
+                const SizedBox(height: 12),
+
+                if (text.isNotEmpty)
+                  Text(
+                    text,
+                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                      fontSize: 18,
+                      height: 1.45,
+                    ),
+                  ),
+
+                if (subtitle.isNotEmpty || bullets.isNotEmpty) ...[
+                  const SizedBox(height: 16),
+                  if (subtitle.isNotEmpty)
+                    Text(
+                      subtitle,
+                      style: Theme.of(context).textTheme.titleMedium
+                          ?.copyWith(fontWeight: FontWeight.w700),
+                    ),
+                  if (bullets.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    ...bullets.map(
+                      (e) => Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('•  '),
+                            Expanded(
+                              child: Text(
+                                e,
+                                style: Theme.of(context).textTheme.bodyLarge,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
                 ],
-              ),
+
+                const Spacer(),
+                FilledButton(
+                  onPressed: _finishLesson,
+                  style: FilledButton.styleFrom(
+                    minimumSize: const Size.fromHeight(56),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(28),
+                    ),
+                  ),
+                  child: Text(
+                    next,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
             ),
           );
         }
@@ -1186,17 +1247,19 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
               });
 
               Future<void> _onNext() async {
+                // Only proceed if answer is correct or revealed
                 if (isCorrect() || revealed) {
-                  await _finishLesson();
+                  // Show completion image before finishing (skip it in _finishLesson)
+                  await _showCompletionDialog(true, false, false);
+                  await _finishLesson(skipCompletionDialog: true);
                 } else {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Mai încearcă!')),
-                  );
+                  SnackBarUtils.showInfo(context, 'Mai încearcă!');
                 }
               }
 
               final good = isCorrect();
               final bad = !good && ctrl.text.trim().isNotEmpty;
+              final canProceed = good || revealed; // Enable button only if correct or revealed
 
               return Padding(
                 padding: const EdgeInsets.all(16),
@@ -1295,9 +1358,10 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
                     const Spacer(),
 
                     FilledButton(
-                      onPressed: _onNext,
+                      onPressed: canProceed ? _onNext : null,
                       style: FilledButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 18),
+                        backgroundColor: canProceed ? null : Colors.grey,
                       ),
                       child: Text(
                         next,

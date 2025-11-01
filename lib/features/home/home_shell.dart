@@ -16,12 +16,54 @@ class HomeShell extends StatefulWidget {
 class _HomeShellState extends State<HomeShell> {
   int _index = 0;
 
+  Widget _buildNavItem(int index, IconData icon, IconData selectedIcon, String label) {
+    final isSelected = _index == index;
+    final cs = Theme.of(context).colorScheme;
+    
+    return GestureDetector(
+      onTap: () => setState(() => _index = index),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: isSelected ? const Color(0xFFEA2233) : Colors.transparent,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: isSelected ? [
+            BoxShadow(
+              color: const Color(0xFFEA2233).withOpacity(0.3),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ] : null,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              isSelected ? selectedIcon : icon,
+              color: isSelected ? Colors.white : const Color(0xFF2D72D2),
+              size: 26,
+            ),
+            const SizedBox(height: 6),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
+                color: isSelected ? Colors.white : const Color(0xFF2D72D2),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final tabs = [
-      const AccountTab(),
       const ProfilesTab(),
-      ModulesTab(profileId: widget.profileId), // placeholder
+      ModulesTab(profileId: widget.profileId),
+      const AccountTab(),
     ];
 
     return BlocListener<AuthCubit, AuthState>(
@@ -31,26 +73,31 @@ class _HomeShellState extends State<HomeShell> {
       },
       child: Scaffold(
         body: IndexedStack(index: _index, children: tabs),
-        bottomNavigationBar: NavigationBar(
-          selectedIndex: _index,
-          onDestinationSelected: (i) => setState(() => _index = i),
-          destinations: const [
-            NavigationDestination(
-              icon: Icon(Icons.person_outline),
-              selectedIcon: Icon(Icons.person),
-              label: 'Contul meu',
+        bottomNavigationBar: Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.08),
+                blurRadius: 16,
+                offset: const Offset(0, -4),
+              ),
+            ],
+          ),
+          child: SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: [
+                  _buildNavItem(0, Icons.group_outlined, Icons.group, 'Profile'),
+                  _buildNavItem(1, Icons.menu_book_outlined, Icons.menu_book, 'Module'),
+                  _buildNavItem(2, Icons.person_outline, Icons.person, 'Contul meu'),
+                ],
+              ),
             ),
-            NavigationDestination(
-              icon: Icon(Icons.group_outlined),
-              selectedIcon: Icon(Icons.group),
-              label: 'Profile',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.menu_book_outlined),
-              selectedIcon: Icon(Icons.menu_book),
-              label: 'Module',
-            ),
-          ],
+          ),
         ),
       ),
     );
