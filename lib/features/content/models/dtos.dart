@@ -262,12 +262,8 @@ class AdvanceResp {
     print('🔍 Parsed data - Next: module=$nextModuleId, submodule=$nextSubmoduleId, lesson=$nextLessonId');
     print('🔍 Parsed flags - endOfLesson=$endOfLesson, endOfSubmodule=$endOfSubmodule, endOfModule=$endOfModule');
     
-    // If we don't have next lesson ID but we're not at the end, try to infer it
-    if (nextLessonId == null && !endOfSubmodule && !endOfModule) {
-      // Maybe the next lesson is just current lesson + 1?
-      nextLessonId = currentLessonId + 1;
-      print('🔍 Inferred next lesson ID: $nextLessonId');
-    }
+    // Don't infer next lesson ID - trust the backend response
+    // If nextLessonId is null, it means there is no next lesson
     
     return AdvanceResp(
       moduleId: currentModuleId,

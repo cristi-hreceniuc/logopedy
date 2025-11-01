@@ -474,20 +474,35 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
 
       // Navigate to next lesson if available, otherwise go back to submodule
       if (mounted) {
-        // Check if we have valid next lesson data
-        final hasNextLesson = resp.nextLessonId != null && 
-                             resp.nextLessonId! > 0 && 
-                             resp.nextLessonId! != resp.lessonId; // Make sure it's actually different
+        // Determine the next lesson ID to navigate to
+        // Priority 1: Use explicit nextLessonId from backend
+        // Priority 2: If lessonId in response is different and we're not at an end, use that
+        int? targetLessonId;
         
-        debugPrint('🎉 Navigation check - hasNextLesson: $hasNextLesson, nextLessonId: ${resp.nextLessonId}, currentLessonId: ${resp.lessonId}');
+        if (resp.nextLessonId != null && resp.nextLessonId! > 0 && resp.nextLessonId! != widget.lessonId) {
+          // Backend explicitly provided next lesson ID
+          targetLessonId = resp.nextLessonId;
+          debugPrint('🎉 Using explicit nextLessonId from backend: $targetLessonId');
+        } else if (!resp.endOfSubmodule && 
+                   !resp.endOfModule && 
+                   resp.lessonId != widget.lessonId && 
+                   resp.lessonId > widget.lessonId) {
+          // Backend returned a different lessonId that's greater than current - likely the next lesson
+          targetLessonId = resp.lessonId;
+          debugPrint('🎉 Using updated lessonId from backend as next lesson: $targetLessonId');
+        }
         
-        if (hasNextLesson) {
-          debugPrint('🎉 Attempting to navigate to next lesson: ${resp.nextLessonId}');
+        debugPrint('🎉 Navigation check - targetLessonId: $targetLessonId, widget.lessonId: ${widget.lessonId}, resp.lessonId: ${resp.lessonId}, resp.nextLessonId: ${resp.nextLessonId}');
+        debugPrint('🎉 End flags - endOfSubmodule: ${resp.endOfSubmodule}, endOfModule: ${resp.endOfModule}');
+        
+        if (targetLessonId != null) {
+          final nextLessonId = targetLessonId!; // Non-null variable for clarity
+          debugPrint('🎉 Attempting to navigate to next lesson: $nextLessonId');
           // Verify the lesson exists before navigating (to prevent 404 errors)
           try {
-            final lessonExists = await _lessonExists(resp.nextLessonId!);
+            final lessonExists = await _lessonExists(nextLessonId);
             if (!lessonExists) {
-              debugPrint('🎉 Lesson ${resp.nextLessonId} does not exist, going back to submodule');
+              debugPrint('🎉 Lesson $nextLessonId does not exist, going back to submodule');
               Navigator.of(context).maybePop(true);
               return;
             }
@@ -496,20 +511,20 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
               MaterialPageRoute(
                 builder: (_) => LessonPlayerPage(
                   profileId: widget.profileId,
-                  lessonId: resp.nextLessonId!,
-                  title: 'Lecția ${resp.nextLessonId}', // You might want to get the actual title
+                  lessonId: nextLessonId,
+                  title: 'Lecția $nextLessonId', // You might want to get the actual title
                 ),
               ),
             );
-            debugPrint('🎉 Successfully navigated to next lesson: ${resp.nextLessonId}');
+            debugPrint('🎉 Successfully navigated to next lesson: $nextLessonId');
           } catch (e) {
-            debugPrint('🎉 Error navigating to next lesson ${resp.nextLessonId}: $e');
+            debugPrint('🎉 Error navigating to next lesson $nextLessonId: $e');
             debugPrint('🎉 Going back to submodule due to navigation error');
             Navigator.of(context).maybePop(true);
           }
         } else {
-          debugPrint('🎉 No valid next lesson data from API, going back to submodule');
-          debugPrint('🎉 Next lesson ID: ${resp.nextLessonId}, Current lesson ID: ${resp.lessonId}');
+          debugPrint('🎉 No valid next lesson data, going back to submodule');
+          debugPrint('🎉 Next lesson ID: ${resp.nextLessonId}, Response lesson ID: ${resp.lessonId}, Widget lesson ID: ${widget.lessonId}');
           // No fallback navigation - just go back to submodule
           Navigator.of(context).maybePop(true);
         }
@@ -1197,18 +1212,6 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
             return cand;
           }
 
-          String _normalize(String s) {
-            final lower = s.trim().toLowerCase();
-            return lower
-                .replaceAll('ă', 'a')
-                .replaceAll('â', 'a')
-                .replaceAll('î', 'i')
-                .replaceAll('ș', 's')
-                .replaceAll('ş', 's')
-                .replaceAll('ț', 't')
-                .replaceAll('ţ', 't');
-          }
-
           // ---- payload
           final title = _s(p, 'title', 'Denumeste imaginea');
           final subtitle = _s(p, 'subtitle', 'Ce vezi în imagine?');
@@ -1233,148 +1236,17 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
             'Ajutor',
           );
 
-          final cs = Theme.of(context).colorScheme;
-          final ctrl = TextEditingController();
-
-          return StatefulBuilder(
-            builder: (ctx, setSB) {
-              bool revealed = (p['revealed'] as bool?) ?? false;
-              bool isCorrect() =>
-                  _normalize(ctrl.text) == _normalize(correctWord);
-
-              void _onChanged(String _) => setSB(() {
-                /* doar re-build pentru feedback */
-              });
-
-              Future<void> _onNext() async {
-                // Only proceed if answer is correct or revealed
-                if (isCorrect() || revealed) {
-                  // Show completion image before finishing (skip it in _finishLesson)
-                  await _showCompletionDialog(true, false, false);
-                  await _finishLesson(skipCompletionDialog: true);
-                } else {
-                  SnackBarUtils.showInfo(context, 'Mai încearcă!');
-                }
-              }
-
-              final good = isCorrect();
-              final bad = !good && ctrl.text.trim().isNotEmpty;
-              final canProceed = good || revealed; // Enable button only if correct or revealed
-
-              return Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Text(
-                      title,
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 28,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    if (subtitle.isNotEmpty)
-                      Text(
-                        subtitle,
-                        style: Theme.of(context).textTheme.titleMedium,
-                      ),
-                    const SizedBox(height: 12),
-
-                    if (imgUrl.isNotEmpty)
-                      Center(
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(16),
-                          child: imgUrl.startsWith('assets/')
-                              ? Image.asset(
-                                  imgUrl,
-                                  width: 260,
-                                  height: 260,
-                                  fit: BoxFit.cover,
-                                )
-                              : Image.network(
-                                  imgUrl,
-                                  width: 260,
-                                  height: 260,
-                                  fit: BoxFit.cover,
-                                ),
-                        ),
-                      ),
-
-                    const SizedBox(height: 16),
-
-                    TextField(
-                      controller: ctrl,
-                      onChanged: _onChanged,
-                      textInputAction: TextInputAction.done,
-                      onSubmitted: (_) => _onNext(),
-                      decoration: InputDecoration(
-                        labelText: 'Scrie cuvântul',
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(14),
-                          borderSide: BorderSide(color: cs.outlineVariant),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(14),
-                          borderSide: BorderSide(
-                            color: good ? cs.primary : cs.primary,
-                          ),
-                        ),
-                        suffixIcon: good
-                            ? const Icon(Icons.check_circle, size: 24)
-                            : (bad ? const Icon(Icons.cancel, size: 24) : null),
-                        suffixIconColor: good
-                            ? Colors.green
-                            : (bad ? Colors.red : null),
-                      ),
-                    ),
-
-                    const SizedBox(height: 6),
-
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: TextButton(
-                        onPressed: revealed
-                            ? null
-                            : () => setSB(() {
-                                p['revealed'] = true;
-                                revealed = true;
-                                ctrl.text = correctWord; // autopopulează
-                              }),
-                        style: TextButton.styleFrom(
-                          foregroundColor: revealed ? cs.outline : cs.error,
-                          textStyle: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        child: Text(helpLabel),
-                      ),
-                    ),
-
-                    const Spacer(),
-
-                    FilledButton(
-                      onPressed: canProceed ? _onNext : null,
-                      style: FilledButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 18),
-                        backgroundColor: canProceed ? null : Colors.grey,
-                      ),
-                      child: Text(
-                        next,
-                        style: const TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            },
+          return _ImageRevealWordWidget(
+            key: ValueKey('imageRevealWord_${widget.lessonId}'),
+            title: title,
+            subtitle: subtitle,
+            imgUrl: imgUrl,
+            correctWord: correctWord,
+            nextLabel: next,
+            helpLabel: helpLabel,
+            payload: p,
+            onFinish: _finishLesson,
+            onShowCompletionDialog: _showCompletionDialog,
           );
         }
 
@@ -1387,6 +1259,206 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
           ),
         );
     }
+  }
+}
+
+class _ImageRevealWordWidget extends StatefulWidget {
+  const _ImageRevealWordWidget({
+    super.key,
+    required this.title,
+    required this.subtitle,
+    required this.imgUrl,
+    required this.correctWord,
+    required this.nextLabel,
+    required this.helpLabel,
+    required this.payload,
+    required this.onFinish,
+    required this.onShowCompletionDialog,
+  });
+
+  final String title;
+  final String subtitle;
+  final String imgUrl;
+  final String correctWord;
+  final String nextLabel;
+  final String helpLabel;
+  final Map<String, dynamic> payload;
+  final Future<void> Function({bool skipCompletionDialog}) onFinish;
+  final Future<void> Function(bool, bool, bool) onShowCompletionDialog;
+
+  @override
+  State<_ImageRevealWordWidget> createState() => _ImageRevealWordWidgetState();
+}
+
+class _ImageRevealWordWidgetState extends State<_ImageRevealWordWidget> {
+  late final TextEditingController _controller;
+  late final FocusNode _focusNode;
+  bool _revealed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController();
+    _focusNode = FocusNode();
+    _revealed = (widget.payload['revealed'] as bool?) ?? false;
+    
+    // Auto-focus the text field when the widget is built
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _focusNode.requestFocus();
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  String _normalize(String s) {
+    final lower = s.trim().toLowerCase();
+    return lower
+        .replaceAll('ă', 'a')
+        .replaceAll('â', 'a')
+        .replaceAll('î', 'i')
+        .replaceAll('ș', 's')
+        .replaceAll('ş', 's')
+        .replaceAll('ț', 't')
+        .replaceAll('ţ', 't');
+  }
+
+  bool get _isCorrect => _normalize(_controller.text) == _normalize(widget.correctWord);
+  bool get _hasError => !_isCorrect && _controller.text.trim().isNotEmpty;
+  bool get _canProceed => _isCorrect || _revealed;
+
+  Future<void> _handleNext() async {
+    if (_canProceed) {
+      await widget.onShowCompletionDialog(true, false, false);
+      await widget.onFinish(skipCompletionDialog: true);
+    } else {
+      SnackBarUtils.showInfo(context, 'Mai încearcă!');
+    }
+  }
+
+  void _handleReveal() {
+    setState(() {
+      _revealed = true;
+      widget.payload['revealed'] = true;
+      _controller.text = widget.correctWord;
+      _focusNode.unfocus();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            widget.title,
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+              fontWeight: FontWeight.w700,
+              fontSize: 28,
+            ),
+          ),
+          const SizedBox(height: 8),
+          if (widget.subtitle.isNotEmpty)
+            Text(
+              widget.subtitle,
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+          const SizedBox(height: 12),
+
+          if (widget.imgUrl.isNotEmpty)
+            Center(
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: widget.imgUrl.startsWith('assets/')
+                    ? Image.asset(
+                        widget.imgUrl,
+                        width: 260,
+                        height: 260,
+                        fit: BoxFit.cover,
+                      )
+                    : Image.network(
+                        widget.imgUrl,
+                        width: 260,
+                        height: 260,
+                        fit: BoxFit.cover,
+                      ),
+              ),
+            ),
+
+          const SizedBox(height: 16),
+
+          TextField(
+            controller: _controller,
+            focusNode: _focusNode,
+            onChanged: (_) => setState(() {}), // Rebuild for feedback icons
+            textInputAction: TextInputAction.done,
+            onSubmitted: (_) => _handleNext(),
+            decoration: InputDecoration(
+              labelText: 'Scrie cuvântul',
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: BorderSide(color: cs.outlineVariant),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: BorderSide(color: cs.primary),
+              ),
+              suffixIcon: _isCorrect
+                  ? const Icon(Icons.check_circle, size: 24)
+                  : (_hasError ? const Icon(Icons.cancel, size: 24) : null),
+              suffixIconColor: _isCorrect
+                  ? Colors.green
+                  : (_hasError ? Colors.red : null),
+            ),
+          ),
+
+          const SizedBox(height: 6),
+
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton(
+              onPressed: _revealed ? null : _handleReveal,
+              style: TextButton.styleFrom(
+                foregroundColor: _revealed ? cs.outline : cs.error,
+                textStyle: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              child: Text(widget.helpLabel),
+            ),
+          ),
+
+          const Spacer(),
+
+          FilledButton(
+            onPressed: _canProceed ? _handleNext : null,
+            style: FilledButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 18),
+              backgroundColor: _canProceed ? null : Colors.grey,
+            ),
+            child: Text(
+              widget.nextLabel,
+              style: const TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 
