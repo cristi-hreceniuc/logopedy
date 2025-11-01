@@ -26,12 +26,24 @@ class ProfileCardDto {
 
   factory ProfileCardDto.fromJson(Map<String, dynamic> j) {
     DateTime? birthDate;
-    if (j['birthDate'] != null) {
-      if (j['birthDate'] is String) {
-        birthDate = DateTime.tryParse(j['birthDate']);
-      } else if (j['birthDate'] is int) {
-        birthDate = DateTime.fromMillisecondsSinceEpoch(j['birthDate']);
+    // Try different possible field names (case insensitive)
+    dynamic birthDateValue = j['birthday'] ?? j['birthDay'] ?? j['birthDate'] ?? j['birthdate'] ?? j['birth_date'];
+    
+    print('🔍 ProfileCardDto.fromJson - Raw birthDate value: $birthDateValue (type: ${birthDateValue?.runtimeType})');
+    
+    if (birthDateValue != null) {
+      if (birthDateValue is String) {
+        birthDate = DateTime.tryParse(birthDateValue);
+        print('🔍 Parsed birthDate from String: $birthDate');
+      } else if (birthDateValue is int) {
+        birthDate = DateTime.fromMillisecondsSinceEpoch(birthDateValue);
+        print('🔍 Parsed birthDate from int: $birthDate');
+      } else if (birthDateValue is Map) {
+        // Handle nested object if needed
+        print('🔍 birthDate is Map: $birthDateValue');
       }
+    } else {
+      print('🔍 No birthDate found in JSON. Available keys: ${j.keys.toList()}');
     }
     
     int? age;

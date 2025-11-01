@@ -1,6 +1,7 @@
 // lib/features/home/tabs/profiles_tab.dart
 import 'package:flutter/material.dart';
 import 'package:get_it/get_it.dart';
+import 'package:intl/intl.dart';
 import '../../../core/network/dio_client.dart';
 import '../../../core/state/active_profile.dart';
 import '../../../core/utils/snackbar_utils.dart';
@@ -33,115 +34,226 @@ class _ProfilesTabState extends State<ProfilesTab> {
   void _showCreateSheet() {
     final nameCtrl = TextEditingController();
     final avatarCtrl = TextEditingController();
+    DateTime? selectedBirthday;
+    String? selectedGender;
+    final formKey = GlobalKey<FormState>();
+    
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) {
-        return Container(
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-          ),
-          child: Padding(
-            padding: EdgeInsets.only(
-              left: 24,
-              right: 24,
-              top: 24,
-              bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Handle bar
-                Center(
-                  child: Container(
-                    width: 42,
-                    height: 4,
-                    margin: const EdgeInsets.only(bottom: 20),
-                    decoration: BoxDecoration(
-                      color: Colors.grey[300],
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                  ),
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Container(
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              child: Padding(
+                padding: EdgeInsets.only(
+                  left: 24,
+                  right: 24,
+                  top: 24,
+                  bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
                 ),
-                Text(
-                  'Profil nou',
-                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.w800,
-                    color: const Color(0xFF17406B),
-                  ),
-                ),
-                const SizedBox(height: 24),
-                TextField(
-                  controller: nameCtrl,
-                  decoration: InputDecoration(
-                    labelText: 'Nume profil',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                  ),
-                ),
-            const SizedBox(height: 16),
-                TextField(
-                  controller: avatarCtrl,
-                  decoration: InputDecoration(
-                    labelText: 'Avatar URL (opțional)',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 24),
-                Container(
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                        color: const Color(0xFFEA2233).withOpacity(0.3),
-                        blurRadius: 8,
-                        offset: const Offset(0, 2),
+                child: Form(
+                  key: formKey,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Handle bar
+                      Center(
+                        child: Container(
+                          width: 42,
+                          height: 4,
+                          margin: const EdgeInsets.only(bottom: 20),
+                          decoration: BoxDecoration(
+                            color: Colors.grey[300],
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                        ),
+                      ),
+                      Text(
+                        'Profil nou',
+                        style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                          fontWeight: FontWeight.w800,
+                          color: const Color(0xFF17406B),
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      TextFormField(
+                        controller: nameCtrl,
+                        decoration: InputDecoration(
+                          labelText: 'Nume profil',
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                        ),
+                        validator: (v) => (v == null || v.trim().isEmpty) ? 'Obligatoriu' : null,
+                      ),
+                      const SizedBox(height: 16),
+                      // Birthday field
+                      InkWell(
+                        onTap: () async {
+                          final picked = await showDatePicker(
+                            context: context,
+                            initialDate: DateTime.now().subtract(const Duration(days: 365 * 5)),
+                            firstDate: DateTime(1900),
+                            lastDate: DateTime.now(),
+                            builder: (context, child) {
+                              return Theme(
+                                data: Theme.of(context).copyWith(
+                                  colorScheme: const ColorScheme.light(
+                                    primary: Color(0xFFEA2233),
+                                  ),
+                                ),
+                                child: child!,
+                              );
+                            },
+                          );
+                          if (picked != null) {
+                            setModalState(() {
+                              selectedBirthday = picked;
+                            });
+                          }
+                        },
+                        child: InputDecorator(
+                          decoration: InputDecoration(
+                            labelText: 'Data nașterii',
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            suffixIcon: const Icon(Icons.calendar_today),
+                          ),
+                          child: Text(
+                            selectedBirthday != null
+                                ? DateFormat('dd/MM/yyyy').format(selectedBirthday!)
+                                : 'Selectează data nașterii',
+                            style: TextStyle(
+                              color: selectedBirthday != null
+                                  ? Colors.black87
+                                  : Colors.grey[600],
+                            ),
+                          ),
+                        ),
+                      ),
+                      if (selectedBirthday == null)
+                        Padding(
+                          padding: const EdgeInsets.only(left: 12, top: 4),
+                          child: Text(
+                            'Obligatoriu',
+                            style: TextStyle(
+                              color: Colors.red[700],
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                      const SizedBox(height: 16),
+                      // Gender field
+                      DropdownButtonFormField<String>(
+                        value: selectedGender,
+                        decoration: InputDecoration(
+                          labelText: 'Gen',
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                        ),
+                        items: const [
+                          DropdownMenuItem(value: 'MALE', child: Text('Masculin')),
+                          DropdownMenuItem(value: 'FEMALE', child: Text('Feminin')),
+                        ],
+                        onChanged: (v) {
+                          setModalState(() {
+                            selectedGender = v;
+                          });
+                        },
+                        validator: (v) => (v == null || v.isEmpty) ? 'Obligatoriu' : null,
+                      ),
+                      const SizedBox(height: 16),
+                      TextField(
+                        controller: avatarCtrl,
+                        decoration: InputDecoration(
+                          labelText: 'Avatar URL (opțional)',
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      Container(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(16),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFFEA2233).withOpacity(0.3),
+                              blurRadius: 8,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: SizedBox(
+                          width: double.infinity,
+                          child: FilledButton(
+                            onPressed: () async {
+                              if (!formKey.currentState!.validate()) return;
+                              if (selectedBirthday == null) {
+                                ScaffoldMessenger.of(ctx).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Te rugăm să selectezi data nașterii'),
+                                    backgroundColor: Color(0xFFEA2233),
+                                  ),
+                                );
+                                return;
+                              }
+                              if (selectedGender == null) {
+                                ScaffoldMessenger.of(ctx).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Te rugăm să selectezi genul'),
+                                    backgroundColor: Color(0xFFEA2233),
+                                  ),
+                                );
+                                return;
+                              }
+                              
+                              final name = nameCtrl.text.trim();
+                              await repo.create(
+                                name: name,
+                                avatarUri: avatarCtrl.text.trim().isEmpty
+                                    ? null
+                                    : avatarCtrl.text.trim(),
+                                birthDate: selectedBirthday!,
+                                gender: selectedGender!,
+                              );
+                              if (!mounted) return;
+                              Navigator.pop(ctx);
+                              SnackBarUtils.showSuccess(context, 'Profil creat');
+                              await _refresh();
+                            },
+                            style: FilledButton.styleFrom(
+                              backgroundColor: const Color(0xFFEA2233),
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              textStyle: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            child: const Text('Creează'),
+                          ),
+                        ),
                       ),
                     ],
                   ),
-                  child: SizedBox(
-              width: double.infinity,
-              child: FilledButton(
-                onPressed: () async {
-                  final name = nameCtrl.text.trim();
-                  if (name.isEmpty) return;
-                        await repo.create(
-                          name: name,
-                          avatarUri: avatarCtrl.text.trim().isEmpty
-                              ? null
-                              : avatarCtrl.text.trim(),
-                        );
-                  if (!mounted) return;
-                  Navigator.pop(ctx);
-                        SnackBarUtils.showSuccess(context, 'Profil creat');
-                  await _refresh();
-                },
-                      style: FilledButton.styleFrom(
-                        backgroundColor: const Color(0xFFEA2233),
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        textStyle: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                child: const Text('Creează'),
-              ),
-                  ),
                 ),
-              ],
-            ),
-          ),
+              ),
+            );
+          },
         );
       },
     );
@@ -325,7 +437,7 @@ class _ProfileCard extends StatelessWidget {
       child: Stack(
         children: [
               Padding(
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.all(10),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                   mainAxisSize: MainAxisSize.min,
@@ -335,7 +447,7 @@ class _ProfileCard extends StatelessWidget {
                     alignment: Alignment.topRight,
                     child: p.premium
                           ? Container(
-                              padding: const EdgeInsets.all(5),
+                              padding: const EdgeInsets.all(4),
                               decoration: BoxDecoration(
                                 color: const Color(0xFFEA2233).withOpacity(0.1),
                                 borderRadius: BorderRadius.circular(10),
@@ -343,12 +455,12 @@ class _ProfileCard extends StatelessWidget {
                               child: Icon(
                                 Icons.star_rounded,
                                 color: const Color(0xFFEA2233),
-                                size: 18,
+                                size: 16,
                               ),
                             )
-                          : const SizedBox(height: 28, width: 28),
+                          : const SizedBox(height: 24, width: 24),
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 2),
                     // Avatar
               Center(
                       child: Stack(
@@ -405,7 +517,7 @@ class _ProfileCard extends StatelessWidget {
                 ],
               ),
             ),
-                    const SizedBox(height: 10),
+                    const SizedBox(height: 6),
                     // Name
                     Text(
                       p.name,
@@ -413,84 +525,70 @@ class _ProfileCard extends StatelessWidget {
                       style: Theme.of(context).textTheme.titleSmall?.copyWith(
                         fontWeight: FontWeight.w700,
                         color: const Color(0xFF17406B),
-                        fontSize: 13,
+                        fontSize: 14,
                       ),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    // Additional info
-                    if (p.age != null || p.gender != null) ...[
-                      const SizedBox(height: 6),
+                    // Additional info - Gender icon + Birthday date (moved up)
+                    Builder(
+                      builder: (context) {
+                        // Debug logging
+                        if (p.birthDate != null || p.gender != null) {
+                          print('🎨 Profile card "${p.name}" - birthDate: ${p.birthDate}, gender: ${p.gender}');
+                        }
+                        return const SizedBox.shrink();
+                      },
+                    ),
+                    if (p.birthDate != null || p.gender != null) ...[
+                      const SizedBox(height: 3),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                          if (p.age != null) ...[
-                            Icon(Icons.cake_outlined, size: 10, color: Colors.grey[600]),
-                            const SizedBox(width: 3),
-                            Flexible(
-                              child: Text(
-                                '${p.age} ani',
-                                style: TextStyle(
-                                  color: Colors.grey[600],
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ],
-                          if (p.age != null && p.gender != null)
-                            Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 4),
-                              child: Container(
-                                width: 2,
-                                height: 2,
-                                decoration: BoxDecoration(
-                                  color: Colors.grey[400],
-                                  shape: BoxShape.circle,
-                                ),
-                              ),
-                            ),
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          // Gender icon (boy or girl)
                           if (p.gender != null) ...[
-                            Icon(Icons.person_outline, size: 10, color: Colors.grey[600]),
-                            const SizedBox(width: 3),
+                            _getGenderIcon(p.gender!),
+                            const SizedBox(width: 8),
+                          ],
+                          // Birthday date only (no label)
+                          if (p.birthDate != null)
                             Flexible(
                               child: Text(
-                                _getGenderLabel(p.gender!),
+                                DateFormat('dd/MM/yyyy').format(p.birthDate!),
                                 style: TextStyle(
-                                  color: Colors.grey[600],
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w500,
+                                  color: Colors.grey[700],
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
                                 ),
                                 overflow: TextOverflow.ellipsis,
+                                textAlign: TextAlign.center,
                               ),
                             ),
-                          ],
                         ],
                       ),
                     ],
                     const Spacer(),
-                    const SizedBox(height: 10),
+                    const SizedBox(height: 6),
                     // Progress
                     LinearProgressIndicator(
                       value: (p.totalLessons == 0)
                           ? 0
                           : (p.completedLessons / p.totalLessons),
                       borderRadius: BorderRadius.circular(8),
-                      minHeight: 7,
+                      minHeight: 6,
                       backgroundColor: const Color(0xFFEA2233).withOpacity(0.1),
                       valueColor: const AlwaysStoppedAnimation<Color>(
                         Color(0xFFEA2233),
                       ),
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 2),
                     Text(
                       '${p.progressPercent}% complet',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         color: Colors.grey[600],
-                        fontSize: 11,
+                        fontSize: 10,
                         fontWeight: FontWeight.w600,
                       ),
                       maxLines: 1,
@@ -554,11 +652,50 @@ class _ProfileCard extends StatelessWidget {
 String _getGenderLabel(String gender) {
   final lowerGender = gender.toLowerCase();
   if (lowerGender == 'male' || lowerGender == 'm' || lowerGender == 'masculin') {
-    return 'M';
+    return 'Băiat';
   } else if (lowerGender == 'female' || lowerGender == 'f' || lowerGender == 'feminin') {
-    return 'F';
+    return 'Fată';
   } else if (lowerGender == 'other' || lowerGender == 'o' || lowerGender == 'altul') {
     return 'Altul';
   }
   return gender;
+}
+
+Widget _getGenderIcon(String gender) {
+  final lowerGender = gender.toLowerCase();
+  if (lowerGender == 'male' || lowerGender == 'm' || lowerGender == 'masculin') {
+    // Boy icon - using child_care icon with blue styling
+    return Container(
+      padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(
+        color: const Color(0xFF2D72D2).withOpacity(0.1),
+        shape: BoxShape.circle,
+      ),
+      child: Icon(
+        Icons.child_care,
+        size: 16,
+        color: const Color(0xFF2D72D2),
+      ),
+    );
+  } else if (lowerGender == 'female' || lowerGender == 'f' || lowerGender == 'feminin') {
+    // Girl icon - using face icon with pink/red styling
+    return Container(
+      padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(
+        color: const Color(0xFFEA2233).withOpacity(0.1),
+        shape: BoxShape.circle,
+      ),
+      child: Icon(
+        Icons.face,
+        size: 16,
+        color: const Color(0xFFEA2233),
+      ),
+    );
+  }
+  // Default icon for other genders
+  return Icon(
+    Icons.person_outline,
+    size: 16,
+    color: Colors.grey[600],
+  );
 }

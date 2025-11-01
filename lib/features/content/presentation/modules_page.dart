@@ -1,8 +1,10 @@
 // lib/features/content/presentation/modules_page.dart
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:get_it/get_it.dart';
 import '../../../core/network/dio_client.dart';
 import '../../../core/utils/snackbar_utils.dart';
+import '../../../features/session/session_info.dart';
 import '../content_repository.dart';
 import '../models/dtos.dart';
 import '../models/modules_details_dto.dart';
@@ -19,11 +21,22 @@ class ModulesPage extends StatefulWidget {
 class _ModulesPageState extends State<ModulesPage> {
   late final repo = ContentRepository(GetIt.I<DioClient>());
   late Future<List<ModuleDto>> _f;
+  bool? _isPremium;
 
   @override
   void initState() {
     super.initState();
     _f = repo.modules(widget.profileId);
+    _loadPremiumStatus();
+  }
+
+  Future<void> _loadPremiumStatus() async {
+    final sessionInfo = await SessionInfo.fromStorage();
+    if (mounted) {
+      setState(() {
+        _isPremium = sessionInfo?.isPremium ?? false;
+      });
+    }
   }
 
   @override
@@ -70,13 +83,32 @@ class _ModulesPageState extends State<ModulesPage> {
   }
 
   Future<void> _openModule(ModuleDto m) async {
+    // Check if module is premium and user doesn't have premium access
+    if (m.isPremium && _isPremium != true) {
+      if (!mounted) return;
+      SnackBarUtils.showInfo(
+        context,
+        'Acest modul necesită cont Premium. Contactează administratorul pentru a obține acces.',
+      );
+      return;
+    }
+
     // 1) ia detaliile modulului (lista de submodule)
     late final ModuleDetailsDto md;
     try {
       md = await repo.moduleDetails(widget.profileId, m.id);
     } catch (e) {
       if (!mounted) return;
-      SnackBarUtils.showError(context, 'Nu pot încărca submodulele: $e');
+      
+      // Check if it's a 403 Forbidden error
+      if (e is DioException && e.response?.statusCode == 403) {
+        SnackBarUtils.showInfo(
+          context,
+          'Acest modul necesită cont Premium. Contactează administratorul pentru a obține acces.',
+        );
+      } else {
+        SnackBarUtils.showError(context, 'Nu pot încărca submodulele: $e');
+      }
       return;
     }
 
@@ -170,6 +202,10 @@ class _ModulesPageState extends State<ModulesPage> {
                 separatorBuilder: (_, __) => const SizedBox(height: 16),
                 itemBuilder: (_, i) {
                   final m = modules[i];
+                  final isPremiumModule = m.isPremium;
+                  final hasPremiumAccess = _isPremium == true;
+                  final isLocked = isPremiumModule && !hasPremiumAccess;
+                  
                   return FutureBuilder<double>(
                     future: _getModuleProgress(m),
                     builder: (context, progressSnapshot) {
@@ -180,94 +216,162 @@ class _ModulesPageState extends State<ModulesPage> {
                         child: InkWell(
                           onTap: () => _openModule(m),
                           borderRadius: BorderRadius.circular(24),
-                          child: Container(
-                            padding: const EdgeInsets.all(20),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(24),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(0.08),
-                                  blurRadius: 16,
-                                  offset: const Offset(0, 4),
-                                ),
-                              ],
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    Container(
-                                      padding: const EdgeInsets.all(12),
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xFF2D72D2).withOpacity(0.1),
-                                        borderRadius: BorderRadius.circular(16),
-                                      ),
-                                      child: Icon(
-                                        Icons.menu_book_rounded,
-                                        size: 28,
-                                        color: const Color(0xFF2D72D2),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 16),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            m.title,
-                                            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                                              fontWeight: FontWeight.w700,
-                                              color: const Color(0xFF17406B),
-                                            ),
-                                          ),
-                                          if (m.introText != null && m.introText!.isNotEmpty) ...[
-                                            const SizedBox(height: 6),
-                                            Text(
-                                              m.introText!,
-                                              style: TextStyle(
-                                                color: Colors.grey[600],
-                                                fontSize: 14,
-                                                fontWeight: FontWeight.w500,
-                                              ),
-                                              maxLines: 2,
-                                              overflow: TextOverflow.ellipsis,
-                                            ),
-                                          ],
-                                        ],
-                                      ),
-                                    ),
-                                    const SizedBox(width: 12),
-                                    Icon(
-                                      Icons.chevron_right_rounded,
-                                      color: const Color(0xFF2D72D2),
-                                      size: 24,
-                                    ),
-                                  ],
-                                ),
-                                if (progress > 0 || progressSnapshot.connectionState == ConnectionState.done) ...[
-                                  const SizedBox(height: 16),
-                                  LinearProgressIndicator(
-                                    value: progress,
-                                    borderRadius: BorderRadius.circular(8),
-                                    minHeight: 8,
-                                    backgroundColor: const Color(0xFF2D72D2).withOpacity(0.1),
-                                    valueColor: const AlwaysStoppedAnimation<Color>(
-                                      Color(0xFF2D72D2),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Text(
-                                    '${(progress * 100).round()}% complet',
-                                    style: TextStyle(
-                                      color: Colors.grey[600],
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w600,
-                                    ),
+                          child: Opacity(
+                            opacity: isLocked ? 0.5 : 1.0,
+                            child: Container(
+                              padding: const EdgeInsets.all(20),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(24),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.08),
+                                    blurRadius: 16,
+                                    offset: const Offset(0, 4),
                                   ),
                                 ],
-                              ],
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.all(12),
+                                        decoration: BoxDecoration(
+                                          color: isLocked
+                                              ? Colors.grey.withOpacity(0.1)
+                                              : const Color(0xFF2D72D2).withOpacity(0.1),
+                                          borderRadius: BorderRadius.circular(16),
+                                        ),
+                                        child: Icon(
+                                          Icons.menu_book_rounded,
+                                          size: 28,
+                                          color: isLocked
+                                              ? Colors.grey[600]
+                                              : const Color(0xFF2D72D2),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 16),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Row(
+                                              children: [
+                                                Expanded(
+                                                  child: Text(
+                                                    m.title,
+                                                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                                                      fontWeight: FontWeight.w700,
+                                                      color: isLocked
+                                                          ? Colors.grey[600]
+                                                          : const Color(0xFF17406B),
+                                                    ),
+                                                  ),
+                                                ),
+                                                if (isPremiumModule) ...[
+                                                  const SizedBox(width: 8),
+                                                  Container(
+                                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                                    decoration: BoxDecoration(
+                                                      color: isLocked
+                                                          ? Colors.grey.withOpacity(0.2)
+                                                          : const Color(0xFFEA2233).withOpacity(0.1),
+                                                      borderRadius: BorderRadius.circular(12),
+                                                      border: Border.all(
+                                                        color: isLocked
+                                                            ? Colors.grey.withOpacity(0.3)
+                                                            : const Color(0xFFEA2233).withOpacity(0.3),
+                                                        width: 1,
+                                                      ),
+                                                    ),
+                                                    child: Row(
+                                                      mainAxisSize: MainAxisSize.min,
+                                                      children: [
+                                                        Icon(
+                                                          Icons.star_rounded,
+                                                          size: 12,
+                                                          color: isLocked
+                                                              ? Colors.grey[600]
+                                                              : const Color(0xFFEA2233),
+                                                        ),
+                                                        const SizedBox(width: 4),
+                                                        Text(
+                                                          'Premium',
+                                                          style: TextStyle(
+                                                            color: isLocked
+                                                                ? Colors.grey[600]
+                                                                : const Color(0xFFEA2233),
+                                                            fontSize: 11,
+                                                            fontWeight: FontWeight.w700,
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  ),
+                                                ],
+                                              ],
+                                            ),
+                                            if (m.introText != null && m.introText!.isNotEmpty) ...[
+                                              const SizedBox(height: 6),
+                                              Text(
+                                                m.introText!,
+                                                style: TextStyle(
+                                                  color: isLocked
+                                                      ? Colors.grey[500]
+                                                      : Colors.grey[600],
+                                                  fontSize: 14,
+                                                  fontWeight: FontWeight.w500,
+                                                ),
+                                                maxLines: 2,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ],
+                                          ],
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Icon(
+                                        isLocked
+                                            ? Icons.lock_outline_rounded
+                                            : Icons.chevron_right_rounded,
+                                        color: isLocked
+                                            ? Colors.grey[600]
+                                            : const Color(0xFF2D72D2),
+                                        size: 24,
+                                      ),
+                                    ],
+                                  ),
+                                  if (progress > 0 || progressSnapshot.connectionState == ConnectionState.done) ...[
+                                    const SizedBox(height: 16),
+                                    LinearProgressIndicator(
+                                      value: progress,
+                                      borderRadius: BorderRadius.circular(8),
+                                      minHeight: 8,
+                                      backgroundColor: isLocked
+                                          ? Colors.grey.withOpacity(0.1)
+                                          : const Color(0xFF2D72D2).withOpacity(0.1),
+                                      valueColor: AlwaysStoppedAnimation<Color>(
+                                        isLocked
+                                            ? Colors.grey[600]!
+                                            : const Color(0xFF2D72D2),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      '${(progress * 100).round()}% complet',
+                                      style: TextStyle(
+                                        color: isLocked
+                                            ? Colors.grey[500]
+                                            : Colors.grey[600],
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              ),
                             ),
                           ),
                         ),

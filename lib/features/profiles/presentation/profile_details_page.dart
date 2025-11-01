@@ -25,6 +25,10 @@ class _ProfileDetailsPageState extends State<ProfileDetailsPage> {
   late final repo = ProfilesRepository(GetIt.I<DioClient>());
   late Future<List<LessonProgressDto>> _f;
   late Future<ProfileCardDto> _profileDetails;
+  
+  // Track expanded state for modules and submodules (collapsed by default)
+  final Set<int> _expandedModules = <int>{};
+  final Set<int> _expandedSubmodules = <int>{};
 
   @override
   void initState() {
@@ -133,22 +137,27 @@ class _ProfileDetailsPageState extends State<ProfileDetailsPage> {
 
   String _formatDate(DateTime? date) {
     if (date == null) return '—';
-    try {
-      final dateFormat = DateFormat('dd MMMM yyyy', 'ro_RO');
-      return dateFormat.format(date);
-    } catch (e) {
-      final dateFormat = DateFormat('dd MMMM yyyy');
-      return dateFormat.format(date);
-    }
+    
+    // Romanian month names
+    const romanianMonths = [
+      'Ianuarie', 'Februarie', 'Martie', 'Aprilie', 'Mai', 'Iunie',
+      'Iulie', 'August', 'Septembrie', 'Octombrie', 'Noiembrie', 'Decembrie'
+    ];
+    
+    final day = date.day;
+    final month = romanianMonths[date.month - 1];
+    final year = date.year;
+    
+    return '$day $month $year';
   }
 
   String _getGenderLabel(String? gender) {
     if (gender == null) return '—';
     final lowerGender = gender.toLowerCase();
     if (lowerGender == 'male' || lowerGender == 'm' || lowerGender == 'masculin') {
-      return 'Masculin';
+      return 'Băiat';
     } else if (lowerGender == 'female' || lowerGender == 'f' || lowerGender == 'feminin') {
-      return 'Feminin';
+      return 'Fată';
     } else if (lowerGender == 'other' || lowerGender == 'o' || lowerGender == 'altul') {
       return 'Altul';
     }
@@ -341,13 +350,20 @@ class _ProfileDetailsPageState extends State<ProfileDetailsPage> {
                               ),
                             const SizedBox(height: 24),
                             // Details
+                            Builder(
+                              builder: (context) {
+                                // Debug logging
+                                print('🎨 Profile details page - birthDate: ${profile.birthDate}, gender: ${profile.gender}');
+                                return const SizedBox.shrink();
+                              },
+                            ),
                             if (profile.birthDate != null || profile.gender != null || profile.age != null) ...[
                               if (profile.birthDate != null)
                                 _DetailRow(
                                   icon: Icons.cake_outlined,
                                   iconColor: const Color(0xFF2D72D2),
-                                  label: 'Data nașterii',
-                                  value: _formatDate(profile.birthDate),
+                                  label: 'Zi de naștere',
+                                  value: _formatDate(profile.birthDate!),
                                 ),
                               if (profile.birthDate != null && (profile.gender != null || profile.age != null))
                                 const SizedBox(height: 16),
@@ -451,77 +467,7 @@ class _ProfileDetailsPageState extends State<ProfileDetailsPage> {
                                 ),
                               ),
                               const SizedBox(height: 16),
-                              ...items.groupBy((e) => e.submoduleId).entries.map((entry) {
-              final subTitle = entry.value.first.submoduleTitle;
-              final lessons = entry.value;
-
-                                return Container(
-                                  margin: const EdgeInsets.only(bottom: 16),
-                                  padding: const EdgeInsets.all(16),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFFF3F5F8),
-                                    borderRadius: BorderRadius.circular(16),
-                                  ),
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        subTitle,
-                                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                          fontWeight: FontWeight.w700,
-                                          color: const Color(0xFF17406B),
-                                        ),
-                                      ),
-                                      const SizedBox(height: 12),
-                                      ...lessons.map((l) => Padding(
-                                        padding: const EdgeInsets.only(bottom: 8),
-                                        child: Row(
-                                          children: [
-                                            _statusIcon(l.status),
-                                            const SizedBox(width: 12),
-                                            Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                                                  Text(
-                                                    l.lessonTitle,
-                                                    style: const TextStyle(
-                                                      fontWeight: FontWeight.w600,
-                                                      color: Color(0xFF17406B),
-                                                    ),
-                                                  ),
-                                                  Text(
-                                                    '${l.moduleTitle} • Lecția ${l.lessonId}',
-                                                    style: TextStyle(
-                                                      color: Colors.grey[600],
-                                                      fontSize: 12,
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                            ),
-                                            Container(
-                                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                              decoration: BoxDecoration(
-                                                color: _getStatusColor(l.status).withOpacity(0.1),
-                                                borderRadius: BorderRadius.circular(12),
-                                              ),
-                                              child: Text(
-                                                _getStatusLabel(l.status),
-                                                style: TextStyle(
-                                                  color: _getStatusColor(l.status),
-                                                  fontSize: 11,
-                                                  fontWeight: FontWeight.w700,
-                                                ),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                      )),
-                    ],
-                ),
-              );
-            }).toList(),
+                              ..._buildModulesList(items),
                             ],
                           ),
                         ),
@@ -622,6 +568,205 @@ class _ProfileDetailsPageState extends State<ProfileDetailsPage> {
       default:
         return 'Blocat';
     }
+  }
+
+  List<Widget> _buildModulesList(List<LessonProgressDto> items) {
+    // First group by module, then by submodule
+    final Map<int, Map<int, List<LessonProgressDto>>> modulesMap = {};
+    
+    for (final item in items) {
+      modulesMap.putIfAbsent(item.moduleId, () => {});
+      modulesMap[item.moduleId]!.putIfAbsent(item.submoduleId, () => []);
+      modulesMap[item.moduleId]![item.submoduleId]!.add(item);
+    }
+
+    return modulesMap.entries.map((moduleEntry) {
+      final moduleId = moduleEntry.key;
+      final moduleData = moduleEntry.value;
+      final firstItem = moduleData.values.first.first;
+      final moduleTitle = firstItem.moduleTitle;
+      final isModuleExpanded = _expandedModules.contains(moduleId);
+
+      return Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: const Color(0xFFF3F5F8),
+            width: 1,
+          ),
+        ),
+        child: Column(
+          children: [
+            // Module header (clickable)
+            InkWell(
+              onTap: () {
+                setState(() {
+                  if (isModuleExpanded) {
+                    _expandedModules.remove(moduleId);
+                  } else {
+                    _expandedModules.add(moduleId);
+                  }
+                });
+              },
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Row(
+                  children: [
+                    Icon(
+                      isModuleExpanded ? Icons.expand_more : Icons.chevron_right,
+                      color: const Color(0xFF17406B),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        moduleTitle,
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
+                          color: const Color(0xFF17406B),
+                        ),
+                      ),
+                    ),
+                    Text(
+                      '${moduleData.length} submodule${moduleData.length != 1 ? '' : ''}',
+                      style: TextStyle(
+                        color: Colors.grey[600],
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            // Submodules (shown when module is expanded)
+            if (isModuleExpanded)
+              Padding(
+                padding: const EdgeInsets.only(left: 16, right: 16, bottom: 16),
+                child: Column(
+                  children: moduleData.entries.map((submoduleEntry) {
+                    final submoduleId = submoduleEntry.key;
+                    final submoduleItems = submoduleEntry.value;
+                    final firstSubmoduleItem = submoduleItems.first;
+                    final submoduleTitle = firstSubmoduleItem.submoduleTitle;
+                    final isSubmoduleExpanded = _expandedSubmodules.contains(submoduleId);
+
+                    return Container(
+                      margin: const EdgeInsets.only(top: 8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF3F5F8),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Column(
+                        children: [
+                          // Submodule header (clickable)
+                          InkWell(
+                            onTap: () {
+                              setState(() {
+                                if (isSubmoduleExpanded) {
+                                  _expandedSubmodules.remove(submoduleId);
+                                } else {
+                                  _expandedSubmodules.add(submoduleId);
+                                }
+                              });
+                            },
+                            borderRadius: const BorderRadius.all(Radius.circular(12)),
+                            child: Padding(
+                              padding: const EdgeInsets.all(12),
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    isSubmoduleExpanded ? Icons.expand_more : Icons.chevron_right,
+                                    color: const Color(0xFF17406B),
+                                    size: 20,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      submoduleTitle,
+                                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                                        fontWeight: FontWeight.w700,
+                                        color: const Color(0xFF17406B),
+                                      ),
+                                    ),
+                                  ),
+                                  Text(
+                                    '${submoduleItems.length} lecții',
+                                    style: TextStyle(
+                                      color: Colors.grey[600],
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          // Lessons (shown when submodule is expanded)
+                          if (isSubmoduleExpanded)
+                            Padding(
+                              padding: const EdgeInsets.only(left: 12, right: 12, bottom: 12),
+                              child: Column(
+                                children: submoduleItems.map((l) => Padding(
+                                  padding: const EdgeInsets.only(bottom: 8),
+                                  child: Row(
+                                    children: [
+                                      _statusIcon(l.status),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              l.lessonTitle,
+                                              style: const TextStyle(
+                                                fontWeight: FontWeight.w600,
+                                                color: Color(0xFF17406B),
+                                                fontSize: 14,
+                                              ),
+                                            ),
+                                            Text(
+                                              '${l.moduleTitle} • Lecția ${l.lessonId}',
+                                              style: TextStyle(
+                                                color: Colors.grey[600],
+                                                fontSize: 12,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                        decoration: BoxDecoration(
+                                          color: _getStatusColor(l.status).withOpacity(0.1),
+                                          borderRadius: BorderRadius.circular(12),
+                                        ),
+                                        child: Text(
+                                          _getStatusLabel(l.status),
+                                          style: TextStyle(
+                                            color: _getStatusColor(l.status),
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                )).toList(),
+                              ),
+                            ),
+                        ],
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
+          ],
+        ),
+      );
+    }).toList();
   }
 }
 
