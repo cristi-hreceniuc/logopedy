@@ -61,8 +61,14 @@ class AuthRepository {
   }
 
   Future<void> deleteAccount() async {
-    await _api.deleteAccount();
+    // Get current user ID and delete using the new endpoint
+    final currentUser = await _api.getCurrentUser();
+    await _api.deleteUser(currentUser.id);
     await _store.clear(); // Clear session after deletion
+  }
+
+  Future<void> deleteUser(String userId) async {
+    await _api.deleteUser(userId);
   }
 
   Future<UserResponseDto> getCurrentUser() async {

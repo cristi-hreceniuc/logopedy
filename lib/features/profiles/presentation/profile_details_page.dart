@@ -100,16 +100,35 @@ class _ProfileDetailsPageState extends State<ProfileDetailsPage> {
 
     if (confirmed == true && mounted) {
       try {
+        final wasActiveProfile = GetIt.I<ActiveProfileService>().id == widget.profile.id;
+        
         await repo.delete(widget.profile.id);
         if (!mounted) return;
         
-        // If this was the active profile, clear it
-        final activeId = GetIt.I<ActiveProfileService>().id;
-        if (activeId == widget.profile.id) {
-          context.read<SelectedProfileCubit>().set(null);
-          await GetIt.I<SecureStore>().saveActiveProfileId(null);
-          GetIt.I<DioClient>().setActiveProfile(null);
-          await GetIt.I<ActiveProfileService>().clear();
+        // If this was the active profile, auto-select the first remaining profile
+        if (wasActiveProfile) {
+          try {
+            final remainingProfiles = await repo.list();
+            if (remainingProfiles.isNotEmpty) {
+              final firstProfile = remainingProfiles.first;
+              context.read<SelectedProfileCubit>().set(firstProfile.id);
+              await GetIt.I<SecureStore>().saveActiveProfileId(firstProfile.id);
+              GetIt.I<DioClient>().setActiveProfile(firstProfile.id);
+              await GetIt.I<ActiveProfileService>().set(firstProfile.id);
+            } else {
+              // No profiles left, clear active profile
+              context.read<SelectedProfileCubit>().set(null);
+              await GetIt.I<SecureStore>().saveActiveProfileId(null);
+              GetIt.I<DioClient>().setActiveProfile(null);
+              await GetIt.I<ActiveProfileService>().clear();
+            }
+          } catch (e) {
+            // If auto-selection fails, just clear the active profile
+            context.read<SelectedProfileCubit>().set(null);
+            await GetIt.I<SecureStore>().saveActiveProfileId(null);
+            GetIt.I<DioClient>().setActiveProfile(null);
+            await GetIt.I<ActiveProfileService>().clear();
+          }
         }
         
         SnackBarUtils.showSuccess(context, 'Profil șters cu succes');

@@ -36,10 +36,8 @@ class LogopedyApp extends StatelessWidget {
                 builder: (context, child) {
                   final active = GetIt.I<ActiveProfileService>().id;
 
-                  if (active == null) {
-                    return const ProfilePickerSheet();
-                  }
-
+                  // Allow HomeShell to show even without active profile for first login
+                  // HomeShell will handle auto-selecting the first profile
                   return HomeShell(profileId: active);
                 },
               );

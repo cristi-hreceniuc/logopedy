@@ -22,4 +22,7 @@ class AppConfig {
 
   static const String refreshPath = '/api/v1/auth/refresh';
 
+  // users
+  static String deleteUserPath(String userId) => '/api/v1/users/$userId';
+
 }

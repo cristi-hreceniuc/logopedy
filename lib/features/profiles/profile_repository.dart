@@ -37,15 +37,18 @@ class ProfilesRepository {
     required DateTime birthDate,
     required String gender,
   }) async {
+    // Format date as YYYY-MM-DD without time
+    final dateOnly = '${birthDate.year}-${birthDate.month.toString().padLeft(2, '0')}-${birthDate.day.toString().padLeft(2, '0')}';
+    
     final requestData = {
       'name': name,
       if (avatarUri != null) 'avatarUri': avatarUri,
-      'birthday': birthDate.toIso8601String(),
+      'birthday': dateOnly,
       'gender': gender,
     };
     
     print('📤 Creating profile with data: $requestData');
-    print('📤 birthDate ISO8601: ${birthDate.toIso8601String()}');
+    print('📤 birthDate (date only): $dateOnly');
     
     final r = await _dio.post('/api/profiles', data: requestData);
     

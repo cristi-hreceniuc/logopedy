@@ -6,16 +6,18 @@ import '../auth/data/domain/auth_repository.dart';
 import '../auth/data/models/user_response_dto.dart';
 import '../profiles/data/profiles_repository.dart';
 import '../profiles/models/profile_model.dart';
+import '../profiles/selected_profile_cubit.dart';
 import '../session/session_info.dart';
 import '../../core/state/active_profile.dart';
 import '../../core/network/dio_client.dart';
+import '../../core/storage/secure_storage.dart';
 import 'tabs/account_tab.dart';
 import 'tabs/profiles_tab.dart';
 import 'tabs/modules_tab.dart';
 
 class HomeShell extends StatefulWidget {
-  const HomeShell({super.key, required this.profileId});
-  final int profileId;
+  const HomeShell({super.key, this.profileId});
+  final int? profileId;
 
   @override
   State<HomeShell> createState() => _HomeShellState();
@@ -23,6 +25,41 @@ class HomeShell extends StatefulWidget {
 
 class _HomeShellState extends State<HomeShell> {
   int _index = 0;
+  bool _hasAutoSelected = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // If no active profile, navigate to profiles tab and auto-select first profile
+    if (widget.profileId == null) {
+      _index = 0; // Profiles tab
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _autoSelectFirstProfile();
+      });
+    }
+  }
+
+  Future<void> _autoSelectFirstProfile() async {
+    if (_hasAutoSelected) return;
+    
+    try {
+      final profilesRepo = ProfilesRepository(GetIt.I<DioClient>());
+      final profiles = await profilesRepo.listProfiles();
+      
+      if (profiles.isNotEmpty && mounted) {
+        _hasAutoSelected = true;
+        final firstProfile = profiles.first;
+        
+        // Set as active profile
+        context.read<SelectedProfileCubit>().set(firstProfile.id);
+        await GetIt.I<SecureStore>().saveActiveProfileId(firstProfile.id);
+        GetIt.I<DioClient>().setActiveProfile(firstProfile.id);
+        await GetIt.I<ActiveProfileService>().set(firstProfile.id);
+      }
+    } catch (e) {
+      debugPrint('Error auto-selecting first profile: $e');
+    }
+  }
 
   Widget _buildInitialsAvatar(String initials, bool isSelected, {double size = 26}) {
     return Container(
@@ -116,95 +153,103 @@ class _HomeShellState extends State<HomeShell> {
 
   @override
   Widget build(BuildContext context) {
-    final tabs = [
-      const ProfilesTab(),
-      ModulesTab(profileId: widget.profileId),
-      const AccountTab(),
-    ];
-
-    final activeProfileService = GetIt.I<ActiveProfileService>();
-    final profilesRepo = ProfilesRepository(GetIt.I<DioClient>());
     final authRepo = GetIt.I<AuthRepository>();
 
-    return BlocListener<AuthCubit, AuthState>(
-      listenWhen: (prev, curr) => prev.authenticated && !curr.authenticated,
-      listener: (context, state) {
-        // Log out -> LogopedyApp te duce automat la LoginPage
-      },
-      child: Scaffold(
-        body: IndexedStack(index: _index, children: tabs),
-        bottomNavigationBar: Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.08),
-                blurRadius: 16,
-                offset: const Offset(0, -4),
-              ),
-            ],
-          ),
-          child: SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
-                children: [
-                  // Profile tab with icon
-                  _buildNavItem(0, Icons.group_outlined, Icons.group, 'Profile', null),
-                  // Modules tab
-                  _buildNavItem(1, Icons.menu_book_outlined, Icons.menu_book, 'Module', null),
-                  // Account tab with initials
-                  FutureBuilder<UserResponseDto?>(
-                    future: authRepo.getCurrentUser().catchError((_) => null),
-                    builder: (context, userSnapshot) {
-                      return FutureBuilder<SessionInfo?>(
-                        future: SessionInfo.fromStorage(),
-                        builder: (context, sessionSnapshot) {
-                          final user = userSnapshot.data;
-                          final session = sessionSnapshot.data;
-                          String accountInitials = 'A';
-                          
-                          // Try user data first
-                          if (user?.firstName != null && user?.lastName != null) {
-                            accountInitials = '${user!.firstName![0]}${user.lastName![0]}';
-                          } else if (user?.firstName != null) {
-                            accountInitials = user!.firstName![0];
-                          } else if (user?.lastName != null) {
-                            accountInitials = user!.lastName![0];
-                          } else if (user?.email != null && user!.email.isNotEmpty) {
-                            accountInitials = user.email[0].toUpperCase();
-                          }
-                          // Fallback to session info
-                          else if (session?.firstName != null && session?.lastName != null) {
-                            accountInitials = '${session!.firstName![0]}${session.lastName![0]}';
-                          } else if (session?.firstName != null) {
-                            accountInitials = session!.firstName![0];
-                          } else if (session?.lastName != null) {
-                            accountInitials = session!.lastName![0];
-                          } else if (session?.email != null && session!.email!.isNotEmpty) {
-                            accountInitials = session.email![0].toUpperCase();
-                          }
-                          
-                          final isSelected = _index == 2;
-                          return _buildNavItem(
-                            2,
-                            Icons.person_outline,
-                            Icons.person,
-                            'Contul meu',
-                            _buildInitialsAvatar(accountInitials, isSelected),
-                          );
-                        },
-                      );
-                    },
+    return ListenableBuilder(
+      listenable: GetIt.I<ActiveProfileService>(),
+      builder: (context, _) {
+        final currentProfileId = GetIt.I<ActiveProfileService>().id;
+        
+        // Update tabs when profile changes
+        final updatedTabs = [
+          const ProfilesTab(),
+          currentProfileId != null 
+            ? ModulesTab(profileId: currentProfileId)
+            : const _PlaceholderModulesTab(),
+          const AccountTab(),
+        ];
+        
+        return BlocListener<AuthCubit, AuthState>(
+          listenWhen: (prev, curr) => prev.authenticated && !curr.authenticated,
+          listener: (context, state) {
+            // Log out -> LogopedyApp te duce automat la LoginPage
+          },
+          child: Scaffold(
+            body: IndexedStack(index: _index, children: updatedTabs),
+            bottomNavigationBar: Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.08),
+                    blurRadius: 16,
+                    offset: const Offset(0, -4),
                   ),
                 ],
               ),
+              child: SafeArea(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                    children: [
+                      // Profile tab with icon
+                      _buildNavItem(0, Icons.group_outlined, Icons.group, 'Profile', null),
+                      // Modules tab
+                      _buildNavItem(1, Icons.menu_book_outlined, Icons.menu_book, 'Module', null),
+                      // Account tab with initials
+                      FutureBuilder<UserResponseDto?>(
+                        future: authRepo.getCurrentUser().catchError((_) => null),
+                        builder: (context, userSnapshot) {
+                          return FutureBuilder<SessionInfo?>(
+                            future: SessionInfo.fromStorage(),
+                            builder: (context, sessionSnapshot) {
+                              final user = userSnapshot.data;
+                              final session = sessionSnapshot.data;
+                              String accountInitials = 'A';
+                              
+                              // Try user data first
+                              if (user?.firstName != null && user?.lastName != null) {
+                                accountInitials = '${user!.firstName![0]}${user.lastName![0]}';
+                              } else if (user?.firstName != null) {
+                                accountInitials = user!.firstName![0];
+                              } else if (user?.lastName != null) {
+                                accountInitials = user!.lastName![0];
+                              } else if (user?.email != null && user!.email.isNotEmpty) {
+                                accountInitials = user.email[0].toUpperCase();
+                              }
+                              // Fallback to session info
+                              else if (session?.firstName != null && session?.lastName != null) {
+                                accountInitials = '${session!.firstName![0]}${session.lastName![0]}';
+                              } else if (session?.firstName != null) {
+                                accountInitials = session!.firstName![0];
+                              } else if (session?.lastName != null) {
+                                accountInitials = session!.lastName![0];
+                              } else if (session?.email != null && session!.email!.isNotEmpty) {
+                                accountInitials = session.email![0].toUpperCase();
+                              }
+                              
+                              final isSelected = _index == 2;
+                              return _buildNavItem(
+                                2,
+                                Icons.person_outline,
+                                Icons.person,
+                                'Contul meu',
+                                _buildInitialsAvatar(accountInitials, isSelected),
+                              );
+                            },
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ),
           ),
-        ),
-      ),
+      );
+      },
     );
   }
 
@@ -215,5 +260,33 @@ class _HomeShellState extends State<HomeShell> {
       return parts[0].isNotEmpty ? parts[0][0] : 'P';
     }
     return '${parts[0][0]}${parts[1][0]}';
+  }
+}
+
+// Placeholder widget for modules tab when no profile is selected
+class _PlaceholderModulesTab extends StatelessWidget {
+  const _PlaceholderModulesTab();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Scaffold(
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.menu_book_outlined, size: 64, color: Color(0xFFEA2233)),
+            SizedBox(height: 16),
+            Text(
+              'Selectează un profil pentru a accesa modulele',
+              style: TextStyle(
+                fontSize: 16,
+                color: Color(0xFF17406B),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

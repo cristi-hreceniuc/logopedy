@@ -367,10 +367,16 @@ class _ProfilesTabState extends State<ProfilesTab> {
                       final p = items[i];
                       return _ProfileCard(
                         p: p,
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (_) => ProfileDetailsPage(profile: p)),
-                        ),
+                        onTap: () async {
+                          final result = await Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => ProfileDetailsPage(profile: p)),
+                          );
+                          // If profile was deleted (result is true), refresh the list
+                          if (result == true && mounted) {
+                            await _refresh();
+                          }
+                        },
                       );
                     },
                   ),
