@@ -19,6 +19,7 @@ class _RegisterPageState extends State<RegisterPage> {
   final _last = TextEditingController();
   String _gender = 'male';
   bool _obscure = true;
+  String? _errorMessage;
 
   @override
   void dispose() { _email.dispose(); _pass.dispose(); _first.dispose(); _last.dispose(); super.dispose(); }
@@ -30,10 +31,20 @@ class _RegisterPageState extends State<RegisterPage> {
     return BlocConsumer<AuthCubit, AuthState>(
       listener: (ctx, st) {
         if (st.error != null) {
-          SnackBarUtils.showError(ctx, st.error!);
+          setState(() {
+            _errorMessage = st.error!;
+          });
+          // Don't show snackbar - error is displayed in the UI
         } else if (st.signupOk) {
+          setState(() {
+            _errorMessage = null;
+          });
           SnackBarUtils.showSuccess(ctx, 'Cont creat. Te poți loga.');
           Navigator.of(ctx).pop();
+        } else {
+          setState(() {
+            _errorMessage = null;
+          });
         }
       },
       builder: (ctx, st) {
@@ -46,6 +57,34 @@ class _RegisterPageState extends State<RegisterPage> {
             key: _form,
             child: Column(
               children: [
+                // Error message display
+                if (_errorMessage != null) ...[
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.red.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.red.withOpacity(0.3)),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.error_outline, color: Colors.red[700], size: 20),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            _errorMessage!,
+                            style: TextStyle(
+                              color: Colors.red[700],
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                ],
                 Row(
                   children: [
                     Expanded(
@@ -101,6 +140,9 @@ class _RegisterPageState extends State<RegisterPage> {
                   loading: st.loading,
                   onPressed: () {
                     if (_form.currentState!.validate()) {
+                      setState(() {
+                        _errorMessage = null; // Clear previous errors
+                      });
                       context.read<AuthCubit>().signup(
                         SignupRequest(
                           email: _email.text.trim(),

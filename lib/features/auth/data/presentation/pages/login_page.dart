@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:get_it/get_it.dart';
 
 import '../../../../../../core/utils/snackbar_utils.dart';
+import '../../../../../../core/storage/secure_storage.dart';
 import '../../../presentation/widgets/auth_ui.dart';
 import '../cubit/auth_cubit.dart';
 import 'register_page.dart';
@@ -18,6 +20,43 @@ class _LoginPageState extends State<LoginPage> {
   final _email = TextEditingController();
   final _pass = TextEditingController();
   bool _obscure = true;
+  bool _rememberEmail = false;
+  String? _errorMessage;
+  bool _isLoadingEmail = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadRememberedEmail();
+  }
+
+  Future<void> _loadRememberedEmail() async {
+    final store = GetIt.I<SecureStore>();
+    final rememberedEmail = await store.readRememberedEmail();
+    if (rememberedEmail != null && rememberedEmail.isNotEmpty) {
+      _email.text = rememberedEmail;
+      setState(() {
+        _rememberEmail = true;
+      });
+    }
+    if (mounted) {
+      setState(() {
+        _isLoadingEmail = false;
+      });
+    }
+  }
+
+  Future<void> _saveEmailIfRemembered() async {
+    final store = GetIt.I<SecureStore>();
+    final emailToSave = _email.text.trim();
+    if (_rememberEmail && emailToSave.isNotEmpty) {
+      // Always save the current email from the input field (this will override any previously saved email)
+      await store.saveRememberedEmail(emailToSave);
+    } else {
+      // Clear remembered email if checkbox is unchecked
+      await store.clearRememberedEmail();
+    }
+  }
 
   @override
   void dispose() { _email.dispose(); _pass.dispose(); super.dispose(); }
@@ -28,11 +67,30 @@ class _LoginPageState extends State<LoginPage> {
 
     return BlocConsumer<AuthCubit, AuthState>(
       listener: (ctx, st) {
-        if (st.error != null) {
+        if (st.error != null && st.error!.isNotEmpty) {
+          setState(() {
+            _errorMessage = st.error!;
+          });
+          // Also show snackbar for visibility
           SnackBarUtils.showError(ctx, st.error!);
+        } else if (st.authenticated) {
+          // Clear error on successful login
+          setState(() {
+            _errorMessage = null;
+          });
+          // Save email if remember is enabled
+          _saveEmailIfRemembered();
         }
+        // Don't clear error when loading or when going back to unauthenticated
+        // Keep error visible until user tries again or succeeds
       },
       builder: (ctx, st) {
+        if (_isLoadingEmail) {
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
+        }
+
         return AuthScaffold(
           illustrationAsset: 'assets/images/login_image.png',
           title: 'Logopedy',
@@ -43,6 +101,34 @@ class _LoginPageState extends State<LoginPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                // Error message display - use state directly for immediate updates
+                if (st.error != null && st.error!.isNotEmpty) ...[
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.red.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.red.withOpacity(0.3)),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.error_outline, color: Colors.red[700], size: 20),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            st.error!,
+                            style: TextStyle(
+                              color: Colors.red[700],
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                ],
                 AuthTextField(
                   controller: _email,
                   label: 'Email',
@@ -63,17 +149,35 @@ class _LoginPageState extends State<LoginPage> {
                   ),
                 ),
                 const SizedBox(height: 8),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: TextButton(
-                    key: UniqueKey(), // previne coliziuni cu GlobalKey-ul intern Ink
-                    onPressed: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(builder: (_) => const ForgotPasswordPage()),
-                      );
-                    },
-                    child: const Text('Ai uitat parola?'),
-                  ),
+                Row(
+                  children: [
+                    Checkbox(
+                      value: _rememberEmail,
+                      onChanged: (value) {
+                        setState(() {
+                          _rememberEmail = value ?? false;
+                        });
+                        // Only update checkbox state, don't save email yet
+                        // Email will be saved after successful login
+                        if (!_rememberEmail) {
+                          // Clear remembered email if checkbox is unchecked
+                          final store = GetIt.I<SecureStore>();
+                          store.clearRememberedEmail();
+                        }
+                      },
+                    ),
+                    const Text('Ține minte email-ul'),
+                    const Spacer(),
+                    TextButton(
+                      key: UniqueKey(),
+                      onPressed: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(builder: (_) => const ForgotPasswordPage()),
+                        );
+                      },
+                      child: const Text('Ai uitat parola?'),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 8),
                 AuthPrimaryButton(
@@ -81,6 +185,9 @@ class _LoginPageState extends State<LoginPage> {
                   loading: st.loading,
                   onPressed: () {
                     if (_form.currentState!.validate()) {
+                      setState(() {
+                        _errorMessage = null; // Clear previous errors
+                      });
                       context.read<AuthCubit>().login(_email.text.trim(), _pass.text);
                     }
                   },

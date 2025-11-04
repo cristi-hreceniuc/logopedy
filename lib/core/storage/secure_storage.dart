@@ -7,6 +7,7 @@ class SecureStore {
   static const _refreshKey = 'refresh_token';
   static const _refreshExpKey = 'refresh_expires_at';
   static const _activeProfileKey = 'active_profile_id';
+  static const _rememberedEmailKey = 'remembered_email';
 
   final _s = const FlutterSecureStorage();
 
@@ -63,4 +64,15 @@ class SecureStore {
   Future<String?> readKey(String key) => _s.read(key: key);
   Future<void> writeKey(String key, String value) => _s.write(key: key, value: value);
   Future<void> deleteKey(String key) => _s.delete(key: key);
+
+  // Remember email functionality
+  Future<void> saveRememberedEmail(String email) async {
+    await _s.write(key: _rememberedEmailKey, value: email);
+  }
+
+  Future<String?> readRememberedEmail() => _s.read(key: _rememberedEmailKey);
+
+  Future<void> clearRememberedEmail() async {
+    await _s.delete(key: _rememberedEmailKey);
+  }
 }

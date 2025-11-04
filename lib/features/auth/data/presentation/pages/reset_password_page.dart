@@ -18,6 +18,7 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
   final _pass2 = TextEditingController();
   bool _o1 = true;
   bool _o2 = true;
+  String? _errorMessage;
 
   @override
   void dispose() { _token.dispose(); _pass1.dispose(); _pass2.dispose(); super.dispose(); }
@@ -27,12 +28,22 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
     return BlocConsumer<AuthCubit, AuthState>(
       listener: (ctx, st) {
         if (st.error != null) {
+          setState(() {
+            _errorMessage = st.error!;
+          });
           ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text(st.error!)));
         } else if (st.resetOk == true) {
+          setState(() {
+            _errorMessage = null;
+          });
           ScaffoldMessenger.of(ctx).showSnackBar(
             const SnackBar(content: Text('Parola a fost resetată.')),
           );
           Navigator.of(context).popUntil((r) => r.isFirst); // înapoi la login
+        } else {
+          setState(() {
+            _errorMessage = null;
+          });
         }
       },
       builder: (ctx, st) {
@@ -46,6 +57,34 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                // Error message display
+                if (_errorMessage != null) ...[
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.red.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.red.withOpacity(0.3)),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.error_outline, color: Colors.red[700], size: 20),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            _errorMessage!,
+                            style: TextStyle(
+                              color: Colors.red[700],
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                ],
                 AuthTextField(
                   controller: _token,
                   label: 'Cod/Token',
@@ -80,8 +119,11 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
                   loading: st.loading,
                   onPressed: () {
                     if (_form.currentState!.validate()) {
+                      setState(() {
+                        _errorMessage = null; // Clear previous errors
+                      });
                       context.read<AuthCubit>().resetPassword(
-                        email: widget.email, // trimitem “pe ascuns” emailul din ecranul anterior
+                        email: widget.email, // trimitem "pe ascuns" emailul din ecranul anterior
                         token: _token.text.trim(),
                         password: _pass1.text,
                         confirmNewPassword: _pass2.text,

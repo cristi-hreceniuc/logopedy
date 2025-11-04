@@ -260,6 +260,73 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
 
   Widget _gap([double h = 12]) => SizedBox(height: h);
 
+  // ---------------- Error handling ----------------
+  String _extractErrorMessage(Object e) {
+    if (e is DioException) {
+      final data = e.response?.data;
+      
+      // Try multiple possible error message formats from backend
+      String? errorMessage;
+      
+      if (data is Map<String, dynamic>) {
+        // Try common error message fields
+        errorMessage = data['message'] as String? ??
+                      data['error'] as String? ??
+                      data['errorMessage'] as String? ??
+                      data['msg'] as String?;
+        
+        // If still no message, try errors array/object
+        if (errorMessage == null && data['errors'] != null) {
+          if (data['errors'] is List && (data['errors'] as List).isNotEmpty) {
+            errorMessage = (data['errors'] as List).first.toString();
+          } else if (data['errors'] is Map) {
+            final errorsMap = data['errors'] as Map;
+            // Get first error value
+            if (errorsMap.isNotEmpty) {
+              final firstError = errorsMap.values.first;
+              if (firstError is List && firstError.isNotEmpty) {
+                errorMessage = firstError.first.toString();
+              } else {
+                errorMessage = firstError.toString();
+              }
+            }
+          }
+        }
+      }
+      
+      // If we have a specific error message, return it
+      if (errorMessage != null && errorMessage.isNotEmpty) {
+        return errorMessage;
+      }
+      
+      // Handle specific HTTP status codes with user-friendly messages
+      final statusCode = e.response?.statusCode;
+      if (statusCode != null) {
+        switch (statusCode) {
+          case 401:
+            return 'Autentificare necesară. Te rog autentifică-te din nou.';
+          case 403:
+            return 'Acces interzis. Nu ai permisiunea de a accesa această resursă.';
+          case 404:
+            return 'Lecția nu a fost găsită.';
+          case 422:
+            return 'Date invalide. Te rog verifică informațiile.';
+          case 429:
+            return 'Prea multe încercări. Te rog așteaptă un moment.';
+          case 500:
+          case 502:
+          case 503:
+            return 'Eroare de server. Te rog încearcă mai târziu.';
+          default:
+            return e.message ?? 'Eroare la încărcarea lecției. Te rog încearcă din nou.';
+        }
+      }
+      
+      return e.message ?? 'Eroare de rețea. Te rog încearcă din nou.';
+    }
+    return e.toString();
+  }
+
   // ---------------- API calls ----------------
   Future<void> _load() async {
     setState(() {
@@ -280,7 +347,7 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _error = e.toString();
+        _error = _extractErrorMessage(e);
         _loading = false;
       });
     }
@@ -554,7 +621,8 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
       }
       
       // For other errors, show error message
-      SnackBarUtils.showError(context, e.toString());
+      final errorMsg = _extractErrorMessage(e);
+      SnackBarUtils.showError(context, errorMsg);
     }
   }
 

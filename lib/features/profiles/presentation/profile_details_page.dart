@@ -11,7 +11,6 @@ import '../../../core/state/active_profile.dart';
 import '../models/profile_model.dart';
 import '../profile_repository.dart';
 import '../selected_profile_cubit.dart';
-import 'profile_picker_sheet.dart';
 
 class ProfileDetailsPage extends StatefulWidget {
   const ProfileDetailsPage({super.key, required this.profile});
@@ -48,19 +47,6 @@ class _ProfileDetailsPageState extends State<ProfileDetailsPage> {
     setState(() {});
   }
 
-  Future<void> _pickAnotherProfile() async {
-    final picked = await showModalBottomSheet<ProfileCardDto>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => const ProfilePickerSheet(),
-    );
-    if (picked != null && mounted) {
-      _f = repo.lessonProgress(picked.id);
-      _profileDetails = repo.getProfileDetails(picked.id);
-      setState(() {});
-    }
-  }
 
   Future<void> _deleteProfile() async {
     final confirmed = await showDialog<bool>(
@@ -509,31 +495,6 @@ class _ProfileDetailsPageState extends State<ProfileDetailsPage> {
             },
           ),
         ),
-      floatingActionButton: Container(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: const Color(0xFF2D72D2).withOpacity(0.3),
-              blurRadius: 12,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: FloatingActionButton.extended(
-          onPressed: _pickAnotherProfile,
-          backgroundColor: const Color(0xFF2D72D2),
-          foregroundColor: Colors.white,
-          icon: const Icon(Icons.swap_horiz_rounded),
-          label: const Text(
-            'Schimbă profilul',
-            style: TextStyle(fontWeight: FontWeight.w700),
-          ),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-        ),
-      ),
     );
   }
 
