@@ -609,7 +609,7 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
           );
 
           return Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
             child: Column(
               children: [
                 // Conținutul în card, centrat și aerisit
@@ -617,16 +617,20 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
                   child: Center(
                     child: ConstrainedBox(
                       constraints: const BoxConstraints(maxWidth: 680),
-                      child: Card(
-                        elevation: 3,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(20),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(24),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.08),
+                              blurRadius: 16,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
                         ),
                         child: Padding(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 20,
-                            vertical: 24,
-                          ),
+                          padding: const EdgeInsets.all(24),
                           child: SingleChildScrollView(
                             child: Column(
                               mainAxisSize: MainAxisSize.min,
@@ -635,23 +639,23 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
                                   Text(
                                     title,
                                     textAlign: TextAlign.center,
-                                    // titlu mare (aceeași familie de font din app theme)
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .titleLarge
-                                        ?.copyWith(
-                                          fontSize: 28,
-                                          fontWeight: FontWeight.w800,
-                                        ),
+                                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                                      fontSize: 28,
+                                      fontWeight: FontWeight.w800,
+                                      color: const Color(0xFF17406B),
+                                    ),
                                   ),
-                                  const SizedBox(height: 16),
+                                  const SizedBox(height: 20),
                                 ],
                                 Text(
                                   text,
                                   textAlign: TextAlign.center,
-                                  // corp mărit și lizibil
-                                  style: Theme.of(context).textTheme.bodyLarge
-                                      ?.copyWith(fontSize: 20, height: 1.45),
+                                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                                    fontSize: 20,
+                                    height: 1.5,
+                                    color: const Color(0xFF17406B),
+                                    fontWeight: FontWeight.w500,
+                                  ),
                                 ),
                               ],
                             ),
@@ -663,20 +667,34 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
                 ),
 
                 // Butonul mare jos, consistent cu restul aplicației
-                const SizedBox(height: 12),
-                FilledButton(
-                  onPressed: _finishLesson,
-                  style: FilledButton.styleFrom(
-                    minimumSize: const Size.fromHeight(56),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(28),
-                    ),
+                const SizedBox(height: 16),
+                Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFFEA2233).withOpacity(0.3),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
                   ),
-                  child: Text(
-                    next,
-                    style: const TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w700,
+                  child: FilledButton(
+                    onPressed: _finishLesson,
+                    style: FilledButton.styleFrom(
+                      backgroundColor: const Color(0xFFEA2233),
+                      foregroundColor: Colors.white,
+                      minimumSize: const Size.fromHeight(56),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                    ),
+                    child: Text(
+                      next,
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   ),
                 ),
@@ -730,74 +748,132 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
           );
 
           return Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                if (title.isNotEmpty)
-                  Text(
-                    title,
-                    textAlign: TextAlign.center,
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontSize: 26,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                const SizedBox(height: 12),
-
-                if (text.isNotEmpty)
-                  Text(
-                    text,
-                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                      fontSize: 18,
-                      height: 1.45,
-                    ),
-                  ),
-
-                if (subtitle.isNotEmpty || bullets.isNotEmpty) ...[
-                  const SizedBox(height: 16),
-                  if (subtitle.isNotEmpty)
-                    Text(
-                      subtitle,
-                      style: Theme.of(context).textTheme.titleMedium
-                          ?.copyWith(fontWeight: FontWeight.w700),
-                    ),
-                  if (bullets.isNotEmpty) ...[
-                    const SizedBox(height: 8),
-                    ...bullets.map(
-                      (e) => Padding(
-                        padding: const EdgeInsets.only(bottom: 8),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text('•  '),
-                            Expanded(
-                              child: Text(
-                                e,
-                                style: Theme.of(context).textTheme.bodyLarge,
+                Expanded(
+                  child: SingleChildScrollView(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(24),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.08),
+                            blurRadius: 16,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      padding: const EdgeInsets.all(24),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (title.isNotEmpty) ...[
+                            Text(
+                              title,
+                              textAlign: TextAlign.center,
+                              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                                fontSize: 26,
+                                fontWeight: FontWeight.w800,
+                                color: const Color(0xFF17406B),
                               ),
                             ),
+                            const SizedBox(height: 20),
                           ],
-                        ),
+
+                          if (text.isNotEmpty) ...[
+                            Text(
+                              text,
+                              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                                fontSize: 18,
+                                height: 1.5,
+                                color: const Color(0xFF17406B),
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            const SizedBox(height: 20),
+                          ],
+
+                          if (subtitle.isNotEmpty || bullets.isNotEmpty) ...[
+                            if (subtitle.isNotEmpty) ...[
+                              Text(
+                                subtitle,
+                                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                  color: const Color(0xFF17406B),
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+                            ],
+                            if (bullets.isNotEmpty) ...[
+                              ...bullets.map(
+                                (e) => Padding(
+                                  padding: const EdgeInsets.only(bottom: 12),
+                                  child: Row(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Container(
+                                        margin: const EdgeInsets.only(top: 6, right: 12),
+                                        width: 6,
+                                        height: 6,
+                                        decoration: const BoxDecoration(
+                                          color: Color(0xFFEA2233),
+                                          shape: BoxShape.circle,
+                                        ),
+                                      ),
+                                      Expanded(
+                                        child: Text(
+                                          e,
+                                          style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                                            fontSize: 16,
+                                            height: 1.5,
+                                            color: const Color(0xFF17406B),
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ],
                       ),
                     ),
-                  ],
-                ],
-
-                const Spacer(),
-                FilledButton(
-                  onPressed: _finishLesson,
-                  style: FilledButton.styleFrom(
-                    minimumSize: const Size.fromHeight(56),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(28),
-                    ),
                   ),
-                  child: Text(
-                    next,
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
+                ),
+
+                const SizedBox(height: 16),
+                Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFFEA2233).withOpacity(0.3),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: FilledButton(
+                    onPressed: _finishLesson,
+                    style: FilledButton.styleFrom(
+                      backgroundColor: const Color(0xFFEA2233),
+                      foregroundColor: Colors.white,
+                      minimumSize: const Size.fromHeight(56),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                    ),
+                    child: Text(
+                      next,
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   ),
                 ),
@@ -815,45 +891,99 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
           final next = _asString(_buttons(p)['nextLabel'], 'Următorul');
 
           return Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                if (title.isNotEmpty)
-                  Text(
-                    title,
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                if (title.isNotEmpty) _gap(8),
                 Expanded(
                   child: SingleChildScrollView(
-                    child: paragraphs.isNotEmpty
-                        ? Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              ...paragraphs.map(
-                                (e) => Padding(
-                                  padding: const EdgeInsets.only(bottom: 12),
-                                  child: Text(
-                                    '$e',
-                                    style: Theme.of(
-                                      context,
-                                    ).textTheme.bodyLarge,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(24),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.08),
+                            blurRadius: 16,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      padding: const EdgeInsets.all(24),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (title.isNotEmpty) ...[
+                            Text(
+                              title,
+                              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                                fontWeight: FontWeight.w700,
+                                color: const Color(0xFF17406B),
+                              ),
+                            ),
+                            const SizedBox(height: 20),
+                          ],
+                          if (paragraphs.isNotEmpty)
+                            ...paragraphs.map(
+                              (e) => Padding(
+                                padding: const EdgeInsets.only(bottom: 16),
+                                child: Text(
+                                  '$e',
+                                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                                    fontSize: 18,
+                                    height: 1.6,
+                                    color: const Color(0xFF17406B),
+                                    fontWeight: FontWeight.w500,
                                   ),
                                 ),
                               ),
-                            ],
-                          )
-                        : Text(
-                            text,
-                            style: Theme.of(context).textTheme.bodyLarge,
-                          ),
+                            )
+                          else
+                            Text(
+                              text,
+                              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                                fontSize: 18,
+                                height: 1.6,
+                                color: const Color(0xFF17406B),
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
-                _gap(),
-                FilledButton(onPressed: _finishLesson, child: Text(next)),
+                const SizedBox(height: 16),
+                Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFFEA2233).withOpacity(0.3),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: FilledButton(
+                    onPressed: _finishLesson,
+                    style: FilledButton.styleFrom(
+                      backgroundColor: const Color(0xFFEA2233),
+                      foregroundColor: Colors.white,
+                      minimumSize: const Size.fromHeight(56),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                    ),
+                    child: Text(
+                      next,
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ),
               ],
             ),
           );
@@ -878,60 +1008,189 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
           }
 
           return Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                if (title.isNotEmpty)
-                  Text(title, style: Theme.of(context).textTheme.titleLarge),
-                _gap(12),
-                if (imgUri.isNotEmpty)
-                  Center(
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(16),
-                      child: Image.asset(
-                        imgUri,
-                        width: 220,
-                        height: 220,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) =>
-                            const Icon(Icons.broken_image, size: 64),
+                Expanded(
+                  child: SingleChildScrollView(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(24),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.08),
+                            blurRadius: 16,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      padding: const EdgeInsets.all(24),
+                      child: Column(
+                        children: [
+                          if (title.isNotEmpty) ...[
+                            Text(
+                              title,
+                              textAlign: TextAlign.center,
+                              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                                fontWeight: FontWeight.w800,
+                                color: const Color(0xFF17406B),
+                              ),
+                            ),
+                            const SizedBox(height: 20),
+                          ],
+                          if (imgUri.isNotEmpty) ...[
+                            Container(
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(20),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.1),
+                                    blurRadius: 12,
+                                    offset: const Offset(0, 4),
+                                  ),
+                                ],
+                              ),
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(20),
+                                child: Image.asset(
+                                  imgUri,
+                                  width: 240,
+                                  height: 240,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, __, ___) => Container(
+                                    width: 240,
+                                    height: 240,
+                                    color: Colors.grey[200],
+                                    child: Icon(Icons.broken_image, size: 64, color: Colors.grey[400]),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 24),
+                          ],
+                          if (word.isNotEmpty) ...[
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF2D72D2).withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    word,
+                                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                                      fontWeight: FontWeight.w700,
+                                      color: const Color(0xFF17406B),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Container(
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF2D72D2),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: IconButton(
+                                      icon: const Icon(Icons.volume_up, color: Colors.white),
+                                      onPressed: () => _playAssetAudio(wordAudioUri),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 24),
+                          ],
+                          if (syllables.isNotEmpty) ...[
+                            Text(
+                              'Silabe',
+                              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.w700,
+                                color: const Color(0xFF17406B),
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            Wrap(
+                              spacing: 10,
+                              runSpacing: 10,
+                              children: syllables.map((e) {
+                                final txt = _asString(e['text']);
+                                final uri = _assetUri(e['audio']);
+                                return Container(
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFEA2233).withOpacity(0.1),
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                      color: const Color(0xFFEA2233).withOpacity(0.3),
+                                    ),
+                                  ),
+                                  child: Material(
+                                    color: Colors.transparent,
+                                    child: InkWell(
+                                      onTap: () => _playAssetAudio(uri),
+                                      borderRadius: BorderRadius.circular(12),
+                                      child: Padding(
+                                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Text(
+                                              txt,
+                                              style: const TextStyle(
+                                                fontSize: 16,
+                                                fontWeight: FontWeight.w600,
+                                                color: Color(0xFF17406B),
+                                              ),
+                                            ),
+                                            const SizedBox(width: 8),
+                                            Icon(Icons.volume_up, size: 18, color: const Color(0xFFEA2233)),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              }).toList(),
+                            ),
+                          ],
+                        ],
                       ),
                     ),
                   ),
-                _gap(16),
-                if (word.isNotEmpty)
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          word,
-                          style: Theme.of(context).textTheme.titleMedium,
-                        ),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.volume_up),
-                        onPressed: () => _playAssetAudio(wordAudioUri),
+                ),
+                const SizedBox(height: 16),
+                Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFFEA2233).withOpacity(0.3),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
                       ),
                     ],
                   ),
-                if (syllables.isNotEmpty) ...[
-                  _gap(8),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: syllables.map((e) {
-                      final txt = _asString(e['text']);
-                      final uri = _assetUri(e['audio']);
-                      return ActionChip(
-                        label: Text(txt),
-                        onPressed: () => _playAssetAudio(uri),
-                      );
-                    }).toList(),
+                  child: FilledButton(
+                    onPressed: _finishLesson,
+                    style: FilledButton.styleFrom(
+                      backgroundColor: const Color(0xFFEA2233),
+                      foregroundColor: Colors.white,
+                      minimumSize: const Size.fromHeight(56),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                    ),
+                    child: Text(
+                      next,
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
                   ),
-                ],
-                const Spacer(),
-                FilledButton(onPressed: _finishLesson, child: Text(next)),
+                ),
               ],
             ),
           );
@@ -954,95 +1213,163 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
             fontSize: 40,
             height: 1.15,
             fontWeight: FontWeight.w600,
+            color: const Color(0xFF17406B),
           );
           final highlightStyle = wordStyle.copyWith(
-            color: cs.error,
+            color: const Color(0xFFEA2233),
             fontWeight: FontWeight.w700,
           );
 
           return Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Text(
-                  title,
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontSize: 28,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 12),
-
                 Expanded(
-                  child: ListView.separated(
-                    itemCount: pairs.length,
-                    separatorBuilder: (_, __) =>
-                        const Divider(height: 28, thickness: 1),
-                    itemBuilder: (_, i) {
-                      final it = (pairs[i] as Map).cast<String, dynamic>();
-                      final masked = _s(
-                        it,
-                        'masked',
-                        _s(it, 'word'),
-                      ); // "__cap"
-                      final solution = _s(
-                        it,
-                        'solution',
-                        _s(it, 'answer'),
-                      ); // "s"
-                      final revealed = (it['revealed'] as bool?) ?? false;
-
-                      return Row(
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          // cuvântul — mare & centrat pe linie
-                          Expanded(
-                            child: Center(
-                              child: RichText(
-                                textAlign: TextAlign.center,
-                                text: revealed
-                                    ? _coloredMaskedWord(
-                                        // helperul pe care ți l-am dat
-                                        masked,
-                                        solution,
-                                        wordStyle,
-                                        highlightStyle,
-                                      )
-                                    : TextSpan(text: masked, style: wordStyle),
-                              ),
-                            ),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(24),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.08),
+                          blurRadius: 16,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          title,
+                          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                            fontSize: 28,
+                            fontWeight: FontWeight.w700,
+                            color: const Color(0xFF17406B),
                           ),
+                        ),
+                        const SizedBox(height: 24),
+                        Expanded(
+                          child: ListView.separated(
+                            itemCount: pairs.length,
+                            separatorBuilder: (_, __) => const SizedBox(height: 20),
+                            itemBuilder: (_, i) {
+                              final it = (pairs[i] as Map).cast<String, dynamic>();
+                              final masked = _s(
+                                it,
+                                'masked',
+                                _s(it, 'word'),
+                              ); // "__cap"
+                              final solution = _s(
+                                it,
+                                'solution',
+                                _s(it, 'answer'),
+                              ); // "s"
+                              final revealed = (it['revealed'] as bool?) ?? false;
 
-                          const SizedBox(width: 12),
-
-                          TextButton(
-                            onPressed: () =>
-                                setState(() => it['revealed'] = true),
-                            style: TextButton.styleFrom(
-                              textStyle: const TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.w700,
-                              ),
-                              foregroundColor: revealed ? cs.outline : cs.error,
-                            ),
-                            child: Text('Arată'),
+                              return Container(
+                                padding: const EdgeInsets.all(16),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFF3F5F8),
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.center,
+                                  children: [
+                                    // cuvântul — mare & centrat pe linie
+                                    Expanded(
+                                      child: Center(
+                                        child: RichText(
+                                          textAlign: TextAlign.center,
+                                          text: revealed
+                                              ? _coloredMaskedWord(
+                                                  masked,
+                                                  solution,
+                                                  wordStyle,
+                                                  highlightStyle,
+                                                )
+                                              : TextSpan(text: masked, style: wordStyle),
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Container(
+                                      decoration: BoxDecoration(
+                                        borderRadius: BorderRadius.circular(12),
+                                        boxShadow: revealed
+                                            ? []
+                                            : [
+                                                BoxShadow(
+                                                  color: const Color(0xFFEA2233).withOpacity(0.2),
+                                                  blurRadius: 8,
+                                                  offset: const Offset(0, 2),
+                                                ),
+                                              ],
+                                      ),
+                                      child: TextButton(
+                                        onPressed: revealed
+                                            ? null
+                                            : () => setState(() => it['revealed'] = true),
+                                        style: TextButton.styleFrom(
+                                          backgroundColor: revealed
+                                              ? Colors.grey[200]
+                                              : const Color(0xFFEA2233),
+                                          foregroundColor: revealed
+                                              ? Colors.grey[600]
+                                              : Colors.white,
+                                          textStyle: const TextStyle(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(12),
+                                          ),
+                                        ),
+                                        child: Text(revealed ? 'Arătat' : 'Arată'),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            },
                           ),
-                        ],
-                      );
-                    },
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-
                 const SizedBox(height: 16),
-                FilledButton(
-                  onPressed: _finishLesson,
-                  style: FilledButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 18),
+                Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFFEA2233).withOpacity(0.3),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
                   ),
-                  child: const Text(
-                    'Următorul',
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
+                  child: FilledButton(
+                    onPressed: _finishLesson,
+                    style: FilledButton.styleFrom(
+                      backgroundColor: const Color(0xFFEA2233),
+                      foregroundColor: Colors.white,
+                      minimumSize: const Size.fromHeight(56),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                    ),
+                    child: Text(
+                      next,
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
                   ),
                 ),
               ],
@@ -1113,98 +1440,181 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
             fontSize: 40,
             height: 1.15,
             fontWeight: FontWeight.w600,
+            color: const Color(0xFF17406B),
           );
           final hiStyle = wordStyle.copyWith(
-            color: cs.error,
+            color: const Color(0xFFEA2233),
             fontWeight: FontWeight.w700,
           );
 
           return Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Text(
-                  title,
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontSize: 28,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 12),
-
-                if (imgUrl.isNotEmpty)
-                  Center(
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(16),
-                      child: imgUrl.startsWith('assets/')
-                          ? Image.asset(
-                              imgUrl,
-                              width: 220,
-                              height: 220,
-                              fit: BoxFit.cover,
-                            )
-                          : Image.network(
-                              imgUrl,
-                              width: 220,
-                              height: 220,
-                              fit: BoxFit.cover,
+                Expanded(
+                  child: SingleChildScrollView(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(24),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.08),
+                            blurRadius: 16,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      padding: const EdgeInsets.all(24),
+                      child: Column(
+                        children: [
+                          Text(
+                            title,
+                            textAlign: TextAlign.center,
+                            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                              fontSize: 28,
+                              fontWeight: FontWeight.w700,
+                              color: const Color(0xFF17406B),
                             ),
+                          ),
+                          const SizedBox(height: 24),
+
+                          if (imgUrl.isNotEmpty) ...[
+                            Container(
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(20),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.1),
+                                    blurRadius: 12,
+                                    offset: const Offset(0, 4),
+                                  ),
+                                ],
+                              ),
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(20),
+                                child: imgUrl.startsWith('assets/')
+                                    ? Image.asset(
+                                        imgUrl,
+                                        width: 240,
+                                        height: 240,
+                                        fit: BoxFit.cover,
+                                      )
+                                    : Image.network(
+                                        imgUrl,
+                                        width: 240,
+                                        height: 240,
+                                        fit: BoxFit.cover,
+                                      ),
+                              ),
+                            ),
+                            const SizedBox(height: 24),
+                          ],
+
+                          // mască mare centrată + buton "Arată"
+                          Container(
+                            padding: const EdgeInsets.all(20),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF3F5F8),
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            child: StatefulBuilder(
+                              builder: (ctx, setSB) {
+                                final revealed = (p['revealed'] as bool?) ?? false;
+                                return Row(
+                                  crossAxisAlignment: CrossAxisAlignment.center,
+                                  children: [
+                                    Expanded(
+                                      child: Center(
+                                        child: RichText(
+                                          textAlign: TextAlign.center,
+                                          text: revealed
+                                              ? _coloredMasked(
+                                                  masked,
+                                                  solution,
+                                                  wordStyle,
+                                                  hiStyle,
+                                                )
+                                              : TextSpan(text: masked, style: wordStyle),
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Container(
+                                      decoration: BoxDecoration(
+                                        borderRadius: BorderRadius.circular(12),
+                                        boxShadow: revealed
+                                            ? []
+                                            : [
+                                                BoxShadow(
+                                                  color: const Color(0xFFEA2233).withOpacity(0.2),
+                                                  blurRadius: 8,
+                                                  offset: const Offset(0, 2),
+                                                ),
+                                              ],
+                                      ),
+                                      child: TextButton(
+                                        onPressed: revealed
+                                            ? null
+                                            : () => setSB(() => p['revealed'] = true),
+                                        style: TextButton.styleFrom(
+                                          backgroundColor: revealed
+                                              ? Colors.grey[200]
+                                              : const Color(0xFFEA2233),
+                                          foregroundColor: revealed
+                                              ? Colors.grey[600]
+                                              : Colors.white,
+                                          textStyle: const TextStyle(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(12),
+                                          ),
+                                        ),
+                                        child: Text(revealed ? 'Arătat' : 'Arată'),
+                                      ),
+                                    ),
+                                  ],
+                                );
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-
-                const SizedBox(height: 16),
-
-                // mască mare centrată + buton "Arată"
-                StatefulBuilder(
-                  builder: (ctx, setSB) {
-                    final revealed = (p['revealed'] as bool?) ?? false;
-                    return Row(
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        Expanded(
-                          child: Center(
-                            child: RichText(
-                              textAlign: TextAlign.center,
-                              text: revealed
-                                  ? _coloredMasked(
-                                      masked,
-                                      solution,
-                                      wordStyle,
-                                      hiStyle,
-                                    )
-                                  : TextSpan(text: masked, style: wordStyle),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        TextButton(
-                          onPressed: () => setSB(() => p['revealed'] = true),
-                          style: TextButton.styleFrom(
-                            textStyle: const TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.w700,
-                            ),
-                            foregroundColor: revealed ? cs.outline : cs.error,
-                          ),
-                          child: const Text('Arată'),
-                        ),
-                      ],
-                    );
-                  },
                 ),
-
-                const Spacer(),
-                FilledButton(
-                  onPressed: _finishLesson,
-                  style: FilledButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 18),
+                const SizedBox(height: 16),
+                Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFFEA2233).withOpacity(0.3),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
                   ),
-                  child: Text(
-                    next,
-                    style: const TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w700,
+                  child: FilledButton(
+                    onPressed: _finishLesson,
+                    style: FilledButton.styleFrom(
+                      backgroundColor: const Color(0xFFEA2233),
+                      foregroundColor: Colors.white,
+                      minimumSize: const Size.fromHeight(56),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                    ),
+                    child: Text(
+                      next,
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   ),
                 ),
@@ -1377,105 +1787,204 @@ class _ImageRevealWordWidgetState extends State<_ImageRevealWordWidget> {
     final cs = Theme.of(context).colorScheme;
     
     return Padding(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(
-            widget.title,
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-              fontWeight: FontWeight.w700,
-              fontSize: 28,
-            ),
-          ),
-          const SizedBox(height: 8),
-          if (widget.subtitle.isNotEmpty)
-            Text(
-              widget.subtitle,
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-          const SizedBox(height: 12),
-
-          if (widget.imgUrl.isNotEmpty)
-            Center(
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(16),
-                child: widget.imgUrl.startsWith('assets/')
-                    ? Image.asset(
-                        widget.imgUrl,
-                        width: 260,
-                        height: 260,
-                        fit: BoxFit.cover,
-                      )
-                    : Image.network(
-                        widget.imgUrl,
-                        width: 260,
-                        height: 260,
-                        fit: BoxFit.cover,
+          Expanded(
+            child: SingleChildScrollView(
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(24),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.08),
+                      blurRadius: 16,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  children: [
+                    Text(
+                      widget.title,
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 28,
+                        color: const Color(0xFF17406B),
                       ),
+                    ),
+                    if (widget.subtitle.isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        widget.subtitle,
+                        textAlign: TextAlign.center,
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          color: Colors.grey[600],
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 24),
+
+                    if (widget.imgUrl.isNotEmpty) ...[
+                      Container(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(20),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.1),
+                              blurRadius: 12,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(20),
+                          child: widget.imgUrl.startsWith('assets/')
+                              ? Image.asset(
+                                  widget.imgUrl,
+                                  width: 260,
+                                  height: 260,
+                                  fit: BoxFit.cover,
+                                )
+                              : Image.network(
+                                  widget.imgUrl,
+                                  width: 260,
+                                  height: 260,
+                                  fit: BoxFit.cover,
+                                ),
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                    ],
+
+                    TextField(
+                      controller: _controller,
+                      focusNode: _focusNode,
+                      onChanged: (_) => setState(() {}), // Rebuild for feedback icons
+                      textInputAction: TextInputAction.done,
+                      onSubmitted: (_) => _handleNext(),
+                      decoration: InputDecoration(
+                        labelText: 'Scrie cuvântul',
+                        labelStyle: TextStyle(
+                          color: Colors.grey[600],
+                          fontWeight: FontWeight.w500,
+                        ),
+                        filled: true,
+                        fillColor: const Color(0xFFF3F5F8),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          borderSide: BorderSide.none,
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          borderSide: BorderSide(color: Colors.grey[300]!),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          borderSide: const BorderSide(
+                            color: Color(0xFFEA2233),
+                            width: 2,
+                          ),
+                        ),
+                        errorBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          borderSide: const BorderSide(
+                            color: Colors.red,
+                            width: 2,
+                          ),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+                        suffixIcon: _isCorrect
+                            ? const Icon(Icons.check_circle, size: 24, color: Colors.green)
+                            : (_hasError ? const Icon(Icons.cancel, size: 24, color: Colors.red) : null),
+                      ),
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF17406B),
+                      ),
+                    ),
+
+                    const SizedBox(height: 12),
+
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(12),
+                          boxShadow: _revealed
+                              ? []
+                              : [
+                                  BoxShadow(
+                                    color: const Color(0xFF2D72D2).withOpacity(0.2),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
+                        ),
+                        child: TextButton(
+                          onPressed: _revealed ? null : _handleReveal,
+                          style: TextButton.styleFrom(
+                            backgroundColor: _revealed
+                                ? Colors.grey[200]
+                                : const Color(0xFF2D72D2),
+                            foregroundColor: _revealed
+                                ? Colors.grey[600]
+                                : Colors.white,
+                            textStyle: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                            ),
+                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          child: Text(widget.helpLabel),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
+          ),
 
           const SizedBox(height: 16),
-
-          TextField(
-            controller: _controller,
-            focusNode: _focusNode,
-            onChanged: (_) => setState(() {}), // Rebuild for feedback icons
-            textInputAction: TextInputAction.done,
-            onSubmitted: (_) => _handleNext(),
-            decoration: InputDecoration(
-              labelText: 'Scrie cuvântul',
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(14),
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(14),
-                borderSide: BorderSide(color: cs.outlineVariant),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(14),
-                borderSide: BorderSide(color: cs.primary),
-              ),
-              suffixIcon: _isCorrect
-                  ? const Icon(Icons.check_circle, size: 24)
-                  : (_hasError ? const Icon(Icons.cancel, size: 24) : null),
-              suffixIconColor: _isCorrect
-                  ? Colors.green
-                  : (_hasError ? Colors.red : null),
+          Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: _canProceed
+                  ? [
+                      BoxShadow(
+                        color: const Color(0xFFEA2233).withOpacity(0.3),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
+                      ),
+                    ]
+                  : [],
             ),
-          ),
-
-          const SizedBox(height: 6),
-
-          Align(
-            alignment: Alignment.centerRight,
-            child: TextButton(
-              onPressed: _revealed ? null : _handleReveal,
-              style: TextButton.styleFrom(
-                foregroundColor: _revealed ? cs.outline : cs.error,
-                textStyle: const TextStyle(
+            child: FilledButton(
+              onPressed: _canProceed ? _handleNext : null,
+              style: FilledButton.styleFrom(
+                backgroundColor: _canProceed ? const Color(0xFFEA2233) : Colors.grey[400],
+                foregroundColor: Colors.white,
+                minimumSize: const Size.fromHeight(56),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+              ),
+              child: Text(
+                widget.nextLabel,
+                style: const TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.w700,
                 ),
-              ),
-              child: Text(widget.helpLabel),
-            ),
-          ),
-
-          const Spacer(),
-
-          FilledButton(
-            onPressed: _canProceed ? _handleNext : null,
-            style: FilledButton.styleFrom(
-              padding: const EdgeInsets.symmetric(vertical: 18),
-              backgroundColor: _canProceed ? null : Colors.grey,
-            ),
-            child: Text(
-              widget.nextLabel,
-              style: const TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.w700,
               ),
             ),
           ),

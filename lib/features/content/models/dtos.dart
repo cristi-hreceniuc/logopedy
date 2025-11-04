@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'enums.dart';
 
 class ModuleDto {
@@ -121,7 +122,7 @@ class ScreenDto {
     if (rawPayload is String) {
       payloadMap = _safeDecode(rawPayload);
     } else if (rawPayload is Map) {
-      payloadMap = Map<String, dynamic>.from(rawPayload as Map);
+      payloadMap = Map<String, dynamic>.from(rawPayload);
     } else {
       payloadMap = <String, dynamic>{};
     }
@@ -213,7 +214,7 @@ class AdvanceResp {
 
   factory AdvanceResp.fromJson(Map<String, dynamic> j) {
     // Debug logging to understand the API response structure
-    print('🔍 AdvanceResp.fromJson received: $j');
+    debugPrint('🔍 AdvanceResp.fromJson received: $j');
     
     // Extract current lesson data
     final currentModuleId = j['moduleId'] ?? 0;
@@ -258,9 +259,9 @@ class AdvanceResp {
                        j['isEndOfModule'] ?? 
                        false;
     
-    print('🔍 Parsed data - Current: module=$currentModuleId, submodule=$currentSubmoduleId, lesson=$currentLessonId');
-    print('🔍 Parsed data - Next: module=$nextModuleId, submodule=$nextSubmoduleId, lesson=$nextLessonId');
-    print('🔍 Parsed flags - endOfLesson=$endOfLesson, endOfSubmodule=$endOfSubmodule, endOfModule=$endOfModule');
+    debugPrint('🔍 Parsed data - Current: module=$currentModuleId, submodule=$currentSubmoduleId, lesson=$currentLessonId');
+    debugPrint('🔍 Parsed data - Next: module=$nextModuleId, submodule=$nextSubmoduleId, lesson=$nextLessonId');
+    debugPrint('🔍 Parsed flags - endOfLesson=$endOfLesson, endOfSubmodule=$endOfSubmodule, endOfModule=$endOfModule');
     
     // Don't infer next lesson ID - trust the backend response
     // If nextLessonId is null, it means there is no next lesson
