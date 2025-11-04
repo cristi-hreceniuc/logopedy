@@ -96,10 +96,16 @@ class AccountTab extends StatelessWidget {
                                   shape: BoxShape.circle,
                                   color: Colors.white,
                                 ),
-                                child: Icon(
-                                  Icons.person_rounded,
-                                  size: 50,
-                                  color: const Color(0xFFEA2233),
+                                child: Center(
+                                  child: Text(
+                                    _getInitials(displayUser),
+                                    style: const TextStyle(
+                                      fontSize: 36,
+                                      fontWeight: FontWeight.w800,
+                                      color: Color(0xFFEA2233),
+                                      letterSpacing: 1,
+                                    ),
+                                  ),
                                 ),
                               ),
                             ],
@@ -527,6 +533,19 @@ class AccountTab extends StatelessWidget {
   }
   return 'Utilizator';
 }
+
+  String _getInitials(UserResponseDto? user) {
+    if (user?.firstName != null && user?.lastName != null) {
+      return '${user!.firstName![0]}${user.lastName![0]}'.toUpperCase();
+    } else if (user?.firstName != null && user!.firstName!.isNotEmpty) {
+      return user.firstName![0].toUpperCase();
+    } else if (user?.lastName != null && user!.lastName!.isNotEmpty) {
+      return user.lastName![0].toUpperCase();
+    } else if (user?.email != null && user!.email.isNotEmpty) {
+      return user.email[0].toUpperCase();
+    }
+    return 'A';
+  }
 
   String _formatDate(DateTime? date) {
     if (date == null) return '—';

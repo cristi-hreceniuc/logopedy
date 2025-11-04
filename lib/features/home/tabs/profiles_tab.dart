@@ -186,11 +186,16 @@ class _ProfilesTabState extends State<ProfilesTab> {
                       Container(
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(16),
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFFEA2233), Color(0xFFD21828)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
                           boxShadow: [
                             BoxShadow(
-                              color: const Color(0xFFEA2233).withOpacity(0.3),
-                              blurRadius: 8,
-                              offset: const Offset(0, 2),
+                              color: const Color(0xFFEA2233).withOpacity(0.35),
+                              blurRadius: 12,
+                              offset: const Offset(0, 4),
                             ),
                           ],
                         ),
@@ -233,8 +238,9 @@ class _ProfilesTabState extends State<ProfilesTab> {
                               await _refresh();
                             },
                             style: FilledButton.styleFrom(
-                              backgroundColor: const Color(0xFFEA2233),
+                              backgroundColor: Colors.transparent,
                               foregroundColor: Colors.white,
+                              elevation: 0,
                               padding: const EdgeInsets.symmetric(vertical: 16),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(16),
@@ -376,18 +382,24 @@ class _ProfilesTabState extends State<ProfilesTab> {
           floatingActionButton: Container(
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(16),
+              gradient: const LinearGradient(
+                colors: [Color(0xFFEA2233), Color(0xFFD21828)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
               boxShadow: [
                 BoxShadow(
-                  color: const Color(0xFFEA2233).withOpacity(0.3),
-                  blurRadius: 12,
-                  offset: const Offset(0, 4),
+                  color: const Color(0xFFEA2233).withOpacity(0.35),
+                  blurRadius: 16,
+                  offset: const Offset(0, 6),
                 ),
               ],
             ),
             child: FloatingActionButton.extended(
-          onPressed: _showCreateSheet,
-              backgroundColor: const Color(0xFFEA2233),
+              onPressed: _showCreateSheet,
+              backgroundColor: Colors.transparent,
               foregroundColor: Colors.white,
+              elevation: 0,
               icon: const Icon(Icons.add_rounded),
               label: const Text(
                 'Profil nou',
@@ -495,23 +507,16 @@ class _ProfileCard extends StatelessWidget {
                               shape: BoxShape.circle,
                               color: Colors.white,
                             ),
-                            child: ClipOval(
-                              child: (p.avatarUri != null &&
-                                      p.avatarUri!.isNotEmpty)
-                                  ? Image.network(
-                                      p.avatarUri!,
-                                      fit: BoxFit.cover,
-                                      errorBuilder: (_, __, ___) => Icon(
-                                        Icons.person_rounded,
-                                        color: const Color(0xFFEA2233),
-                                        size: 30,
-                                      ),
-                                    )
-                                  : Icon(
-                                      Icons.person_rounded,
-                                      color: const Color(0xFFEA2233),
-                                      size: 30,
-                                    ),
+                            child: Center(
+                              child: Text(
+                                _getProfileInitials(p.name),
+                                style: const TextStyle(
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.w800,
+                                  color: Color(0xFFEA2233),
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
                             ),
                           ),
                 ],
@@ -647,6 +652,15 @@ class _ProfileCard extends StatelessWidget {
       ),
     );
   }
+}
+
+String _getProfileInitials(String name) {
+  final parts = name.trim().split(' ');
+  if (parts.isEmpty) return 'P';
+  if (parts.length == 1) {
+    return parts[0].isNotEmpty ? parts[0][0].toUpperCase() : 'P';
+  }
+  return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
 }
 
 String _getGenderLabel(String gender) {

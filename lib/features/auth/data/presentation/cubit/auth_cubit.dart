@@ -8,6 +8,7 @@ import '../../../../../core/storage/secure_storage.dart';
 import '../../domain/auth_repository.dart';
 import '../../../data/models/login_request.dart';
 import '../../../data/models/signup_request.dart';
+import '../../../../session/session_info.dart';
 
 part 'auth_state.dart';
 
@@ -100,6 +101,12 @@ class AuthCubit extends Cubit<AuthState> {
   }
 
   Future<void> logout() async {
+    // Save the email from session before clearing
+    final sessionInfo = await SessionInfo.fromStorage();
+    if (sessionInfo?.email != null && sessionInfo!.email!.isNotEmpty) {
+      final store = GetIt.I<SecureStore>();
+      await store.saveRememberedEmail(sessionInfo.email!);
+    }
     await _repo.logout();
     emit(const AuthState.unauthenticated());
   }
@@ -107,6 +114,12 @@ class AuthCubit extends Cubit<AuthState> {
   Future<void> deleteAccount() async {
     emit(const AuthState.loading());
     try {
+      // Save the email from session before clearing
+      final sessionInfo = await SessionInfo.fromStorage();
+      if (sessionInfo?.email != null && sessionInfo!.email!.isNotEmpty) {
+        final store = GetIt.I<SecureStore>();
+        await store.saveRememberedEmail(sessionInfo.email!);
+      }
       await _repo.deleteAccount();
       emit(const AuthState.unauthenticated());
     } on DioException catch (e) {

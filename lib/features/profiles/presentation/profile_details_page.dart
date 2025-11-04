@@ -277,23 +277,16 @@ class _ProfileDetailsPageState extends State<ProfileDetailsPage> {
                                     shape: BoxShape.circle,
                                     color: Colors.white,
                                   ),
-                                  child: ClipOval(
-                                    child: (profile.avatarUri != null &&
-                                            profile.avatarUri!.isNotEmpty)
-                                        ? Image.network(
-                                            profile.avatarUri!,
-                                            fit: BoxFit.cover,
-                                            errorBuilder: (_, __, ___) => Icon(
-                                              Icons.person_rounded,
-                                              color: const Color(0xFFEA2233),
-                                              size: 50,
-                                            ),
-                                          )
-                                        : Icon(
-                                            Icons.person_rounded,
-                                            color: const Color(0xFFEA2233),
-                                            size: 50,
-                                          ),
+                                  child: Center(
+                                    child: Text(
+                                      _getProfileInitials(profile.name),
+                                      style: const TextStyle(
+                                        fontSize: 36,
+                                        fontWeight: FontWeight.w800,
+                                        color: Color(0xFFEA2233),
+                                        letterSpacing: 1,
+                                      ),
+                                    ),
                                   ),
                                 ),
                               ],
@@ -784,6 +777,15 @@ class _DetailRow extends StatelessWidget {
       ],
     );
   }
+}
+
+String _getProfileInitials(String name) {
+  final parts = name.trim().split(' ');
+  if (parts.isEmpty) return 'P';
+  if (parts.length == 1) {
+    return parts[0].isNotEmpty ? parts[0][0].toUpperCase() : 'P';
+  }
+  return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
 }
 
 // Helper extension for grouping

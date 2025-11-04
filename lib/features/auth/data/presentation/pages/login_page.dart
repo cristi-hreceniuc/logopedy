@@ -23,6 +23,7 @@ class _LoginPageState extends State<LoginPage> {
   bool _rememberEmail = false;
   String? _errorMessage;
   bool _isLoadingEmail = true;
+  bool _wasAuthenticated = false;
 
   @override
   void initState() {
@@ -46,15 +47,37 @@ class _LoginPageState extends State<LoginPage> {
     }
   }
 
+  Future<void> _reloadRememberedEmail() async {
+    final store = GetIt.I<SecureStore>();
+    final rememberedEmail = await store.readRememberedEmail();
+    if (rememberedEmail != null && rememberedEmail.isNotEmpty) {
+      _email.text = rememberedEmail;
+      if (mounted) {
+        setState(() {
+          _rememberEmail = true;
+        });
+      }
+    } else {
+      if (mounted) {
+        setState(() {
+          _rememberEmail = false;
+        });
+      }
+    }
+  }
+
   Future<void> _saveEmailIfRemembered() async {
     final store = GetIt.I<SecureStore>();
     final emailToSave = _email.text.trim();
-    if (_rememberEmail && emailToSave.isNotEmpty) {
-      // Always save the current email from the input field (this will override any previously saved email)
+    // Always save the email when logging in successfully (regardless of checkbox)
+    if (emailToSave.isNotEmpty) {
       await store.saveRememberedEmail(emailToSave);
-    } else {
-      // Clear remembered email if checkbox is unchecked
-      await store.clearRememberedEmail();
+      // Update checkbox to reflect that email is now remembered
+      if (mounted) {
+        setState(() {
+          _rememberEmail = true;
+        });
+      }
     }
   }
 
@@ -77,9 +100,14 @@ class _LoginPageState extends State<LoginPage> {
           // Clear error on successful login
           setState(() {
             _errorMessage = null;
+            _wasAuthenticated = true;
           });
-          // Save email if remember is enabled
+          // Always save the email used for login
           _saveEmailIfRemembered();
+        } else if (!st.authenticated && !st.loading && _wasAuthenticated) {
+          // Reload remembered email when user logs out (transition from authenticated to unauthenticated)
+          _reloadRememberedEmail();
+          _wasAuthenticated = false;
         }
         // Don't clear error when loading or when going back to unauthenticated
         // Keep error visible until user tries again or succeeds
@@ -154,13 +182,12 @@ class _LoginPageState extends State<LoginPage> {
                     Checkbox(
                       value: _rememberEmail,
                       onChanged: (value) {
+                        final newValue = value ?? false;
                         setState(() {
-                          _rememberEmail = value ?? false;
+                          _rememberEmail = newValue;
                         });
-                        // Only update checkbox state, don't save email yet
-                        // Email will be saved after successful login
-                        if (!_rememberEmail) {
-                          // Clear remembered email if checkbox is unchecked
+                        // If unchecked, clear the remembered email
+                        if (!newValue) {
                           final store = GetIt.I<SecureStore>();
                           store.clearRememberedEmail();
                         }
