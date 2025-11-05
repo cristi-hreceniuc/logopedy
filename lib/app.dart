@@ -5,11 +5,13 @@ import 'package:logopedy/features/profiles/presentation/profile_picker_sheet.dar
 import 'core/state/active_profile.dart';
 import 'core/storage/secure_storage.dart';
 import 'core/theme/app_theme.dart';
+import 'core/network/dio_client.dart';
 import 'features/home/home_shell.dart';
 import 'features/theme/theme_cubit.dart';
 import 'features/auth/data/presentation/cubit/auth_cubit.dart';
 import 'features/auth/data/presentation/pages/login_page.dart';
 import 'features/onboarding/welcome_page.dart';
+import 'features/profiles/data/profiles_repository.dart';
 
 class LogopedyApp extends StatelessWidget {
   const LogopedyApp({super.key});
@@ -59,12 +61,40 @@ class _OnboardingWrapperState extends State<_OnboardingWrapper> {
   }
 
   Future<void> _checkOnboardingStatus() async {
-    final completed = await GetIt.I<SecureStore>().readKey('onboarding_completed');
-    if (mounted) {
-      setState(() {
-        _hasCompletedOnboarding = completed == 'true';
-        _isCheckingOnboarding = false;
-      });
+    try {
+      // Check if user has any profiles - new users won't have profiles
+      final profilesRepo = ProfilesRepository(GetIt.I<DioClient>());
+      final profiles = await profilesRepo.listProfiles();
+      
+      // If user has no profiles, they're new and should see welcome page
+      if (profiles.isEmpty) {
+        if (mounted) {
+          setState(() {
+            _hasCompletedOnboarding = false;
+            _isCheckingOnboarding = false;
+          });
+        }
+        return;
+      }
+      
+      // If user has profiles, they've already been using the app
+      // Skip welcome page (they've completed onboarding)
+      if (mounted) {
+        setState(() {
+          _hasCompletedOnboarding = true;
+          _isCheckingOnboarding = false;
+        });
+      }
+    } catch (e) {
+      // If there's an error checking profiles, fall back to onboarding flag
+      debugPrint('Error checking profiles for onboarding: $e');
+      final completed = await GetIt.I<SecureStore>().readKey('onboarding_completed');
+      if (mounted) {
+        setState(() {
+          _hasCompletedOnboarding = completed == 'true';
+          _isCheckingOnboarding = false;
+        });
+      }
     }
   }
 

@@ -52,10 +52,6 @@ class AuthApi {
     return r.data as Map<String, dynamic>;
   }
 
-  Future<void> deleteAccount() async {
-    await _dio.delete('/api/user/delete');
-  }
-
   Future<void> deleteUser(String userId) async {
     await _dio.delete(AppConfig.deleteUserPath(userId));
   }
