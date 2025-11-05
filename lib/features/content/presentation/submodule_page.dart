@@ -36,9 +36,29 @@ class _SubmodulePageState extends State<SubmodulePage> {
     _f = repo.submodule(widget.profileId, widget.submoduleId);
   }
 
+  @override
+  void didUpdateWidget(SubmodulePage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Refresh if profileId or submoduleId changed
+    if (oldWidget.profileId != widget.profileId || oldWidget.submoduleId != widget.submoduleId) {
+      setState(() {
+        _f = repo.submodule(widget.profileId, widget.submoduleId, forceRefresh: true);
+      });
+    }
+  }
+
   void _refresh() {
+    if (!mounted) return;
+    // Use active profile ID if available, otherwise use widget.profileId
+    final activePid = context.read<SelectedProfileCubit>().state;
+    final pid = activePid ?? widget.profileId;
+    
+    debugPrint('🔄 Refreshing submodule ${widget.submoduleId} for profile $pid (force refresh)');
+    
     setState(() {
-      _f = repo.submodule(widget.profileId, widget.submoduleId);
+      // Refresh with the active profile ID and force refresh to bypass cache
+      // This ensures we get the latest lesson completion status from the backend
+      _f = repo.submodule(pid, widget.submoduleId, forceRefresh: true);
     });
   }
 
@@ -47,18 +67,18 @@ class _SubmodulePageState extends State<SubmodulePage> {
     final activePid = context.watch<SelectedProfileCubit>().state;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF3F5F8),
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        title: Text(
-          widget.title,
-          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-            fontWeight: FontWeight.w800,
-            color: const Color(0xFF17406B),
+        backgroundColor: const Color(0xFFF3F5F8),
+        appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          title: Text(
+            widget.title,
+            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+              fontWeight: FontWeight.w800,
+              color: const Color(0xFF17406B),
+            ),
           ),
         ),
-      ),
       body: SafeArea(
         top: true,
         bottom: true,
@@ -74,7 +94,7 @@ class _SubmodulePageState extends State<SubmodulePage> {
               }
           final sub = s.data!;
 
-              // Calculate progress
+              // Calculate progress - ensure we're using the active profile's data
               final totalLessons = sub.lessons.length;
               final completedLessons = sub.lessons.where((l) =>
                 l is LessonLiteWithStatus && l.status == 'DONE'
@@ -187,7 +207,7 @@ class _SubmodulePageState extends State<SubmodulePage> {
                     return;
                   }
 
-                  // Folosește profile-ul ACTIV din cubit (nu hardcodat)
+                  // Use active profile ID if available, otherwise use widget.profileId
                   final pid = activePid ?? widget.profileId;
                   final changed = await Navigator.of(context).push<bool>(
                     MaterialPageRoute(
@@ -199,7 +219,19 @@ class _SubmodulePageState extends State<SubmodulePage> {
                     ),
                   );
 
-                  if (changed == true && mounted) _refresh();
+                  // Always refresh when returning from lesson to show updated progress
+                  // This ensures the last lesson completion is reflected
+                  // Add a delay to ensure backend has processed the update
+                  debugPrint('🔄 Returning from lesson ${l.id}, changed=$changed');
+                  if (mounted && changed == true) {
+                    // Wait longer to ensure backend has processed the lesson completion
+                    // This is especially important for the last lesson in a submodule
+                    await Future.delayed(const Duration(milliseconds: 1000));
+                    if (mounted) {
+                      debugPrint('🔄 Triggering refresh after lesson completion');
+                      _refresh();
+                    }
+                  }
                 },
                             borderRadius: BorderRadius.circular(20),
                             child: Container(

@@ -16,8 +16,9 @@ import 'tabs/profiles_tab.dart';
 import 'tabs/modules_tab.dart';
 
 class HomeShell extends StatefulWidget {
-  const HomeShell({super.key, this.profileId});
+  const HomeShell({super.key, this.profileId, this.shouldOpenCreateDialog = false});
   final int? profileId;
+  final bool shouldOpenCreateDialog;
 
   @override
   State<HomeShell> createState() => _HomeShellState();
@@ -55,6 +56,10 @@ class _HomeShellState extends State<HomeShell> {
         await GetIt.I<SecureStore>().saveActiveProfileId(firstProfile.id);
         GetIt.I<DioClient>().setActiveProfile(firstProfile.id);
         await GetIt.I<ActiveProfileService>().set(firstProfile.id);
+      } else if (profiles.isEmpty && mounted && widget.profileId == null) {
+        // No profiles exist and no active profile - this will trigger the create dialog
+        // The ProfilesTab will handle opening the dialog automatically
+        _hasAutoSelected = true; // Prevent retrying
       }
     } catch (e) {
       debugPrint('Error auto-selecting first profile: $e');
@@ -98,9 +103,28 @@ class _HomeShellState extends State<HomeShell> {
     Widget? customIcon,
   ) {
     final isSelected = _index == index;
+    final currentProfileId = GetIt.I<ActiveProfileService>().id;
+    
+    // Prevent navigation to modules tab if no active profile
+    final canNavigateToModules = index != 1 || currentProfileId != null;
     
     return GestureDetector(
-      onTap: () => setState(() => _index = index),
+      onTap: () {
+        if (canNavigateToModules) {
+          setState(() => _index = index);
+        } else {
+          // Show message when trying to access modules without profile
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Te rugăm să creezi un profil pentru a accesa modulele'),
+              backgroundColor: Color(0xFFEA2233),
+              duration: Duration(seconds: 2),
+            ),
+          );
+          // Navigate to profiles tab instead
+          setState(() => _index = 0);
+        }
+      },
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         decoration: BoxDecoration(
@@ -162,7 +186,7 @@ class _HomeShellState extends State<HomeShell> {
         
         // Update tabs when profile changes
         final updatedTabs = [
-          const ProfilesTab(),
+          ProfilesTab(shouldOpenCreateDialog: widget.shouldOpenCreateDialog),
           currentProfileId != null 
             ? ModulesTab(profileId: currentProfileId)
             : const _PlaceholderModulesTab(),

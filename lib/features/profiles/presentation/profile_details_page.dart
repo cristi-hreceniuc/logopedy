@@ -49,6 +49,25 @@ class _ProfileDetailsPageState extends State<ProfileDetailsPage> {
 
 
   Future<void> _deleteProfile() async {
+    // Check if this is the last profile
+    try {
+      final allProfiles = await repo.list();
+      final isLastProfile = allProfiles.length == 1;
+      
+      if (isLastProfile) {
+        if (mounted) {
+          SnackBarUtils.showError(
+            context,
+            'Nu poți șterge ultimul profil. Aplicația necesită cel puțin un profil activ.',
+          );
+        }
+        return;
+      }
+    } catch (e) {
+      debugPrint('Error checking profiles: $e');
+      // Continue anyway if check fails
+    }
+
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -409,34 +428,46 @@ class _ProfileDetailsPageState extends State<ProfileDetailsPage> {
                       ),
                       const SizedBox(height: 16),
                       // Delete Button
-                      Container(
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(16),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.red.withOpacity(0.2),
-                              blurRadius: 8,
-                              offset: const Offset(0, 2),
-                            ),
-                          ],
-                        ),
-                        child: FilledButton.icon(
-                          onPressed: _deleteProfile,
-                          icon: const Icon(Icons.delete_outline_rounded),
-                          label: const Text('Șterge profil'),
-                          style: FilledButton.styleFrom(
-                            backgroundColor: Colors.red,
-                            foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(
+                      FutureBuilder<List<ProfileCardDto>>(
+                        future: repo.list(),
+                        builder: (context, snapshot) {
+                          final allProfiles = snapshot.data ?? [];
+                          final isLastProfile = allProfiles.length == 1;
+                          
+                          return Container(
+                            decoration: BoxDecoration(
                               borderRadius: BorderRadius.circular(16),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.red.withOpacity(isLastProfile ? 0.1 : 0.2),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
                             ),
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            textStyle: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w700,
+                            child: FilledButton.icon(
+                              onPressed: isLastProfile ? null : _deleteProfile,
+                              icon: const Icon(Icons.delete_outline_rounded),
+                              label: Text(isLastProfile 
+                                ? 'Nu poți șterge ultimul profil' 
+                                : 'Șterge profil'),
+                              style: FilledButton.styleFrom(
+                                backgroundColor: Colors.red,
+                                foregroundColor: Colors.white,
+                                disabledBackgroundColor: Colors.grey[400],
+                                disabledForegroundColor: Colors.white,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                                padding: const EdgeInsets.symmetric(vertical: 16),
+                                textStyle: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
                             ),
-                          ),
-                        ),
+                          );
+                        },
                       ),
                       const SizedBox(height: 16),
                       // Lessons Progress

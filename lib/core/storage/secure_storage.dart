@@ -41,6 +41,8 @@ class SecureStore {
     await _s.delete(key: _expiresAtKey);
     await _s.delete(key: _refreshKey);
     await _s.delete(key: _refreshExpKey);
+    // Don't clear onboarding_completed here - it should persist across logins
+    // Only clear it when account is deleted (handled in deleteAccount)
   }
 
   Future<void> saveActiveProfileId(int? id) async {

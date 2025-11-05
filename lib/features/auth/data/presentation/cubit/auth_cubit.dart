@@ -121,6 +121,8 @@ class AuthCubit extends Cubit<AuthState> {
         await store.saveRememberedEmail(sessionInfo.email!);
       }
       await _repo.deleteAccount();
+      // Clear onboarding status so user sees welcome page again if they re-register
+      await GetIt.I<SecureStore>().deleteKey('onboarding_completed');
       emit(const AuthState.unauthenticated());
     } on DioException catch (e) {
       emit(AuthState.error(_niceError(e)));

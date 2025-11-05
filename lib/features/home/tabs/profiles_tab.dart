@@ -1,16 +1,21 @@
 // lib/features/home/tabs/profiles_tab.dart
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:get_it/get_it.dart';
 import 'package:intl/intl.dart';
 import '../../../core/network/dio_client.dart';
 import '../../../core/state/active_profile.dart';
+import '../../../core/storage/secure_storage.dart';
 import '../../../core/utils/snackbar_utils.dart';
 import '../../profiles/models/profile_model.dart';
 import '../../profiles/presentation/profile_details_page.dart';
 import '../../profiles/profile_repository.dart';
+import '../../profiles/selected_profile_cubit.dart';
 
 class ProfilesTab extends StatefulWidget {
-  const ProfilesTab({super.key});
+  const ProfilesTab({super.key, this.shouldOpenCreateDialog = false});
+  
+  final bool shouldOpenCreateDialog;
 
   @override
   State<ProfilesTab> createState() => _ProfilesTabState();
@@ -19,11 +24,67 @@ class ProfilesTab extends StatefulWidget {
 class _ProfilesTabState extends State<ProfilesTab> {
   late final repo = ProfilesRepository(GetIt.I<DioClient>());
   late Future<List<ProfileCardDto>> _f;
+  bool _hasCheckedForEmptyProfiles = false;
+  bool _wasAutoOpened = false;
 
   @override
   void initState() {
     super.initState();
     _f = repo.list();
+    // Check if we need to auto-open create dialog
+    // Use multiple post-frame callbacks to ensure the widget is fully ready
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      // Wait for the next frame to ensure the widget is visible
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _checkAndOpenCreateDialog();
+      });
+    });
+  }
+
+  @override
+  void didUpdateWidget(ProfilesTab oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // If shouldOpenCreateDialog changed to true, check again
+    if (widget.shouldOpenCreateDialog && !oldWidget.shouldOpenCreateDialog) {
+      _hasCheckedForEmptyProfiles = false;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _checkAndOpenCreateDialog();
+        });
+      });
+    }
+  }
+
+  Future<void> _checkAndOpenCreateDialog() async {
+    if (_hasCheckedForEmptyProfiles) return;
+    _hasCheckedForEmptyProfiles = true;
+    
+    try {
+      final profiles = await _f;
+      final activeProfileId = GetIt.I<ActiveProfileService>().id;
+      
+      // If shouldOpenCreateDialog is true (after onboarding) or if no profiles exist, automatically open create dialog
+      final shouldOpen = widget.shouldOpenCreateDialog || (profiles.isEmpty && activeProfileId == null);
+      
+      debugPrint('ProfilesTab: shouldOpenCreateDialog=${widget.shouldOpenCreateDialog}, profiles.isEmpty=${profiles.isEmpty}, activeProfileId=$activeProfileId, shouldOpen=$shouldOpen');
+      
+      if (shouldOpen && mounted) {
+        // Wait a bit for the UI to be ready, especially after onboarding
+        await Future.delayed(Duration(milliseconds: widget.shouldOpenCreateDialog ? 1200 : 500));
+        if (mounted) {
+          debugPrint('ProfilesTab: Opening create profile dialog');
+          _wasAutoOpened = true; // Track that dialog was auto-opened
+          _showCreateSheet();
+        } else {
+          debugPrint('ProfilesTab: Widget not mounted, skipping dialog');
+        }
+      } else {
+        debugPrint('ProfilesTab: Not opening dialog - shouldOpen=$shouldOpen, mounted=$mounted');
+      }
+    } catch (e, stackTrace) {
+      debugPrint('Error checking for empty profiles: $e');
+      debugPrint('Stack trace: $stackTrace');
+    }
   }
 
   Future<void> _refresh() async {
@@ -224,7 +285,7 @@ class _ProfilesTabState extends State<ProfilesTab> {
                               }
                               
                               final name = nameCtrl.text.trim();
-                              await repo.create(
+                              final createdProfile = await repo.create(
                                 name: name,
                                 avatarUri: avatarCtrl.text.trim().isEmpty
                                     ? null
@@ -236,6 +297,19 @@ class _ProfilesTabState extends State<ProfilesTab> {
                               Navigator.pop(ctx);
                               SnackBarUtils.showSuccess(context, 'Profil creat');
                               await _refresh();
+                              
+                              // Automatically select the newly created profile if no active profile exists
+                              // OR if this profile was created from the auto-opened dialog (after onboarding)
+                              final activeProfileId = GetIt.I<ActiveProfileService>().id;
+                              final shouldSetAsActive = activeProfileId == null || _wasAutoOpened;
+                              if (shouldSetAsActive && mounted) {
+                                context.read<SelectedProfileCubit>().set(createdProfile.id);
+                                await GetIt.I<SecureStore>().saveActiveProfileId(createdProfile.id);
+                                GetIt.I<DioClient>().setActiveProfile(createdProfile.id);
+                                await GetIt.I<ActiveProfileService>().set(createdProfile.id);
+                              }
+                              // Reset the flag after creating the profile
+                              _wasAutoOpened = false;
                             },
                             style: FilledButton.styleFrom(
                               backgroundColor: Colors.transparent,

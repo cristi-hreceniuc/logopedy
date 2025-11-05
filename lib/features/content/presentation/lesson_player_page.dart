@@ -120,6 +120,11 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
   LessonDto? _data;
   String? _error;
   bool _loading = true;
+  
+  // Timer for minimum lesson duration
+  Timer? _lessonTimer;
+  int _elapsedSeconds = 0;
+  static const int _minimumSeconds = 10;
 
   @override
   void initState() {
@@ -149,8 +154,25 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
     _load();
   }
 
+  void _startTimer() {
+    _elapsedSeconds = 0;
+    _lessonTimer?.cancel();
+    _lessonTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (mounted) {
+        setState(() {
+          _elapsedSeconds++;
+        });
+      } else {
+        timer.cancel();
+      }
+    });
+  }
+
+  bool get _canFinishLesson => _elapsedSeconds >= _minimumSeconds;
+
   @override
   void dispose() {
+    _lessonTimer?.cancel();
     _player.dispose();
     super.dispose();
   }
@@ -340,6 +362,8 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
         _data = d;
         _loading = false;
       });
+      // Reset and restart timer when lesson loads
+      _startTimer();
       // debug payload
       for (final sc in _data!.screens) {
         debugPrint('SCREEN ${sc.screenType} => ${sc.payload}');
@@ -350,6 +374,15 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
         _error = _extractErrorMessage(e);
         _loading = false;
       });
+    }
+  }
+  
+  @override
+  void didUpdateWidget(LessonPlayerPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // If lesson ID changed, reload and restart timer
+    if (oldWidget.lessonId != widget.lessonId) {
+      _load();
     }
   }
 
@@ -571,7 +604,13 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
             final lessonExists = await _lessonExists(nextLessonId);
             if (!lessonExists) {
               debugPrint('🎉 Lesson $nextLessonId does not exist, going back to submodule');
-              Navigator.of(context).maybePop(true);
+              // Add a longer delay to ensure backend has processed the lesson completion
+              // This ensures the current lesson is marked as DONE before we navigate back
+              debugPrint('🎉 Waiting for backend to process lesson completion before navigating back...');
+              await Future.delayed(const Duration(milliseconds: 1000));
+              if (mounted) {
+                Navigator.of(context).maybePop(true);
+              }
               return;
             }
             
@@ -588,13 +627,26 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
           } catch (e) {
             debugPrint('🎉 Error navigating to next lesson $nextLessonId: $e');
             debugPrint('🎉 Going back to submodule due to navigation error');
-            Navigator.of(context).maybePop(true);
+            // Add a small delay to ensure backend has processed the lesson completion
+            await Future.delayed(const Duration(milliseconds: 500));
+            if (mounted) {
+              Navigator.of(context).maybePop(true);
+            }
           }
         } else {
           debugPrint('🎉 No valid next lesson data, going back to submodule');
           debugPrint('🎉 Next lesson ID: ${resp.nextLessonId}, Response lesson ID: ${resp.lessonId}, Widget lesson ID: ${widget.lessonId}');
           // No fallback navigation - just go back to submodule
-          Navigator.of(context).maybePop(true);
+          // Add a longer delay to ensure backend has processed the lesson completion
+          // This is especially important for the last lesson in a submodule
+          // The backend needs time to update the lesson status to DONE
+          debugPrint('🎉 Waiting for backend to process lesson completion...');
+          await Future.delayed(const Duration(milliseconds: 1000));
+          if (mounted) {
+            // Always return true to signal that data changed and submodule should refresh
+            debugPrint('🎉 Navigating back to submodule after lesson completion');
+            Navigator.of(context).maybePop(true);
+          }
         }
       }
     } catch (e) {
@@ -612,7 +664,12 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
             await _showCompletionDialog(true, false, false);
           }
           
-          // Navigate back to submodule
+          // Navigate back to submodule and signal refresh
+          // Add a longer delay to ensure backend has processed the lesson completion
+          // Even if we got a server error, we still want to give the backend time
+          // to process the lesson completion before navigating back
+          debugPrint('🎉 Server error occurred, but waiting for backend to process lesson completion...');
+          await Future.delayed(const Duration(milliseconds: 1000));
           if (mounted) {
             Navigator.of(context).maybePop(true);
           }
@@ -620,13 +677,57 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
         }
       }
       
-      // For other errors, show error message
+      // For other errors, still return true to allow refresh if the lesson was completed
+      // This ensures the submodule page refreshes even if there was a minor error
+      if (mounted) {
+        Navigator.of(context).maybePop(true);
+      }
+      
+      // Show error message
       final errorMsg = _extractErrorMessage(e);
       SnackBarUtils.showError(context, errorMsg);
     }
   }
 
   // ---------------- UI ----------------
+  Widget _buildTimerIndicator() {
+    if (_canFinishLesson) {
+      return const SizedBox.shrink();
+    }
+    
+    final remainingSeconds = _minimumSeconds - _elapsedSeconds;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFFEA2233).withOpacity(0.1),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: const Color(0xFFEA2233).withOpacity(0.3),
+          width: 1,
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            Icons.hourglass_empty,
+            size: 18,
+            color: const Color(0xFFEA2233),
+          ),
+          const SizedBox(width: 6),
+          Text(
+            '$remainingSeconds',
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+              color: const Color(0xFFEA2233),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
@@ -642,6 +743,10 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
             color: const Color(0xFF17406B),
           ),
         ),
+        actions: [
+          _buildTimerIndicator(),
+          const SizedBox(width: 16),
+        ],
       ),
       body: SafeArea(
         top: true,
@@ -748,21 +853,30 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
                     ],
                   ),
                   child: FilledButton(
-                    onPressed: _finishLesson,
+                    onPressed: _canFinishLesson ? _finishLesson : null,
                     style: FilledButton.styleFrom(
-                      backgroundColor: const Color(0xFFEA2233),
+                      backgroundColor: _canFinishLesson ? const Color(0xFFEA2233) : Colors.grey[400],
                       foregroundColor: Colors.white,
                       minimumSize: const Size.fromHeight(56),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(16),
                       ),
                     ),
-                    child: Text(
-                      next,
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
-                      ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        if (!_canFinishLesson) ...[
+                          Icon(Icons.hourglass_empty, size: 20),
+                          const SizedBox(width: 8),
+                        ],
+                        Text(
+                          next,
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
@@ -927,21 +1041,30 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
                     ],
                   ),
                   child: FilledButton(
-                    onPressed: _finishLesson,
+                    onPressed: _canFinishLesson ? _finishLesson : null,
                     style: FilledButton.styleFrom(
-                      backgroundColor: const Color(0xFFEA2233),
+                      backgroundColor: _canFinishLesson ? const Color(0xFFEA2233) : Colors.grey[400],
                       foregroundColor: Colors.white,
                       minimumSize: const Size.fromHeight(56),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(16),
                       ),
                     ),
-                    child: Text(
-                      next,
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
-                      ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        if (!_canFinishLesson) ...[
+                          Icon(Icons.hourglass_empty, size: 20),
+                          const SizedBox(width: 8),
+                        ],
+                        Text(
+                          next,
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
@@ -1034,21 +1157,30 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
                     ],
                   ),
                   child: FilledButton(
-                    onPressed: _finishLesson,
+                    onPressed: _canFinishLesson ? _finishLesson : null,
                     style: FilledButton.styleFrom(
-                      backgroundColor: const Color(0xFFEA2233),
+                      backgroundColor: _canFinishLesson ? const Color(0xFFEA2233) : Colors.grey[400],
                       foregroundColor: Colors.white,
                       minimumSize: const Size.fromHeight(56),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(16),
                       ),
                     ),
-                    child: Text(
-                      next,
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
-                      ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        if (!_canFinishLesson) ...[
+                          Icon(Icons.hourglass_empty, size: 20),
+                          const SizedBox(width: 8),
+                        ],
+                        Text(
+                          next,
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
@@ -1241,21 +1373,30 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
                     ],
                   ),
                   child: FilledButton(
-                    onPressed: _finishLesson,
+                    onPressed: _canFinishLesson ? _finishLesson : null,
                     style: FilledButton.styleFrom(
-                      backgroundColor: const Color(0xFFEA2233),
+                      backgroundColor: _canFinishLesson ? const Color(0xFFEA2233) : Colors.grey[400],
                       foregroundColor: Colors.white,
                       minimumSize: const Size.fromHeight(56),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(16),
                       ),
                     ),
-                    child: Text(
-                      next,
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
-                      ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        if (!_canFinishLesson) ...[
+                          Icon(Icons.hourglass_empty, size: 20),
+                          const SizedBox(width: 8),
+                        ],
+                        Text(
+                          next,
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
@@ -1422,21 +1563,30 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
                     ],
                   ),
                   child: FilledButton(
-                    onPressed: _finishLesson,
+                    onPressed: _canFinishLesson ? _finishLesson : null,
                     style: FilledButton.styleFrom(
-                      backgroundColor: const Color(0xFFEA2233),
+                      backgroundColor: _canFinishLesson ? const Color(0xFFEA2233) : Colors.grey[400],
                       foregroundColor: Colors.white,
                       minimumSize: const Size.fromHeight(56),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(16),
                       ),
                     ),
-                    child: Text(
-                      next,
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
-                      ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        if (!_canFinishLesson) ...[
+                          Icon(Icons.hourglass_empty, size: 20),
+                          const SizedBox(width: 8),
+                        ],
+                        Text(
+                          next,
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
@@ -1668,21 +1818,30 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
                     ],
                   ),
                   child: FilledButton(
-                    onPressed: _finishLesson,
+                    onPressed: _canFinishLesson ? _finishLesson : null,
                     style: FilledButton.styleFrom(
-                      backgroundColor: const Color(0xFFEA2233),
+                      backgroundColor: _canFinishLesson ? const Color(0xFFEA2233) : Colors.grey[400],
                       foregroundColor: Colors.white,
                       minimumSize: const Size.fromHeight(56),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(16),
                       ),
                     ),
-                    child: Text(
-                      next,
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
-                      ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        if (!_canFinishLesson) ...[
+                          Icon(Icons.hourglass_empty, size: 20),
+                          const SizedBox(width: 8),
+                        ],
+                        Text(
+                          next,
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
@@ -1748,6 +1907,7 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
             payload: p,
             onFinish: _finishLesson,
             onShowCompletionDialog: _showCompletionDialog,
+            canFinishLesson: _canFinishLesson,
           );
         }
 
@@ -1775,6 +1935,7 @@ class _ImageRevealWordWidget extends StatefulWidget {
     required this.payload,
     required this.onFinish,
     required this.onShowCompletionDialog,
+    required this.canFinishLesson,
   });
 
   final String title;
@@ -1786,6 +1947,7 @@ class _ImageRevealWordWidget extends StatefulWidget {
   final Map<String, dynamic> payload;
   final Future<void> Function({bool skipCompletionDialog}) onFinish;
   final Future<void> Function(bool, bool, bool) onShowCompletionDialog;
+  final bool canFinishLesson;
 
   @override
   State<_ImageRevealWordWidget> createState() => _ImageRevealWordWidgetState();
@@ -2038,21 +2200,30 @@ class _ImageRevealWordWidgetState extends State<_ImageRevealWordWidget> {
                   : [],
             ),
             child: FilledButton(
-              onPressed: _canProceed ? _handleNext : null,
+              onPressed: (_canProceed && widget.canFinishLesson) ? _handleNext : null,
               style: FilledButton.styleFrom(
-                backgroundColor: _canProceed ? const Color(0xFFEA2233) : Colors.grey[400],
+                backgroundColor: (_canProceed && widget.canFinishLesson) ? const Color(0xFFEA2233) : Colors.grey[400],
                 foregroundColor: Colors.white,
                 minimumSize: const Size.fromHeight(56),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(16),
                 ),
               ),
-              child: Text(
-                widget.nextLabel,
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  if (!widget.canFinishLesson) ...[
+                    Icon(Icons.hourglass_empty, size: 20),
+                    const SizedBox(width: 8),
+                  ],
+                  Text(
+                    widget.nextLabel,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
               ),
             ),
           ),

@@ -49,6 +49,12 @@ class _ModulesPageState extends State<ModulesPage> {
     }
   }
 
+  Future<void> _refreshModules() async {
+    setState(() {
+      _f = repo.modules(widget.profileId);
+    });
+  }
+
   Future<double> _getModuleProgress(ModuleDto module) async {
     try {
       final details = await repo.moduleDetails(widget.profileId, module.id);
@@ -121,7 +127,7 @@ class _ModulesPageState extends State<ModulesPage> {
     }
 
     // 3) navighează către o pagină de selecție submodule
-    Navigator.push(
+    final result = await Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => _SubmoduleSelectionPage(
@@ -131,6 +137,12 @@ class _ModulesPageState extends State<ModulesPage> {
         ),
       ),
     );
+    
+    // Refresh modules if returning from submodule navigation
+    // This ensures progress updates are reflected
+    if (result == true && mounted) {
+      _refreshModules();
+    }
   }
 
   @override
@@ -426,8 +438,8 @@ class _SubmoduleSelectionPage extends StatelessWidget {
               return Material(
                 color: Colors.transparent,
                 child: InkWell(
-                  onTap: () {
-                    Navigator.push(
+                  onTap: () async {
+                    final result = await Navigator.push(
                       context,
                       MaterialPageRoute(
                         builder: (_) => SubmodulePage(
@@ -437,6 +449,13 @@ class _SubmoduleSelectionPage extends StatelessWidget {
                         ),
                       ),
                     );
+                    
+                    // Refresh modules page when returning from submodule
+                    // This ensures progress updates are reflected
+                    if (result == true && context.mounted) {
+                      // Return true to signal parent modules page to refresh
+                      Navigator.of(context).pop(true);
+                    }
                   },
                   borderRadius: BorderRadius.circular(20),
                   child: Container(

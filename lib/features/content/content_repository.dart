@@ -15,8 +15,8 @@ class ContentRepository {
           .toList()
           .cast<ModuleDto>();
 
-  Future<SubmoduleDto> submodule(int profileId, int subId) async =>
-      SubmoduleDto.fromJson(await _api.getSubmodule(profileId, subId));
+  Future<SubmoduleDto> submodule(int profileId, int subId, {bool forceRefresh = false}) async =>
+      SubmoduleDto.fromJson(await _api.getSubmodule(profileId, subId, forceRefresh: forceRefresh));
 
   /// Lecția cu ecrane (pentru player)
   Future<LessonDto> getLesson(int profileId, int lessonId) async =>

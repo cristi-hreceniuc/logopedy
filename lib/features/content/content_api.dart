@@ -16,8 +16,13 @@ class ContentApi {
     return r.data;
   }
 
-  Future<Map<String,dynamic>> getSubmodule(int profileId, int subId) async {
-    final r = await _dio.get(AppConfig.submodulePath(profileId, subId));
+  Future<Map<String,dynamic>> getSubmodule(int profileId, int subId, {bool forceRefresh = false}) async {
+    final path = AppConfig.submodulePath(profileId, subId);
+    // Add cache-busting parameter if force refresh is requested
+    final url = forceRefresh 
+        ? '$path?t=${DateTime.now().millisecondsSinceEpoch}'
+        : path;
+    final r = await _dio.get(url);
     return r.data;
   }
 
