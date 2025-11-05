@@ -133,11 +133,11 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
     // 1) Context audio corect (iOS + Android)
     _player.setReleaseMode(ReleaseMode.stop);
     _player.setAudioContext(
-      const AudioContext(
+      AudioContext(
         iOS: AudioContextIOS(
           // redă chiar dacă telefonul e pe mute / switch silențios
           category: AVAudioSessionCategory.playback,
-          options: [AVAudioSessionOptions.mixWithOthers],
+          options: {AVAudioSessionOptions.mixWithOthers},
         ),
         android: AudioContextAndroid(
           contentType: AndroidContentType.music,

@@ -7,6 +7,7 @@ import '../../auth/data/presentation/cubit/auth_cubit.dart';
 import '../../auth/data/domain/auth_repository.dart';
 import '../../auth/data/models/user_response_dto.dart';
 import '../../session/session_info.dart';
+import '../../../widgets/app_version.dart';
 
 class AccountTab extends StatelessWidget {
   const AccountTab({super.key});
@@ -433,6 +434,21 @@ class AccountTab extends StatelessWidget {
                       ),
                   );
                 },
+              ),
+              const SizedBox(height: 24),
+              // App Version in bottom-right corner
+              Align(
+                alignment: Alignment.centerRight,
+                child: Padding(
+                  padding: const EdgeInsets.only(right: 16),
+                  child: AppVersion(
+                    style: TextStyle(
+                      color: Colors.grey[600],
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
               ),
             ],
           );

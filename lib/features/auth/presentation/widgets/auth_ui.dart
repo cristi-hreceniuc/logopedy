@@ -1,6 +1,7 @@
 // lib/features/auth/presentation/widgets/auth_ui.dart
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:logopedy/core/theme/app_theme.dart';
 
 class AuthColors {
@@ -198,61 +199,101 @@ class AuthScaffold extends StatelessWidget {
         ),
         body: SafeArea(
           top: !showBack,
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
-              return GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: () => FocusScope.of(context).unfocus(),
-                child: SingleChildScrollView(
-                  primary: true,
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-                  // Ridicăm conținutul cu exact înălțimea tastaturii + spațiu
-                  padding: EdgeInsets.fromLTRB(16, 0, 16, bottomInset + 16),
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(minHeight: constraints.maxHeight),
-                    child: Align(
-                      alignment: Alignment.topCenter,
+          child: Stack(
+            children: [
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
+                  return GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () => FocusScope.of(context).unfocus(),
+                    child: SingleChildScrollView(
+                      primary: true,
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+                      // Ridicăm conținutul cu exact înălțimea tastaturii + spațiu
+                      padding: EdgeInsets.fromLTRB(16, 0, 16, bottomInset + 16),
                       child: ConstrainedBox(
-                        constraints: BoxConstraints(maxWidth: maxWidth),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            AuthIllustration(illustrationAsset),
-                            if (title != null) ...[
-                              const SizedBox(height: 4),
-                              AuthTitle(title!),
-                            ],
-                            if (subtitle != null) ...[
-                              const SizedBox(height: 6),
-                              AuthSubtitle(subtitle!),
-                            ],
-                            const SizedBox(height: 12),
-                            Card(
-                              color: cs.surface,
-                              elevation: 0.5,
-                              shadowColor: cs.shadow.withOpacity(0.1),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(24),
-                              ),
-                              child: Padding(
-                                padding: const EdgeInsets.all(16),
-                                child: child,
-                              ),
+                        constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                        child: Align(
+                          alignment: Alignment.topCenter,
+                          child: ConstrainedBox(
+                            constraints: BoxConstraints(maxWidth: maxWidth),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                AuthIllustration(illustrationAsset),
+                                if (title != null) ...[
+                                  const SizedBox(height: 4),
+                                  AuthTitle(title!),
+                                ],
+                                if (subtitle != null) ...[
+                                  const SizedBox(height: 6),
+                                  AuthSubtitle(subtitle!),
+                                ],
+                                const SizedBox(height: 12),
+                                Card(
+                                  color: cs.surface,
+                                  elevation: 0.5,
+                                  shadowColor: cs.shadow.withOpacity(0.1),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(24),
+                                  ),
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(16),
+                                    child: child,
+                                  ),
+                                ),
+                                const SizedBox(height: 24),
+                              ],
                             ),
-                            const SizedBox(height: 24),
-                          ],
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                ),
-              );
-            },
+                  );
+                },
+              ),
+              // Version in bottom-right corner
+              Positioned(
+                bottom: 8,
+                right: 16,
+                child: _AuthVersion(),
+              ),
+            ],
           ),
         ),
       ),
+    );
+  }
+}
+
+class _AuthVersion extends StatelessWidget {
+  const _AuthVersion();
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return FutureBuilder<PackageInfo>(
+      future: PackageInfo.fromPlatform(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return const SizedBox.shrink();
+        }
+
+        final version = snapshot.data!.version;
+        final buildNumber = snapshot.data!.buildNumber;
+        final versionText = 'v$version${buildNumber != '1' ? '+$buildNumber' : ''}';
+
+        return Text(
+          versionText,
+          style: TextStyle(
+            fontSize: 12,
+            color: cs.onSurface.withOpacity(0.5),
+            fontWeight: FontWeight.w500,
+          ),
+        );
+      },
     );
   }
 }
