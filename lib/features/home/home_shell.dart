@@ -14,6 +14,7 @@ import '../../core/storage/secure_storage.dart';
 import 'tabs/account_tab.dart';
 import 'tabs/profiles_tab.dart';
 import 'tabs/modules_tab.dart';
+import '../settings/settings_page.dart';
 
 class HomeShell extends StatefulWidget {
   const HomeShell({super.key, this.profileId, this.shouldOpenCreateDialog = false});
@@ -191,6 +192,7 @@ class _HomeShellState extends State<HomeShell> {
             ? ModulesTab(profileId: currentProfileId)
             : const _PlaceholderModulesTab(),
           const AccountTab(),
+          const SettingsPage(),
         ];
         
         return BlocListener<AuthCubit, AuthState>(
@@ -200,76 +202,85 @@ class _HomeShellState extends State<HomeShell> {
           },
           child: Scaffold(
             body: IndexedStack(index: _index, children: updatedTabs),
-            bottomNavigationBar: Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.08),
-                    blurRadius: 16,
-                    offset: const Offset(0, -4),
-                  ),
-                ],
-              ),
-              child: SafeArea(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceAround,
-                    children: [
-                      // Profile tab with icon
-                      _buildNavItem(0, Icons.group_outlined, Icons.group, 'Profile', null),
-                      // Modules tab
-                      _buildNavItem(1, Icons.menu_book_outlined, Icons.menu_book, 'Module', null),
-                      // Account tab with initials
-                      FutureBuilder<UserResponseDto?>(
-                        future: authRepo.getCurrentUser().catchError((_) => null),
-                        builder: (context, userSnapshot) {
-                          return FutureBuilder<SessionInfo?>(
-                            future: SessionInfo.fromStorage(),
-                            builder: (context, sessionSnapshot) {
-                              final user = userSnapshot.data;
-                              final session = sessionSnapshot.data;
-                              String accountInitials = 'A';
-                              
-                              // Try user data first
-                              if (user?.firstName != null && user?.lastName != null) {
-                                accountInitials = '${user!.firstName![0]}${user.lastName![0]}';
-                              } else if (user?.firstName != null) {
-                                accountInitials = user!.firstName![0];
-                              } else if (user?.lastName != null) {
-                                accountInitials = user!.lastName![0];
-                              } else if (user?.email != null && user!.email.isNotEmpty) {
-                                accountInitials = user.email[0].toUpperCase();
-                              }
-                              // Fallback to session info
-                              else if (session?.firstName != null && session?.lastName != null) {
-                                accountInitials = '${session!.firstName![0]}${session.lastName![0]}';
-                              } else if (session?.firstName != null) {
-                                accountInitials = session!.firstName![0];
-                              } else if (session?.lastName != null) {
-                                accountInitials = session!.lastName![0];
-                              } else if (session?.email != null && session!.email!.isNotEmpty) {
-                                accountInitials = session.email![0].toUpperCase();
-                              }
-                              
-                              final isSelected = _index == 2;
-                              return _buildNavItem(
-                                2,
-                                Icons.person_outline,
-                                Icons.person,
-                                'Contul meu',
-                                _buildInitialsAvatar(accountInitials, isSelected),
-                              );
-                            },
-                          );
-                        },
+            bottomNavigationBar: Builder(
+              builder: (context) {
+                final cs = Theme.of(context).colorScheme;
+                return Container(
+                  decoration: BoxDecoration(
+                    color: cs.brightness == Brightness.dark
+                        ? const Color(0xFF1B1B20)
+                        : Colors.white,
+                    borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.08),
+                        blurRadius: 16,
+                        offset: const Offset(0, -4),
                       ),
                     ],
                   ),
-                ),
-              ),
+                  child: SafeArea(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceAround,
+                        children: [
+                          // Profile tab with icon
+                          _buildNavItem(0, Icons.group_outlined, Icons.group, 'Profile', null),
+                          // Modules tab
+                          _buildNavItem(1, Icons.menu_book_outlined, Icons.menu_book, 'Module', null),
+                          // Account tab with initials
+                          FutureBuilder<UserResponseDto?>(
+                            future: authRepo.getCurrentUser().then<UserResponseDto?>((value) => value).catchError((_) => Future.value(null)),
+                            builder: (context, userSnapshot) {
+                              return FutureBuilder<SessionInfo?>(
+                                future: SessionInfo.fromStorage(),
+                                builder: (context, sessionSnapshot) {
+                                  final user = userSnapshot.data;
+                                  final session = sessionSnapshot.data;
+                                  String accountInitials = 'A';
+                                  
+                                  // Try user data first
+                                  if (user?.firstName != null && user?.lastName != null) {
+                                    accountInitials = '${user!.firstName![0]}${user.lastName![0]}';
+                                  } else if (user?.firstName != null) {
+                                    accountInitials = user!.firstName![0];
+                                  } else if (user?.lastName != null) {
+                                    accountInitials = user!.lastName![0];
+                                  } else if (user?.email != null && user!.email.isNotEmpty) {
+                                    accountInitials = user.email[0].toUpperCase();
+                                  }
+                                  // Fallback to session info
+                                  else if (session?.firstName != null && session?.lastName != null) {
+                                    accountInitials = '${session!.firstName![0]}${session.lastName![0]}';
+                                  } else if (session?.firstName != null) {
+                                    accountInitials = session!.firstName![0];
+                                  } else if (session?.lastName != null) {
+                                    accountInitials = session!.lastName![0];
+                                  } else if (session?.email != null && session!.email!.isNotEmpty) {
+                                    accountInitials = session.email![0].toUpperCase();
+                                  }
+                                  
+                                  final isSelected = _index == 2;
+                                  return _buildNavItem(
+                                    2,
+                                    Icons.person_outline,
+                                    Icons.person,
+                                    'Contul meu',
+                                    _buildInitialsAvatar(accountInitials, isSelected),
+                                  );
+                                },
+                              );
+                            },
+                          ),
+                          // Settings tab
+                          _buildNavItem(3, Icons.settings_outlined, Icons.settings, 'Setări', null),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              },
             ),
           ),
       );
@@ -293,22 +304,57 @@ class _PlaceholderModulesTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(
+    return Scaffold(
+      backgroundColor: const Color(0xFFF3F5F8),
       body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.menu_book_outlined, size: 64, color: Color(0xFFEA2233)),
-            SizedBox(height: 16),
-            Text(
-              'Selectează un profil pentru a accesa modulele',
-              style: TextStyle(
-                fontSize: 16,
-                color: Color(0xFF17406B),
-                fontWeight: FontWeight.w600,
+        child: Container(
+          margin: const EdgeInsets.all(24),
+          padding: const EdgeInsets.all(32),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.08),
+                blurRadius: 16,
+                offset: const Offset(0, 4),
               ),
-            ),
-          ],
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEA2233).withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.menu_book_outlined,
+                  size: 64,
+                  color: Color(0xFFEA2233),
+                ),
+              ),
+              const SizedBox(height: 24),
+              Text(
+                'Creează un profil',
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  color: const Color(0xFF17406B),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'Pentru a accesa modulele și lecțiile, ai nevoie de cel puțin un profil activ. Mergi la tab-ul Profile și creează un profil nou.',
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: Colors.grey[600],
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

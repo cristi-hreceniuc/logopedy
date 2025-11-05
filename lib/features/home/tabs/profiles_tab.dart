@@ -296,12 +296,19 @@ class _ProfilesTabState extends State<ProfilesTab> {
                               if (!mounted) return;
                               Navigator.pop(ctx);
                               SnackBarUtils.showSuccess(context, 'Profil creat');
+                              
+                              // Refresh to get updated profile list
                               await _refresh();
                               
-                              // Automatically select the newly created profile if no active profile exists
-                              // OR if this profile was created from the auto-opened dialog (after onboarding)
+                              // Automatically select the newly created profile if:
+                              // 1. No active profile exists, OR
+                              // 2. This profile was created from the auto-opened dialog (after onboarding/welcome page), OR
+                              // 3. This is the only profile (first profile created)
                               final activeProfileId = GetIt.I<ActiveProfileService>().id;
-                              final shouldSetAsActive = activeProfileId == null || _wasAutoOpened;
+                              final profiles = await repo.list();
+                              final isOnlyProfile = profiles.length == 1;
+                              final shouldSetAsActive = activeProfileId == null || _wasAutoOpened || isOnlyProfile;
+                              
                               if (shouldSetAsActive && mounted) {
                                 context.read<SelectedProfileCubit>().set(createdProfile.id);
                                 await GetIt.I<SecureStore>().saveActiveProfileId(createdProfile.id);
