@@ -74,7 +74,7 @@ class _WelcomePageState extends State<WelcomePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF3F5F8),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
         child: Column(
           children: [
@@ -84,16 +84,16 @@ class _WelcomePageState extends State<WelcomePage> {
                 alignment: Alignment.topRight,
                 child: Padding(
                   padding: const EdgeInsets.all(16.0),
-                  child: TextButton(
-                    onPressed: _skip,
-                    child: const Text(
-                      'Sari peste',
-                      style: TextStyle(
-                        color: Color(0xFF17406B),
-                        fontWeight: FontWeight.w600,
+                    child: TextButton(
+                      onPressed: _skip,
+                      child: Text(
+                        'Sari peste',
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.onSurface,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ),
-                  ),
                 ),
               ),
             
@@ -218,7 +218,7 @@ class _WelcomeSlideWidget extends StatelessWidget {
             slide.title,
             style: Theme.of(context).textTheme.headlineMedium?.copyWith(
               fontWeight: FontWeight.w800,
-              color: const Color(0xFF17406B),
+              color: Theme.of(context).colorScheme.onSurface,
             ),
             textAlign: TextAlign.center,
           ),

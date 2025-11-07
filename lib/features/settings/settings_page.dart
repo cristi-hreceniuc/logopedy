@@ -10,9 +10,7 @@ class SettingsPage extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
 
     return Scaffold(
-      backgroundColor: cs.brightness == Brightness.dark
-          ? const Color(0xFF0D0D10)
-          : const Color(0xFFF3F5F8),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         title: const Text(
           'Setări',

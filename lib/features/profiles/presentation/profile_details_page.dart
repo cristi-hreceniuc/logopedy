@@ -192,9 +192,10 @@ class _ProfileDetailsPageState extends State<ProfileDetailsPage> {
   Widget build(BuildContext context) {
     final activeId = context.watch<SelectedProfileCubit>().state;
     final isActive = activeId == widget.profile.id;
+    final cs = Theme.of(context).colorScheme;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF3F5F8),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
             backgroundColor: Colors.transparent,
             elevation: 0,
@@ -202,7 +203,7 @@ class _ProfileDetailsPageState extends State<ProfileDetailsPage> {
               widget.profile.name,
               style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                 fontWeight: FontWeight.w800,
-                color: const Color(0xFF17406B),
+                color: cs.onSurface,
               ),
             ),
         actions: [

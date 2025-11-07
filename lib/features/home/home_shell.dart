@@ -207,9 +207,7 @@ class _HomeShellState extends State<HomeShell> {
                 final cs = Theme.of(context).colorScheme;
                 return Container(
                   decoration: BoxDecoration(
-                    color: cs.brightness == Brightness.dark
-                        ? const Color(0xFF1B1B20)
-                        : Colors.white,
+                    color: cs.surface,
                     borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
                     boxShadow: [
                       BoxShadow(
@@ -304,14 +302,15 @@ class _PlaceholderModulesTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Scaffold(
-      backgroundColor: const Color(0xFFF3F5F8),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: Center(
         child: Container(
           margin: const EdgeInsets.all(24),
           padding: const EdgeInsets.all(32),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: cs.surface,
             borderRadius: BorderRadius.circular(24),
             boxShadow: [
               BoxShadow(
@@ -327,13 +326,13 @@ class _PlaceholderModulesTab extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFEA2233).withOpacity(0.1),
+                  color: cs.primary.withOpacity(0.1),
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(
+                child: Icon(
                   Icons.menu_book_outlined,
                   size: 64,
-                  color: Color(0xFFEA2233),
+                  color: cs.primary,
                 ),
               ),
               const SizedBox(height: 24),
@@ -341,7 +340,7 @@ class _PlaceholderModulesTab extends StatelessWidget {
                 'Creează un profil',
                 style: Theme.of(context).textTheme.titleLarge?.copyWith(
                   fontWeight: FontWeight.w700,
-                  color: const Color(0xFF17406B),
+                  color: cs.onSurface,
                 ),
               ),
               const SizedBox(height: 12),
@@ -349,7 +348,7 @@ class _PlaceholderModulesTab extends StatelessWidget {
                 'Pentru a accesa modulele și lecțiile, ai nevoie de cel puțin un profil activ. Mergi la tab-ul Profile și creează un profil nou.',
                 textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: Colors.grey[600],
+                  color: cs.onSurface.withOpacity(0.7),
                   fontWeight: FontWeight.w500,
                 ),
               ),

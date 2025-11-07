@@ -19,7 +19,7 @@ class AccountTab extends StatelessWidget {
 
     return SafeArea(
       child: Container(
-        color: const Color(0xFFF3F5F8),
+        color: Theme.of(context).scaffoldBackgroundColor,
         child: FutureBuilder<UserResponseDto?>(
           future: repo.getCurrentUser().then<UserResponseDto?>((user) => user).catchError((e) {
             debugPrint('Error fetching user: $e');
@@ -52,7 +52,7 @@ class AccountTab extends StatelessWidget {
                     Container(
                       padding: const EdgeInsets.all(24),
                       decoration: BoxDecoration(
-                        color: Colors.white,
+                        color: cs.surface,
                         borderRadius: BorderRadius.circular(24),
                         boxShadow: [
                           BoxShadow(
@@ -95,7 +95,7 @@ class AccountTab extends StatelessWidget {
                                 height: 90,
                                 decoration: BoxDecoration(
                                   shape: BoxShape.circle,
-                                  color: Colors.white,
+                                  color: cs.surface,
                                 ),
                                 child: Center(
                                   child: Text(
@@ -117,7 +117,7 @@ class AccountTab extends StatelessWidget {
                             _getDisplayName(displayUser),
                             style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                               fontWeight: FontWeight.w800,
-                              color: const Color(0xFF17406B),
+                              color: cs.onSurface,
                             ),
                           ),
                           const SizedBox(height: 6),
@@ -167,7 +167,7 @@ class AccountTab extends StatelessWidget {
                     Container(
                       padding: const EdgeInsets.all(20),
                       decoration: BoxDecoration(
-                        color: Colors.white,
+                        color: cs.surface,
                         borderRadius: BorderRadius.circular(20),
                         boxShadow: [
                           BoxShadow(
@@ -251,7 +251,7 @@ class AccountTab extends StatelessWidget {
                     Container(
                       padding: const EdgeInsets.all(20),
                       decoration: BoxDecoration(
-                        color: Colors.white,
+                        color: cs.surface,
                         borderRadius: BorderRadius.circular(20),
                         boxShadow: [
                           BoxShadow(
@@ -272,7 +272,7 @@ class AccountTab extends StatelessWidget {
                                 'Detalii cont',
                                 style: Theme.of(context).textTheme.titleLarge?.copyWith(
                                   fontWeight: FontWeight.w700,
-                                  color: const Color(0xFF17406B),
+                                  color: cs.onSurface,
                                 ),
                               ),
                             ],
@@ -628,10 +628,10 @@ class _DetailRow extends StatelessWidget {
               const SizedBox(height: 4),
               Text(
                 value,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.w600,
-                  color: Color(0xFF17406B),
+                  color: Theme.of(context).colorScheme.onSurface,
                 ),
               ),
             ],

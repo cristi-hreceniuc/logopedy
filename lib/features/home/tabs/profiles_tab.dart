@@ -108,9 +108,9 @@ class _ProfilesTabState extends State<ProfilesTab> {
         return StatefulBuilder(
           builder: (context, setModalState) {
             return Container(
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surface,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
               ),
               child: Padding(
                 padding: EdgeInsets.only(
@@ -348,9 +348,10 @@ class _ProfilesTabState extends State<ProfilesTab> {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return SafeArea(
       child: Container(
-        color: const Color(0xFFF3F5F8),
+        color: Theme.of(context).scaffoldBackgroundColor,
       child: Scaffold(
           backgroundColor: Colors.transparent,
           appBar: AppBar(
@@ -360,7 +361,7 @@ class _ProfilesTabState extends State<ProfilesTab> {
               'Profile',
               style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                 fontWeight: FontWeight.w800,
-                color: const Color(0xFF17406B),
+                color: cs.onSurface,
               ),
             ),
           ),
@@ -523,7 +524,7 @@ class _ProfileCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(24),
         child: Container(
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: Theme.of(context).colorScheme.surface,
             borderRadius: BorderRadius.circular(24),
             boxShadow: [
               BoxShadow(
