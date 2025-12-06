@@ -1,11 +1,16 @@
 // lib/features/content/presentation/lesson_player_page.dart
 import 'dart:async';
+import 'dart:io';
+import 'dart:typed_data';
 import 'package:audioplayers/audioplayers.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:get_it/get_it.dart';
 
 import '../../../core/network/dio_client.dart';
+import '../../../core/services/audio_cache_service.dart';
+import '../../../core/services/s3_service.dart';
 import '../../../core/utils/snackbar_utils.dart';
 import '../content_repository.dart';
 import '../models/dtos.dart';
@@ -115,29 +120,36 @@ List<String> _sxList(Map m, List<String> keys) {
 
 class _LessonPlayerPageState extends State<LessonPlayerPage> {
   late final ContentRepository _repo = ContentRepository(GetIt.I<DioClient>());
+  late final S3Service _s3 = GetIt.I<S3Service>();
+  late final AudioCacheService _audioCache = GetIt.I<AudioCacheService>();
   final _player = AudioPlayer();
 
   LessonDto? _data;
   String? _error;
   bool _loading = true;
   
-  // Timer for minimum lesson duration
-  Timer? _lessonTimer;
+  // Timer for minimum screen duration (per screen, not per lesson)
+  Timer? _screenTimer;
   int _elapsedSeconds = 0;
-  static const int _minimumSeconds = 10;
+  int _minimumSeconds = 10; // Default, will be overridden by screen payload
 
   @override
   void initState() {
     super.initState();
 
-    // 1) Context audio corect (iOS + Android)
-    _player.setReleaseMode(ReleaseMode.stop);
+    // 1) Set player mode FIRST for better compatibility
+    _player.setPlayerMode(PlayerMode.lowLatency);
+    
+    // 2) Set release mode
+    _player.setReleaseMode(ReleaseMode.release);
+    
+    // 3) Set audio context - keep it simple for iOS
     _player.setAudioContext(
       AudioContext(
         iOS: AudioContextIOS(
           // redă chiar dacă telefonul e pe mute / switch silențios
           category: AVAudioSessionCategory.playback,
-          options: {AVAudioSessionOptions.mixWithOthers},
+          options: {},
         ),
         android: AudioContextAndroid(
           contentType: AndroidContentType.music,
@@ -150,14 +162,24 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
     // (opțional) log pentru debugging
     _player.onPlayerStateChanged.listen((s) => debugPrint('AUDIO state: $s'));
     _player.onPlayerComplete.listen((_) => debugPrint('AUDIO complete'));
+    
+    // Listen for errors
+    _player.eventStream.listen((event) {
+      if (event.eventType == AudioEventType.log) {
+        debugPrint('🎵 Audio log: ${event.logMessage}');
+      }
+    }, onError: (error) {
+      debugPrint('\x1B[31mAudioPlayers Exception: $error\x1B[0m');
+    });
 
     _load();
   }
 
-  void _startTimer() {
+  void _startTimer({int? minSeconds}) {
     _elapsedSeconds = 0;
-    _lessonTimer?.cancel();
-    _lessonTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+    _minimumSeconds = minSeconds ?? 10; // Use provided minSeconds or default to 10
+    _screenTimer?.cancel();
+    _screenTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (mounted) {
         setState(() {
           _elapsedSeconds++;
@@ -169,10 +191,17 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
   }
 
   bool get _canFinishLesson => _elapsedSeconds >= _minimumSeconds;
+  
+  int _getMinSecondsFromPayload(Map<String, dynamic> payload) {
+    final minSec = payload['minSeconds'];
+    if (minSec is int) return minSec;
+    if (minSec is String) return int.tryParse(minSec) ?? 10;
+    return 10; // Default to 10 seconds
+  }
 
   @override
   void dispose() {
-    _lessonTimer?.cancel();
+    _screenTimer?.cancel();
     _player.dispose();
     super.dispose();
   }
@@ -190,6 +219,19 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
 
   /// Extrage `uri` dintr-un obiect asset { uri: 'assets/...' }.
   String _assetUri(Object? v) => _asMap(v)['uri'] as String? ?? '';
+
+  /// Construiește calea completă către un asset local.
+  /// Ex: _asset('img', 'masa') -> 'assets/images/masa.png'
+  String _asset(String folder, String filename) {
+    final folderPath = folder == 'img' ? 'images' : folder;
+    final extension = folder == 'img' ? 'png' : 'mp3';
+    
+    // Dacă filename-ul are deja extensie, o folosim
+    if (filename.contains('.')) {
+      return 'assets/$folderPath/$filename';
+    }
+    return 'assets/$folderPath/$filename.$extension';
+  }
 
   /// Convenție pentru butoane (next/back) – payload.buttons e Map.
   Map<String, dynamic> _buttons(Map<String, dynamic> p) => _asMap(p['buttons']);
@@ -257,17 +299,77 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
     return TextSpan(children: spans, style: base);
   }
 
-  String _asset(String kind, String name) {
-    if (name.isEmpty) return name;
-    if (name.startsWith('assets/')) return name;
-    if (kind == 'img') {
-      final base = 'assets/images/';
-      return name.contains('.') ? '$base$name' : '$base$name.png';
-    } else if (kind == 'snd') {
-      final base = 'assets/audio/';
-      return name.contains('.') ? '$base$name' : '$base$name.m4a';
+  /// Get full URL/path for image or audio
+  /// Handles S3 keys, full URLs, and legacy asset paths
+  String _getMediaUrl(String uriOrKey) {
+    if (uriOrKey.isEmpty) return '';
+    
+    // Already a full URL
+    if (uriOrKey.startsWith('http://') || uriOrKey.startsWith('https://')) {
+      return uriOrKey;
     }
-    return name;
+    
+    // S3 key - construct full URL
+    if (uriOrKey.startsWith('modules/')) {
+      return _s3.getFullUrl(uriOrKey);
+    }
+    
+    // Legacy assets path - return as-is
+    if (uriOrKey.startsWith('assets/')) {
+      return uriOrKey;
+    }
+    
+    // Assume it's an S3 key without the full path
+    return _s3.getFullUrl(uriOrKey);
+  }
+  
+  /// Load image from S3, URL, or assets
+  Widget _buildImage(String uriOrKey, {double? width, double? height, BoxFit fit = BoxFit.cover}) {
+    final url = _getMediaUrl(uriOrKey);
+    if (url.isEmpty) {
+      return Container(
+        width: width ?? 240,
+        height: height ?? 240,
+        color: Colors.grey[200],
+        child: Icon(Icons.broken_image, size: 64, color: Colors.grey[400]),
+      );
+    }
+    
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      // Load from network (S3) with caching
+      return CachedNetworkImage(
+        imageUrl: url,
+        width: width,
+        height: height,
+        fit: fit,
+        placeholder: (context, url) => Container(
+          width: width ?? 240,
+          height: height ?? 240,
+          color: Colors.grey[100],
+          child: const Center(child: CircularProgressIndicator()),
+        ),
+        errorWidget: (context, url, error) => Container(
+          width: width ?? 240,
+          height: height ?? 240,
+          color: Colors.grey[200],
+          child: Icon(Icons.broken_image, size: 64, color: Colors.grey[400]),
+        ),
+      );
+    } else {
+      // Load from assets
+      return Image.asset(
+        url,
+        width: width,
+        height: height,
+        fit: fit,
+        errorBuilder: (_, __, ___) => Container(
+          width: width ?? 240,
+          height: height ?? 240,
+          color: Colors.grey[200],
+          child: Icon(Icons.broken_image, size: 64, color: Colors.grey[400]),
+        ),
+      );
+    }
   }
 
   String _s(Map? m, String k, [String fb = '']) {
@@ -362,8 +464,12 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
         _data = d;
         _loading = false;
       });
-      // Reset and restart timer when lesson loads
-      _startTimer();
+      // Reset and restart timer when lesson loads with screen-specific duration
+      if (_data!.screens.isNotEmpty) {
+        final firstScreen = _data!.screens.first;
+        final minSeconds = _getMinSecondsFromPayload(firstScreen.payload);
+        _startTimer(minSeconds: minSeconds);
+      }
       // debug payload
       for (final sc in _data!.screens) {
         debugPrint('SCREEN ${sc.screenType} => ${sc.payload}');
@@ -386,12 +492,56 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
     }
   }
 
-  Future<void> _playAssetAudio(String uri) async {
-    if (uri.isEmpty) return;
-    // AssetSource primește calea FĂRĂ prefixul "assets/"
-    final path = uri.startsWith('assets/') ? uri.substring(7) : uri;
-    await _player.stop();
-    await _player.play(AssetSource(path), volume: 1.0);
+  Future<void> _playAudio(String uriOrKey) async {
+    if (uriOrKey.isEmpty) return;
+    
+    try {
+      // Stop any currently playing audio
+      await _player.stop();
+      
+      // Check if it's an S3 key or full URL
+      if (uriOrKey.startsWith('http://') || uriOrKey.startsWith('https://')) {
+        // Full URL - download and cache, then play from bytes in memory
+        debugPrint('🎵 Caching and playing audio from URL: $uriOrKey');
+        final localPath = await _audioCache.getLocalPath(uriOrKey);
+        
+        if (localPath != null) {
+          debugPrint('🎵 Loading cached audio into memory: $localPath');
+          // Read file into memory and play from bytes
+          final file = File(localPath);
+          final bytes = await file.readAsBytes();
+          debugPrint('🎵 Playing ${bytes.length} bytes from memory');
+          await _player.play(BytesSource(bytes), volume: 1.0);
+        } else {
+          debugPrint('❌ Failed to cache audio, cannot play');
+        }
+      } else if (uriOrKey.startsWith('modules/') || !uriOrKey.startsWith('assets/')) {
+        // S3 key - construct full URL, download and cache, then play from bytes in memory
+        final url = _s3.getFullUrl(uriOrKey);
+        debugPrint('🎵 Caching and playing audio from S3 key: $uriOrKey');
+        final localPath = await _audioCache.getLocalPath(url);
+        
+        if (localPath != null) {
+          debugPrint('🎵 Loading cached audio into memory: $localPath');
+          // Read file into memory and play from bytes
+          final file = File(localPath);
+          final bytes = await file.readAsBytes();
+          debugPrint('🎵 Playing ${bytes.length} bytes from memory');
+          await _player.play(BytesSource(bytes), volume: 1.0);
+        } else {
+          debugPrint('❌ Failed to cache audio, cannot play');
+        }
+      } else {
+        // Legacy assets/ path - convert to asset source
+        final path = uriOrKey.startsWith('assets/') ? uriOrKey.substring(7) : uriOrKey;
+        debugPrint('🎵 Playing audio from assets: $path');
+        await _player.play(AssetSource(path), volume: 1.0);
+      }
+    } catch (e, stack) {
+      debugPrint('\x1B[31m❌ Failed to play audio "$uriOrKey": $e\x1B[0m');
+      debugPrint('Stack: $stack');
+      // Don't rethrow - just log the error so the app doesn't crash
+    }
   }
 
   /// Check if a lesson exists by trying to load it
@@ -1202,9 +1352,7 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
           final next = _asString(_buttons(p)['nextLabel'], 'Următorul');
 
           Future<void> _play(String uri) async {
-            if (uri.isEmpty) return;
-            await _player.stop();
-            await _playAssetAudio(uri);
+            await _playAudio(uri);
           }
 
           return Padding(
@@ -1254,18 +1402,7 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
                               ),
                               child: ClipRRect(
                                 borderRadius: BorderRadius.circular(20),
-                                child: Image.asset(
-                                  imgUri,
-                                  width: 240,
-                                  height: 240,
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (_, __, ___) => Container(
-                                    width: 240,
-                                    height: 240,
-                                    color: Colors.grey[200],
-                                    child: Icon(Icons.broken_image, size: 64, color: Colors.grey[400]),
-                                  ),
-                                ),
+                                child: _buildImage(imgUri, width: 240, height: 240),
                               ),
                             ),
                             const SizedBox(height: 24),
@@ -1280,11 +1417,14 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Text(
-                                    word,
-                                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                                      fontWeight: FontWeight.w700,
-                                      color: cs.onSurface,
+                                  Flexible(
+                                    child: Text(
+                                      word,
+                                      textAlign: TextAlign.center,
+                                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                                        fontWeight: FontWeight.w700,
+                                        color: cs.onSurface,
+                                      ),
                                     ),
                                   ),
                                   const SizedBox(width: 12),
@@ -1295,7 +1435,7 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
                                     ),
                                     child: IconButton(
                                       icon: const Icon(Icons.volume_up, color: Colors.white),
-                                      onPressed: () => _playAssetAudio(wordAudioUri),
+                                      onPressed: () => _playAudio(wordAudioUri),
                                     ),
                                   ),
                                 ],
@@ -1329,7 +1469,7 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
                                   child: Material(
                                     color: Colors.transparent,
                                     child: InkWell(
-                                      onTap: () => _playAssetAudio(uri),
+                                      onTap: () => _playAudio(uri),
                                       borderRadius: BorderRadius.circular(12),
                                       child: Padding(
                                         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -1712,19 +1852,7 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
                               ),
                               child: ClipRRect(
                                 borderRadius: BorderRadius.circular(20),
-                                child: imgUrl.startsWith('assets/')
-                                    ? Image.asset(
-                                        imgUrl,
-                                        width: 240,
-                                        height: 240,
-                                        fit: BoxFit.cover,
-                                      )
-                                    : Image.network(
-                                        imgUrl,
-                                        width: 240,
-                                        height: 240,
-                                        fit: BoxFit.cover,
-                                      ),
+                                child: _buildImage(imgUrl, width: 240, height: 240),
                               ),
                             ),
                             const SizedBox(height: 24),
@@ -1908,6 +2036,244 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
             onFinish: _finishLesson,
             onShowCompletionDialog: _showCompletionDialog,
             canFinishLesson: _canFinishLesson,
+            buildImage: _buildImage,
+          );
+        }
+
+      // 8) Image Selection - select correct image from 3 options
+      case ScreenType.imageSelection:
+        {
+          final question = _s(p, 'question', 'Selectează imaginea corectă');
+          final images = _asListOfMap(p['images']); // [{s3Key: string, correct: boolean}]
+          final next = _s(_buttons(p), 'nextLabel', 'Următorul');
+
+          return _ImageSelectionWidget(
+            key: ValueKey('imageSelection_${widget.lessonId}'),
+            question: question,
+            images: images,
+            nextLabel: next,
+            onFinish: _finishLesson,
+            onShowCompletionDialog: _showCompletionDialog,
+            canFinishLesson: _canFinishLesson,
+            buildImage: _buildImage,
+          );
+        }
+
+      // 9) Find Sound - tap syllable containing target sound
+      case ScreenType.findSound:
+        {
+          final question = _s(p, 'question', 'Găsește sunetul');
+          final word = _s(p, 'word', '');
+          final syllables = _asListOfMap(p['syllables']); // [{text, s3AudioKey, correct}]
+          final next = _s(_buttons(p), 'nextLabel', 'Următorul');
+
+          return _FindSoundWidget(
+            key: ValueKey('findSound_${widget.lessonId}'),
+            question: question,
+            word: word,
+            syllables: syllables,
+            nextLabel: next,
+            onFinish: _finishLesson,
+            onShowCompletionDialog: _showCompletionDialog,
+            canFinishLesson: _canFinishLesson,
+            playAudio: _playAudio,
+          );
+        }
+
+      // 10) Find Missing Letter - type missing letter in word
+      case ScreenType.findMissingLetter:
+        {
+          final question = _s(p, 'question', 'Găsește litera lipsă');
+          final maskedWord = _s(p, 'maskedWord', '');
+          final correctLetter = _s(p, 'correctLetter', '');
+          final imageKey = _s(p, 's3ImageKey', '');
+          final next = _s(_buttons(p), 'nextLabel', 'Următorul');
+
+          return _FindMissingLetterWidget(
+            key: ValueKey('findMissingLetter_${widget.lessonId}'),
+            question: question,
+            maskedWord: maskedWord,
+            correctLetter: correctLetter,
+            imageKey: imageKey,
+            nextLabel: next,
+            onFinish: _finishLesson,
+            onShowCompletionDialog: _showCompletionDialog,
+            canFinishLesson: _canFinishLesson,
+            buildImage: _buildImage,
+          );
+        }
+
+      // 11) Find Non-Intruder - select 2 matching images from 3
+      case ScreenType.findNonIntruder:
+        {
+          final question = _s(p, 'question', 'Selectează cele două imagini care se potrivesc');
+          final images = _asListOfMap(p['images']); // [{s3Key, isMatch}]
+          final next = _s(_buttons(p), 'nextLabel', 'Următorul');
+
+          return _FindNonIntruderWidget(
+            key: ValueKey('findNonIntruder_${widget.lessonId}'),
+            question: question,
+            images: images,
+            nextLabel: next,
+            onFinish: _finishLesson,
+            onShowCompletionDialog: _showCompletionDialog,
+            canFinishLesson: _canFinishLesson,
+            buildImage: _buildImage,
+          );
+        }
+
+      // 12) Format Word - order scrambled letters to form word
+      case ScreenType.formatWord:
+        {
+          final audioQuestionKey = _s(p, 's3AudioQuestionKey', '');
+          final correctWord = _s(p, 'correctWord', '');
+          final next = _s(_buttons(p), 'nextLabel', 'Următorul');
+
+          return _FormatWordWidget(
+            key: ValueKey('formatWord_${widget.lessonId}'),
+            audioQuestionKey: audioQuestionKey,
+            correctWord: correctWord,
+            nextLabel: next,
+            onFinish: _finishLesson,
+            onShowCompletionDialog: _showCompletionDialog,
+            canFinishLesson: _canFinishLesson,
+            playAudio: _playAudio,
+          );
+        }
+
+      // 13) Instructions - scrollable text
+      case ScreenType.instructions:
+        {
+          final title = _s(p, 'title', 'Instrucțiuni');
+          final text = _s(p, 'text', '');
+          final instructions = _l(p, 'instructions');
+          final next = _s(_buttons(p), 'nextLabel', 'Următorul');
+
+          return Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: cs.surface,
+                      borderRadius: BorderRadius.circular(24),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.08),
+                          blurRadius: 16,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    padding: const EdgeInsets.all(24),
+                    child: SingleChildScrollView(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (title.isNotEmpty) ...[
+                            Text(
+                              title,
+                              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                                fontSize: 28,
+                                fontWeight: FontWeight.w700,
+                                color: cs.onSurface,
+                              ),
+                            ),
+                            const SizedBox(height: 20),
+                          ],
+                          if (text.isNotEmpty) ...[
+                            Text(
+                              text,
+                              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                                fontSize: 18,
+                                height: 1.6,
+                                color: cs.onSurface,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                          ],
+                          if (instructions.isNotEmpty) ...[
+                            ...instructions.map(
+                              (e) => Padding(
+                                padding: const EdgeInsets.only(bottom: 12),
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Container(
+                                      margin: const EdgeInsets.only(top: 6, right: 12),
+                                      width: 6,
+                                      height: 6,
+                                      decoration: const BoxDecoration(
+                                        color: Color(0xFFEA2233),
+                                        shape: BoxShape.circle,
+                                      ),
+                                    ),
+                                    Expanded(
+                                      child: Text(
+                                        '$e',
+                                        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                                          fontSize: 16,
+                                          height: 1.5,
+                                          color: cs.onSurface,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFFEA2233).withOpacity(0.3),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: FilledButton(
+                    onPressed: _canFinishLesson ? _finishLesson : null,
+                    style: FilledButton.styleFrom(
+                      backgroundColor: _canFinishLesson ? const Color(0xFFEA2233) : Colors.grey[400],
+                      foregroundColor: Colors.white,
+                      minimumSize: const Size.fromHeight(56),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        if (!_canFinishLesson) ...[
+                          const Icon(Icons.hourglass_empty, size: 20),
+                          const SizedBox(width: 8),
+                        ],
+                        Text(
+                          next,
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
           );
         }
 
@@ -1936,6 +2302,7 @@ class _ImageRevealWordWidget extends StatefulWidget {
     required this.onFinish,
     required this.onShowCompletionDialog,
     required this.canFinishLesson,
+    required this.buildImage,
   });
 
   final String title;
@@ -1948,6 +2315,7 @@ class _ImageRevealWordWidget extends StatefulWidget {
   final Future<void> Function({bool skipCompletionDialog}) onFinish;
   final Future<void> Function(bool, bool, bool) onShowCompletionDialog;
   final bool canFinishLesson;
+  final Widget Function(String, {double? width, double? height, BoxFit fit}) buildImage;
 
   @override
   State<_ImageRevealWordWidget> createState() => _ImageRevealWordWidgetState();
@@ -2074,19 +2442,7 @@ class _ImageRevealWordWidgetState extends State<_ImageRevealWordWidget> {
                         ),
                         child: ClipRRect(
                           borderRadius: BorderRadius.circular(20),
-                          child: widget.imgUrl.startsWith('assets/')
-                              ? Image.asset(
-                                  widget.imgUrl,
-                                  width: 260,
-                                  height: 260,
-                                  fit: BoxFit.cover,
-                                )
-                              : Image.network(
-                                  widget.imgUrl,
-                                  width: 260,
-                                  height: 260,
-                                  fit: BoxFit.cover,
-                                ),
+                          child: widget.buildImage(widget.imgUrl, width: 260, height: 260),
                         ),
                       ),
                       const SizedBox(height: 24),
@@ -2214,6 +2570,1481 @@ class _ImageRevealWordWidgetState extends State<_ImageRevealWordWidget> {
                 children: [
                   if (!widget.canFinishLesson) ...[
                     Icon(Icons.hourglass_empty, size: 20),
+                    const SizedBox(width: 8),
+                  ],
+                  Text(
+                    widget.nextLabel,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ImageSelectionWidget extends StatefulWidget {
+  const _ImageSelectionWidget({
+    super.key,
+    required this.question,
+    required this.images,
+    required this.nextLabel,
+    required this.onFinish,
+    required this.onShowCompletionDialog,
+    required this.canFinishLesson,
+    required this.buildImage,
+  });
+
+  final String question;
+  final List<Map<String, dynamic>> images;
+  final String nextLabel;
+  final Future<void> Function({bool skipCompletionDialog}) onFinish;
+  final Future<void> Function(bool, bool, bool) onShowCompletionDialog;
+  final bool canFinishLesson;
+  final Widget Function(String, {double? width, double? height, BoxFit fit}) buildImage;
+
+  @override
+  State<_ImageSelectionWidget> createState() => _ImageSelectionWidgetState();
+}
+
+class _ImageSelectionWidgetState extends State<_ImageSelectionWidget> {
+  late List<Map<String, dynamic>> _shuffledImages;
+  int? _selectedIndex;
+  bool _isCorrect = false;
+  bool _showError = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Shuffle images on init
+    _shuffledImages = List.from(widget.images)..shuffle();
+  }
+
+  void _handleImageTap(int index) {
+    final image = _shuffledImages[index];
+    final correct = image['correct'] == true;
+
+    setState(() {
+      _selectedIndex = index;
+      _isCorrect = correct;
+      _showError = !correct;
+    });
+
+    if (correct) {
+      // Correct answer - user can proceed
+      Future.delayed(const Duration(milliseconds: 500), () {
+        if (mounted) {
+          setState(() => _showError = false);
+        }
+      });
+    }
+  }
+
+  Future<void> _handleNext() async {
+    if (_isCorrect) {
+      await widget.onShowCompletionDialog(true, false, false);
+      await widget.onFinish(skipCompletionDialog: true);
+    } else {
+      SnackBarUtils.showInfo(context, 'Selectează imaginea corectă pentru a continua!');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Expanded(
+            child: SingleChildScrollView(
+              child: Container(
+                decoration: BoxDecoration(
+                  color: cs.surface,
+                  borderRadius: BorderRadius.circular(24),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.08),
+                      blurRadius: 16,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  children: [
+                    Text(
+                      widget.question,
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontSize: 24,
+                        fontWeight: FontWeight.w700,
+                        color: cs.onSurface,
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    if (_showError) ...[
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.red.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.red.withOpacity(0.3)),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.close, color: Colors.red[700], size: 20),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Încercă din nou!',
+                              style: TextStyle(
+                                color: Colors.red[700],
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                    ],
+                    // Display images in a grid layout
+                    Wrap(
+                      spacing: 12,
+                      runSpacing: 12,
+                      alignment: WrapAlignment.center,
+                      children: List.generate(_shuffledImages.length, (index) {
+                        final image = _shuffledImages[index];
+                        final s3Key = image['s3Key']?.toString() ?? image['uri']?.toString() ?? '';
+                        final isSelected = _selectedIndex == index;
+                        final showCorrect = isSelected && _isCorrect;
+                        final showWrong = isSelected && !_isCorrect;
+
+                        // Calculate square size based on screen width
+                        final screenWidth = MediaQuery.of(context).size.width;
+                        final imageSize = (screenWidth - 88) / 2; // 88 = padding (16*2) + container padding (24*2) + spacing (12) + borders
+
+                        return GestureDetector(
+                          onTap: () => _handleImageTap(index),
+                          child: Container(
+                            width: imageSize,
+                            height: imageSize,
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(
+                                color: showCorrect
+                                    ? Colors.green
+                                    : showWrong
+                                        ? Colors.red
+                                        : isSelected
+                                            ? const Color(0xFFEA2233)
+                                            : Colors.grey[300]!,
+                                width: showCorrect || showWrong ? 3 : 2,
+                              ),
+                              boxShadow: [
+                                if (isSelected)
+                                  BoxShadow(
+                                    color: (showCorrect
+                                            ? Colors.green
+                                            : showWrong
+                                                ? Colors.red
+                                                : const Color(0xFFEA2233))
+                                        .withOpacity(0.3),
+                                    blurRadius: 12,
+                                    offset: const Offset(0, 4),
+                                  ),
+                              ],
+                            ),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(18),
+                              child: Stack(
+                                fit: StackFit.expand,
+                                children: [
+                                  widget.buildImage(s3Key, width: imageSize, height: imageSize, fit: BoxFit.contain),
+                                  if (showCorrect)
+                                    Positioned(
+                                      top: 8,
+                                      right: 8,
+                                      child: Container(
+                                        padding: const EdgeInsets.all(8),
+                                        decoration: const BoxDecoration(
+                                          color: Colors.green,
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: const Icon(Icons.check, color: Colors.white, size: 24),
+                                      ),
+                                    ),
+                                  if (showWrong)
+                                    Positioned(
+                                      top: 8,
+                                      right: 8,
+                                      child: Container(
+                                        padding: const EdgeInsets.all(8),
+                                        decoration: const BoxDecoration(
+                                          color: Colors.red,
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: const Icon(Icons.close, color: Colors.white, size: 24),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        );
+                      }),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: _isCorrect
+                  ? [
+                      BoxShadow(
+                        color: const Color(0xFFEA2233).withOpacity(0.3),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
+                      ),
+                    ]
+                  : [],
+            ),
+            child: FilledButton(
+              onPressed: (_isCorrect && widget.canFinishLesson) ? _handleNext : null,
+              style: FilledButton.styleFrom(
+                backgroundColor: (_isCorrect && widget.canFinishLesson) ? const Color(0xFFEA2233) : Colors.grey[400],
+                foregroundColor: Colors.white,
+                minimumSize: const Size.fromHeight(56),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  if (!widget.canFinishLesson) ...[
+                    const Icon(Icons.hourglass_empty, size: 20),
+                    const SizedBox(width: 8),
+                  ],
+                  Text(
+                    widget.nextLabel,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FindSoundWidget extends StatefulWidget {
+  const _FindSoundWidget({
+    super.key,
+    required this.question,
+    required this.word,
+    required this.syllables,
+    required this.nextLabel,
+    required this.onFinish,
+    required this.onShowCompletionDialog,
+    required this.canFinishLesson,
+    required this.playAudio,
+  });
+
+  final String question;
+  final String word;
+  final List<Map<String, dynamic>> syllables;
+  final String nextLabel;
+  final Future<void> Function({bool skipCompletionDialog}) onFinish;
+  final Future<void> Function(bool, bool, bool) onShowCompletionDialog;
+  final bool canFinishLesson;
+  final Future<void> Function(String) playAudio;
+
+  @override
+  State<_FindSoundWidget> createState() => _FindSoundWidgetState();
+}
+
+class _FindSoundWidgetState extends State<_FindSoundWidget> {
+  int? _selectedIndex;
+  bool _isCorrect = false;
+  bool _showError = false;
+
+  void _handleSyllableTap(int index) {
+    final syllable = widget.syllables[index];
+    final correct = syllable['correct'] == true;
+
+    setState(() {
+      _selectedIndex = index;
+      _isCorrect = correct;
+      _showError = !correct;
+    });
+
+    if (correct) {
+      Future.delayed(const Duration(milliseconds: 500), () {
+        if (mounted) {
+          setState(() => _showError = false);
+        }
+      });
+    }
+  }
+
+  Future<void> _handleNext() async {
+    if (_isCorrect) {
+      await widget.onShowCompletionDialog(true, false, false);
+      await widget.onFinish(skipCompletionDialog: true);
+    } else {
+      SnackBarUtils.showInfo(context, 'Selectează silaba corectă pentru a continua!');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Expanded(
+            child: Container(
+              decoration: BoxDecoration(
+                color: cs.surface,
+                borderRadius: BorderRadius.circular(24),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.08),
+                    blurRadius: 16,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              padding: const EdgeInsets.all(24),
+              child: SingleChildScrollView(
+                child: Column(
+                  children: [
+                    Text(
+                      widget.question,
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontSize: 24,
+                        fontWeight: FontWeight.w700,
+                        color: cs.onSurface,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    if (widget.word.isNotEmpty) ...[
+                      Text(
+                        widget.word,
+                        textAlign: TextAlign.center,
+                        style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                          fontSize: 32,
+                          fontWeight: FontWeight.w600,
+                          color: const Color(0xFF2D72D2),
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                    ],
+                    if (_showError) ...[
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.red.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.red.withOpacity(0.3)),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.close, color: Colors.red[700], size: 20),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Încercă din nou!',
+                              style: TextStyle(
+                                color: Colors.red[700],
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                    ],
+                    Wrap(
+                      spacing: 12,
+                      runSpacing: 12,
+                      alignment: WrapAlignment.center,
+                      children: List.generate(widget.syllables.length, (index) {
+                        final syllable = widget.syllables[index];
+                        final text = syllable['text']?.toString() ?? '';
+                        final audioKey = syllable['s3AudioKey']?.toString() ?? syllable['audioUri']?.toString() ?? '';
+                        final isSelected = _selectedIndex == index;
+                        final showCorrect = isSelected && _isCorrect;
+                        final showWrong = isSelected && !_isCorrect;
+
+                        return GestureDetector(
+                          onTap: () => _handleSyllableTap(index),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                            decoration: BoxDecoration(
+                              color: showCorrect
+                                  ? Colors.green.withOpacity(0.1)
+                                  : showWrong
+                                      ? Colors.red.withOpacity(0.1)
+                                      : const Color(0xFFEA2233).withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(
+                                color: showCorrect
+                                    ? Colors.green
+                                    : showWrong
+                                        ? Colors.red
+                                        : const Color(0xFFEA2233).withOpacity(0.3),
+                                width: showCorrect || showWrong ? 2 : 1,
+                              ),
+                              boxShadow: isSelected
+                                  ? [
+                                      BoxShadow(
+                                        color: (showCorrect ? Colors.green : showWrong ? Colors.red : const Color(0xFFEA2233))
+                                            .withOpacity(0.2),
+                                        blurRadius: 8,
+                                        offset: const Offset(0, 2),
+                                      ),
+                                    ]
+                                  : null,
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Flexible(
+                                  child: Text(
+                                    text,
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.w600,
+                                      color: showCorrect
+                                          ? Colors.green[700]
+                                          : showWrong
+                                              ? Colors.red[700]
+                                              : const Color(0xFF17406B),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                GestureDetector(
+                                  onTap: () => widget.playAudio(audioKey),
+                                  child: Container(
+                                    padding: const EdgeInsets.all(6),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF2D72D2),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: const Icon(Icons.volume_up, color: Colors.white, size: 18),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      }),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: _isCorrect
+                  ? [
+                      BoxShadow(
+                        color: const Color(0xFFEA2233).withOpacity(0.3),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
+                      ),
+                    ]
+                  : [],
+            ),
+            child: FilledButton(
+              onPressed: (_isCorrect && widget.canFinishLesson) ? _handleNext : null,
+              style: FilledButton.styleFrom(
+                backgroundColor: (_isCorrect && widget.canFinishLesson) ? const Color(0xFFEA2233) : Colors.grey[400],
+                foregroundColor: Colors.white,
+                minimumSize: const Size.fromHeight(56),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  if (!widget.canFinishLesson) ...[
+                    const Icon(Icons.hourglass_empty, size: 20),
+                    const SizedBox(width: 8),
+                  ],
+                  Text(
+                    widget.nextLabel,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FindMissingLetterWidget extends StatefulWidget {
+  const _FindMissingLetterWidget({
+    super.key,
+    required this.question,
+    required this.maskedWord,
+    required this.correctLetter,
+    required this.imageKey,
+    required this.nextLabel,
+    required this.onFinish,
+    required this.onShowCompletionDialog,
+    required this.canFinishLesson,
+    required this.buildImage,
+  });
+
+  final String question;
+  final String maskedWord;
+  final String correctLetter;
+  final String imageKey;
+  final String nextLabel;
+  final Future<void> Function({bool skipCompletionDialog}) onFinish;
+  final Future<void> Function(bool, bool, bool) onShowCompletionDialog;
+  final bool canFinishLesson;
+  final Widget Function(String, {double? width, double? height, BoxFit fit}) buildImage;
+
+  @override
+  State<_FindMissingLetterWidget> createState() => _FindMissingLetterWidgetState();
+}
+
+class _FindMissingLetterWidgetState extends State<_FindMissingLetterWidget> {
+  final _controller = TextEditingController();
+  bool _isCorrect = false;
+  bool _showError = false;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  String _normalize(String text) {
+    // Remove diacritics and convert to lowercase
+    return text
+        .toLowerCase()
+        .replaceAll('ă', 'a')
+        .replaceAll('â', 'a')
+        .replaceAll('î', 'i')
+        .replaceAll('ș', 's')
+        .replaceAll('ş', 's')
+        .replaceAll('ț', 't')
+        .replaceAll('ţ', 't')
+        .trim();
+  }
+
+  void _checkAnswer() {
+    final input = _controller.text;
+    final correct = _normalize(input) == _normalize(widget.correctLetter);
+
+    setState(() {
+      _isCorrect = correct;
+      _showError = !correct;
+    });
+
+    if (correct) {
+      Future.delayed(const Duration(milliseconds: 500), () {
+        if (mounted) {
+          setState(() => _showError = false);
+        }
+      });
+    }
+  }
+
+  Future<void> _handleNext() async {
+    if (_isCorrect) {
+      await widget.onShowCompletionDialog(true, false, false);
+      await widget.onFinish(skipCompletionDialog: true);
+    } else {
+      SnackBarUtils.showInfo(context, 'Completează litera corectă pentru a continua!');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Expanded(
+            child: Container(
+              decoration: BoxDecoration(
+                color: cs.surface,
+                borderRadius: BorderRadius.circular(24),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.08),
+                    blurRadius: 16,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              padding: const EdgeInsets.all(24),
+              child: SingleChildScrollView(
+                child: Column(
+                  children: [
+                    if (widget.imageKey.isNotEmpty) ...[
+                      Container(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(20),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.1),
+                              blurRadius: 12,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(20),
+                          child: widget.buildImage(widget.imageKey, width: 200, height: 200),
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                    ],
+                    Text(
+                      widget.question,
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w700,
+                        color: cs.onSurface,
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    Text(
+                      widget.maskedWord,
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                        fontSize: 48,
+                        fontWeight: FontWeight.w700,
+                        color: const Color(0xFF2D72D2),
+                        letterSpacing: 8,
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    Container(
+                      constraints: const BoxConstraints(maxWidth: 120),
+                      child: TextField(
+                        controller: _controller,
+                        maxLength: 1,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          fontSize: 36,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 2,
+                        ),
+                        decoration: InputDecoration(
+                          counterText: '',
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(16),
+                            borderSide: BorderSide(
+                              color: _isCorrect
+                                  ? Colors.green
+                                  : _showError
+                                      ? Colors.red
+                                      : Colors.grey[300]!,
+                              width: 2,
+                            ),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(16),
+                            borderSide: BorderSide(
+                              color: _isCorrect
+                                  ? Colors.green
+                                  : _showError
+                                      ? Colors.red
+                                      : Colors.grey[300]!,
+                              width: 2,
+                            ),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(16),
+                            borderSide: BorderSide(
+                              color: _isCorrect
+                                  ? Colors.green
+                                  : _showError
+                                      ? Colors.red
+                                      : const Color(0xFFEA2233),
+                              width: 2,
+                            ),
+                          ),
+                        ),
+                        onChanged: (value) {
+                          if (value.isNotEmpty) {
+                            _checkAnswer();
+                          } else {
+                            setState(() {
+                              _isCorrect = false;
+                              _showError = false;
+                            });
+                          }
+                        },
+                      ),
+                    ),
+                    if (_showError) ...[
+                      const SizedBox(height: 16),
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.red.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.red.withOpacity(0.3)),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.close, color: Colors.red[700], size: 20),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Încercă din nou!',
+                              style: TextStyle(
+                                color: Colors.red[700],
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                    if (_isCorrect) ...[
+                      const SizedBox(height: 16),
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.green.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.green.withOpacity(0.3)),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.check, color: Colors.green[700], size: 20),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Corect!',
+                              style: TextStyle(
+                                color: Colors.green[700],
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: _isCorrect
+                  ? [
+                      BoxShadow(
+                        color: const Color(0xFFEA2233).withOpacity(0.3),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
+                      ),
+                    ]
+                  : [],
+            ),
+            child: FilledButton(
+              onPressed: (_isCorrect && widget.canFinishLesson) ? _handleNext : null,
+              style: FilledButton.styleFrom(
+                backgroundColor: (_isCorrect && widget.canFinishLesson) ? const Color(0xFFEA2233) : Colors.grey[400],
+                foregroundColor: Colors.white,
+                minimumSize: const Size.fromHeight(56),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  if (!widget.canFinishLesson) ...[
+                    const Icon(Icons.hourglass_empty, size: 20),
+                    const SizedBox(width: 8),
+                  ],
+                  Text(
+                    widget.nextLabel,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FindNonIntruderWidget extends StatefulWidget {
+  const _FindNonIntruderWidget({
+    super.key,
+    required this.question,
+    required this.images,
+    required this.nextLabel,
+    required this.onFinish,
+    required this.onShowCompletionDialog,
+    required this.canFinishLesson,
+    required this.buildImage,
+  });
+
+  final String question;
+  final List<Map<String, dynamic>> images;
+  final String nextLabel;
+  final Future<void> Function({bool skipCompletionDialog}) onFinish;
+  final Future<void> Function(bool, bool, bool) onShowCompletionDialog;
+  final bool canFinishLesson;
+  final Widget Function(String, {double? width, double? height, BoxFit fit}) buildImage;
+
+  @override
+  State<_FindNonIntruderWidget> createState() => _FindNonIntruderWidgetState();
+}
+
+class _FindNonIntruderWidgetState extends State<_FindNonIntruderWidget> {
+  late List<Map<String, dynamic>> _shuffledImages;
+  final Set<int> _selectedIndices = {};
+  bool _isCorrect = false;
+  bool _showError = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _shuffledImages = List.from(widget.images)..shuffle();
+  }
+
+  void _handleImageTap(int index) {
+    setState(() {
+      if (_selectedIndices.contains(index)) {
+        _selectedIndices.remove(index);
+        _isCorrect = false;
+        _showError = false;
+      } else {
+        if (_selectedIndices.length < 2) {
+          _selectedIndices.add(index);
+        }
+      }
+    });
+
+    // Check if both selected images are correct
+    if (_selectedIndices.length == 2) {
+      final allCorrect = _selectedIndices.every((idx) {
+        final image = _shuffledImages[idx];
+        return image['isMatch'] == true;
+      });
+
+      setState(() {
+        _isCorrect = allCorrect;
+        _showError = !allCorrect;
+      });
+
+      if (allCorrect) {
+        Future.delayed(const Duration(milliseconds: 500), () {
+          if (mounted) {
+            setState(() => _showError = false);
+          }
+        });
+      }
+    }
+  }
+
+  Future<void> _handleNext() async {
+    if (_isCorrect) {
+      await widget.onShowCompletionDialog(true, false, false);
+      await widget.onFinish(skipCompletionDialog: true);
+    } else {
+      SnackBarUtils.showInfo(context, 'Selectează cele două imagini corecte pentru a continua!');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Expanded(
+            child: SingleChildScrollView(
+              child: Container(
+                decoration: BoxDecoration(
+                  color: cs.surface,
+                  borderRadius: BorderRadius.circular(24),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.08),
+                      blurRadius: 16,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  children: [
+                    Text(
+                      widget.question,
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontSize: 24,
+                        fontWeight: FontWeight.w700,
+                        color: cs.onSurface,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Selectează 2 imagini',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: Colors.grey[600],
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    if (_showError) ...[
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.red.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.red.withOpacity(0.3)),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.close, color: Colors.red[700], size: 20),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Încercă din nou!',
+                              style: TextStyle(
+                                color: Colors.red[700],
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                    ],
+                    ...List.generate(_shuffledImages.length, (index) {
+                      final image = _shuffledImages[index];
+                      final s3Key = image['s3Key']?.toString() ?? image['uri']?.toString() ?? '';
+                      final isSelected = _selectedIndices.contains(index);
+                      final showCorrect = isSelected && _isCorrect && _selectedIndices.length == 2;
+                      final showWrong = isSelected && _showError && _selectedIndices.length == 2;
+
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 16),
+                        child: GestureDetector(
+                          onTap: () => _handleImageTap(index),
+                          child: Container(
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(
+                                color: showCorrect
+                                    ? Colors.green
+                                    : showWrong
+                                        ? Colors.red
+                                        : isSelected
+                                            ? const Color(0xFFEA2233)
+                                            : Colors.grey[300]!,
+                                width: showCorrect || showWrong ? 3 : 2,
+                              ),
+                              boxShadow: [
+                                if (isSelected)
+                                  BoxShadow(
+                                    color: (showCorrect
+                                            ? Colors.green
+                                            : showWrong
+                                                ? Colors.red
+                                                : const Color(0xFFEA2233))
+                                        .withOpacity(0.3),
+                                    blurRadius: 12,
+                                    offset: const Offset(0, 4),
+                                  ),
+                              ],
+                            ),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(18),
+                              child: Stack(
+                                children: [
+                                  widget.buildImage(s3Key, width: double.infinity, height: 180, fit: BoxFit.cover),
+                                  if (showCorrect)
+                                    Positioned(
+                                      top: 8,
+                                      right: 8,
+                                      child: Container(
+                                        padding: const EdgeInsets.all(8),
+                                        decoration: const BoxDecoration(
+                                          color: Colors.green,
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: const Icon(Icons.check, color: Colors.white, size: 24),
+                                      ),
+                                    ),
+                                  if (showWrong)
+                                    Positioned(
+                                      top: 8,
+                                      right: 8,
+                                      child: Container(
+                                        padding: const EdgeInsets.all(8),
+                                        decoration: const BoxDecoration(
+                                          color: Colors.red,
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: const Icon(Icons.close, color: Colors.white, size: 24),
+                                      ),
+                                    ),
+                                  if (isSelected && !showCorrect && !showWrong)
+                                    Positioned(
+                                      top: 8,
+                                      right: 8,
+                                      child: Container(
+                                        padding: const EdgeInsets.all(4),
+                                        decoration: const BoxDecoration(
+                                          color: Color(0xFFEA2233),
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: Text(
+                                          '${_selectedIndices.toList().indexOf(index) + 1}',
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      );
+                    }),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: _isCorrect
+                  ? [
+                      BoxShadow(
+                        color: const Color(0xFFEA2233).withOpacity(0.3),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
+                      ),
+                    ]
+                  : [],
+            ),
+            child: FilledButton(
+              onPressed: (_isCorrect && widget.canFinishLesson) ? _handleNext : null,
+              style: FilledButton.styleFrom(
+                backgroundColor: (_isCorrect && widget.canFinishLesson) ? const Color(0xFFEA2233) : Colors.grey[400],
+                foregroundColor: Colors.white,
+                minimumSize: const Size.fromHeight(56),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  if (!widget.canFinishLesson) ...[
+                    const Icon(Icons.hourglass_empty, size: 20),
+                    const SizedBox(width: 8),
+                  ],
+                  Text(
+                    widget.nextLabel,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FormatWordWidget extends StatefulWidget {
+  const _FormatWordWidget({
+    super.key,
+    required this.audioQuestionKey,
+    required this.correctWord,
+    required this.nextLabel,
+    required this.onFinish,
+    required this.onShowCompletionDialog,
+    required this.canFinishLesson,
+    required this.playAudio,
+  });
+
+  final String audioQuestionKey;
+  final String correctWord;
+  final String nextLabel;
+  final Future<void> Function({bool skipCompletionDialog}) onFinish;
+  final Future<void> Function(bool, bool, bool) onShowCompletionDialog;
+  final bool canFinishLesson;
+  final Future<void> Function(String) playAudio;
+
+  @override
+  State<_FormatWordWidget> createState() => _FormatWordWidgetState();
+}
+
+class _FormatWordWidgetState extends State<_FormatWordWidget> {
+  late List<String> _availableLetters;
+  final List<String> _selectedLetters = [];
+  bool _isCorrect = false;
+  bool _showError = false;
+  bool _hasPlayedAudio = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _availableLetters = widget.correctWord.split('')..shuffle();
+    
+    // Play audio question on init
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!_hasPlayedAudio && widget.audioQuestionKey.isNotEmpty) {
+        _hasPlayedAudio = true;
+        widget.playAudio(widget.audioQuestionKey);
+      }
+    });
+  }
+
+  void _handleLetterTap(int index) {
+    setState(() {
+      final letter = _availableLetters[index];
+      _selectedLetters.add(letter);
+      _availableLetters.removeAt(index);
+      _showError = false;
+    });
+
+    // Check if word is complete
+    if (_availableLetters.isEmpty) {
+      _checkAnswer();
+    }
+  }
+
+  void _handleSelectedTap(int index) {
+    setState(() {
+      final letter = _selectedLetters[index];
+      _availableLetters.add(letter);
+      _selectedLetters.removeAt(index);
+      _isCorrect = false;
+      _showError = false;
+    });
+  }
+
+  void _checkAnswer() {
+    final formedWord = _selectedLetters.join('');
+    final correct = formedWord.toLowerCase() == widget.correctWord.toLowerCase();
+
+    setState(() {
+      _isCorrect = correct;
+      _showError = !correct;
+    });
+
+    if (correct) {
+      Future.delayed(const Duration(milliseconds: 500), () {
+        if (mounted) {
+          setState(() => _showError = false);
+        }
+      });
+    }
+  }
+
+  void _reset() {
+    setState(() {
+      _availableLetters = widget.correctWord.split('')..shuffle();
+      _selectedLetters.clear();
+      _isCorrect = false;
+      _showError = false;
+    });
+  }
+
+  Future<void> _handleNext() async {
+    if (_isCorrect) {
+      await widget.onShowCompletionDialog(true, false, false);
+      await widget.onFinish(skipCompletionDialog: true);
+    } else {
+      SnackBarUtils.showInfo(context, 'Formează cuvântul corect pentru a continua!');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Expanded(
+            child: Container(
+              decoration: BoxDecoration(
+                color: cs.surface,
+                borderRadius: BorderRadius.circular(24),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.08),
+                    blurRadius: 16,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              padding: const EdgeInsets.all(24),
+              child: SingleChildScrollView(
+                child: Column(
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Flexible(
+                          child: Text(
+                            'Ascultă și formează cuvântul',
+                            textAlign: TextAlign.center,
+                            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                              fontSize: 22,
+                              fontWeight: FontWeight.w700,
+                              color: cs.onSurface,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        GestureDetector(
+                          onTap: () => widget.playAudio(widget.audioQuestionKey),
+                          child: Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: const BoxDecoration(
+                              color: Color(0xFF2D72D2),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(Icons.volume_up, color: Colors.white, size: 24),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 32),
+                    // Selected letters area
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: _isCorrect
+                            ? Colors.green.withOpacity(0.1)
+                            : _showError
+                                ? Colors.red.withOpacity(0.1)
+                                : Colors.grey[100],
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: _isCorrect
+                              ? Colors.green
+                              : _showError
+                                  ? Colors.red
+                                  : Colors.grey[300]!,
+                          width: 2,
+                        ),
+                      ),
+                      child: _selectedLetters.isEmpty
+                          ? Text(
+                              'Selectează literele...',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 24,
+                                color: Colors.grey[400],
+                                fontStyle: FontStyle.italic,
+                              ),
+                            )
+                          : Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              alignment: WrapAlignment.center,
+                              children: List.generate(_selectedLetters.length, (index) {
+                                return GestureDetector(
+                                  onTap: () => _handleSelectedTap(index),
+                                  child: Container(
+                                    padding: const EdgeInsets.all(12),
+                                    decoration: BoxDecoration(
+                                      color: _isCorrect
+                                          ? Colors.green
+                                          : _showError
+                                              ? Colors.red
+                                              : const Color(0xFFEA2233),
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: Text(
+                                      _selectedLetters[index].toUpperCase(),
+                                      style: const TextStyle(
+                                        fontSize: 28,
+                                        fontWeight: FontWeight.w700,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              }),
+                            ),
+                    ),
+                    if (_showError) ...[
+                      const SizedBox(height: 16),
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.red.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.red.withOpacity(0.3)),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.close, color: Colors.red[700], size: 20),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Încearcă din nou!',
+                              style: TextStyle(
+                                color: Colors.red[700],
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            TextButton(
+                              onPressed: _reset,
+                              child: const Text('Resetează'),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 32),
+                    // Available letters
+                    Wrap(
+                      spacing: 12,
+                      runSpacing: 12,
+                      alignment: WrapAlignment.center,
+                      children: List.generate(_availableLetters.length, (index) {
+                        return GestureDetector(
+                          onTap: () => _handleLetterTap(index),
+                          child: Container(
+                            padding: const EdgeInsets.all(14),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF2D72D2).withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: const Color(0xFF2D72D2).withOpacity(0.3),
+                              ),
+                            ),
+                            child: Text(
+                              _availableLetters[index].toUpperCase(),
+                              style: const TextStyle(
+                                fontSize: 28,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFF17406B),
+                              ),
+                            ),
+                          ),
+                        );
+                      }),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: _isCorrect
+                  ? [
+                      BoxShadow(
+                        color: const Color(0xFFEA2233).withOpacity(0.3),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
+                      ),
+                    ]
+                  : [],
+            ),
+            child: FilledButton(
+              onPressed: (_isCorrect && widget.canFinishLesson) ? _handleNext : null,
+              style: FilledButton.styleFrom(
+                backgroundColor: (_isCorrect && widget.canFinishLesson) ? const Color(0xFFEA2233) : Colors.grey[400],
+                foregroundColor: Colors.white,
+                minimumSize: const Size.fromHeight(56),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  if (!widget.canFinishLesson) ...[
+                    const Icon(Icons.hourglass_empty, size: 20),
                     const SizedBox(width: 8),
                   ],
                   Text(

@@ -6,6 +6,13 @@ enum LessonType {
   missingLetterPairs,
   imageMissingLetter,
   imageRevealWord,
+  // New types
+  instructions,
+  imageSelection,
+  findSound,
+  findMissingLetter,
+  findNonIntruder,
+  formatWord,
   unknown,
 }
 
@@ -19,6 +26,13 @@ LessonType lessonTypeFrom(dynamic v) {
     case 'MISSING_LETTER_PAIRS': return LessonType.missingLetterPairs;
     case 'IMAGE_MISSING_LETTER': return LessonType.imageMissingLetter;
     case 'IMAGE_REVEAL_WORD': return LessonType.imageRevealWord;
+    // New types
+    case 'INSTRUCTIONS': return LessonType.instructions;
+    case 'IMAGE_SELECTION': return LessonType.imageSelection;
+    case 'FIND_SOUND': return LessonType.findSound;
+    case 'FIND_MISSING_LETTER': return LessonType.findMissingLetter;
+    case 'FIND_NON_INTRUDER': return LessonType.findNonIntruder;
+    case 'FORMAT_WORD': return LessonType.formatWord;
     default: return LessonType.unknown;
   }
 }
@@ -31,6 +45,13 @@ enum ScreenType {
   missingLetterPairs,
   imageMissingLetter,
   imageRevealWord,
+  // New types
+  instructions,
+  imageSelection,
+  findSound,
+  findMissingLetter,
+  findNonIntruder,
+  formatWord,
   unknown,
 }
 
@@ -44,6 +65,13 @@ ScreenType screenTypeFrom(dynamic v) {
     case 'MISSING_LETTER_PAIRS': return ScreenType.missingLetterPairs;
     case 'IMAGE_MISSING_LETTER': return ScreenType.imageMissingLetter;
     case 'IMAGE_REVEAL_WORD': return ScreenType.imageRevealWord;
+    // New types
+    case 'INSTRUCTIONS': return ScreenType.instructions;
+    case 'IMAGE_SELECTION': return ScreenType.imageSelection;
+    case 'FIND_SOUND': return ScreenType.findSound;
+    case 'FIND_MISSING_LETTER': return ScreenType.findMissingLetter;
+    case 'FIND_NON_INTRUDER': return ScreenType.findNonIntruder;
+    case 'FORMAT_WORD': return ScreenType.formatWord;
     default: return ScreenType.unknown;
   }
 }
@@ -65,6 +93,19 @@ extension LessonTypeExtension on LessonType {
         return 'Completează litera lipsă după imagine';
       case LessonType.imageRevealWord:
         return 'Dezvăluie cuvântul din imagine';
+      // New types
+      case LessonType.instructions:
+        return 'Citește instrucțiunile';
+      case LessonType.imageSelection:
+        return 'Selectează imaginea corectă';
+      case LessonType.findSound:
+        return 'Găsește sunetul în cuvânt';
+      case LessonType.findMissingLetter:
+        return 'Găsește litera lipsă';
+      case LessonType.findNonIntruder:
+        return 'Găsește elementele care se potrivesc';
+      case LessonType.formatWord:
+        return 'Formează cuvântul corect';
       case LessonType.unknown:
         return 'Tip de lecție necunoscut';
     }

@@ -1,5 +1,8 @@
 class AppConfig {
   static const String baseUrl = 'https://logobeapp.actiunepentrusanatate.ro';
+  
+  // Note: S3 assets are served via pre-signed URLs from backend
+  // No need for S3 configuration in the mobile app
 
   // auth (le ai deja)
   static const String loginPath = '/api/v1/auth/login';

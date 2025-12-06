@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:get_it/get_it.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 import '../auth/data/presentation/cubit/auth_cubit.dart';
 import '../auth/data/domain/auth_repository.dart';
 import '../auth/data/models/user_response_dto.dart';
@@ -10,11 +11,12 @@ import '../profiles/selected_profile_cubit.dart';
 import '../session/session_info.dart';
 import '../../core/state/active_profile.dart';
 import '../../core/network/dio_client.dart';
+import '../../core/services/s3_service.dart';
 import '../../core/storage/secure_storage.dart';
 import 'tabs/account_tab.dart';
 import 'tabs/profiles_tab.dart';
 import 'tabs/modules_tab.dart';
-import '../settings/settings_page.dart';
+import 'tabs/specialist_tab.dart';
 
 class HomeShell extends StatefulWidget {
   const HomeShell({super.key, this.profileId, this.shouldOpenCreateDialog = false});
@@ -28,6 +30,7 @@ class HomeShell extends StatefulWidget {
 class _HomeShellState extends State<HomeShell> {
   int _index = 0;
   bool _hasAutoSelected = false;
+  bool _hasPrefetched = false;
 
   @override
   void initState() {
@@ -38,7 +41,48 @@ class _HomeShellState extends State<HomeShell> {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _autoSelectFirstProfile();
       });
+    } else {
+      // If we have a profile, start prefetching
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _startImagePrefetching(widget.profileId!);
+      });
     }
+    
+    // Listen to connectivity changes
+    _listenToConnectivity();
+  }
+  
+  void _listenToConnectivity() {
+    Connectivity().onConnectivityChanged.listen((result) {
+      if (result != ConnectivityResult.none) {
+        final profileId = GetIt.I<ActiveProfileService>().id;
+        if (profileId != null && !_hasPrefetched) {
+          _startImagePrefetching(profileId);
+        }
+      }
+    });
+  }
+  
+  Future<void> _startImagePrefetching(int profileId) async {
+    if (_hasPrefetched) return;
+    
+    // Check connectivity first
+    final connectivityResult = await Connectivity().checkConnectivity();
+    if (connectivityResult == ConnectivityResult.none) {
+      debugPrint('[HomeShell] No internet connection, skipping prefetch');
+      return;
+    }
+    
+    _hasPrefetched = true;
+    debugPrint('[HomeShell] Starting background image prefetch for profile $profileId');
+    
+    // Run prefetch in background without awaiting
+    GetIt.I<S3Service>().prefetchAllLessonImages(profileId).then((_) {
+      debugPrint('[HomeShell] Image prefetch completed');
+    }).catchError((e) {
+      debugPrint('[HomeShell] Image prefetch error: $e');
+      _hasPrefetched = false; // Allow retry on next connectivity change
+    });
   }
 
   Future<void> _autoSelectFirstProfile() async {
@@ -57,6 +101,9 @@ class _HomeShellState extends State<HomeShell> {
         await GetIt.I<SecureStore>().saveActiveProfileId(firstProfile.id);
         GetIt.I<DioClient>().setActiveProfile(firstProfile.id);
         await GetIt.I<ActiveProfileService>().set(firstProfile.id);
+        
+        // Start prefetching for this profile
+        _startImagePrefetching(firstProfile.id);
       } else if (profiles.isEmpty && mounted && widget.profileId == null) {
         // No profiles exist and no active profile - this will trigger the create dialog
         // The ProfilesTab will handle opening the dialog automatically
@@ -106,8 +153,8 @@ class _HomeShellState extends State<HomeShell> {
     final isSelected = _index == index;
     final currentProfileId = GetIt.I<ActiveProfileService>().id;
     
-    // Prevent navigation to modules tab if no active profile
-    final canNavigateToModules = index != 1 || currentProfileId != null;
+    // Prevent navigation to modules or specialist tabs if no active profile
+    final canNavigateToModules = (index != 1 && index != 2) || currentProfileId != null;
     
     return GestureDetector(
       onTap: () {
@@ -127,7 +174,7 @@ class _HomeShellState extends State<HomeShell> {
         }
       },
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
         decoration: BoxDecoration(
           gradient: isSelected
               ? const LinearGradient(
@@ -137,7 +184,7 @@ class _HomeShellState extends State<HomeShell> {
                 )
               : null,
           color: isSelected ? null : Colors.transparent,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(14),
           boxShadow: isSelected
               ? [
                   BoxShadow(
@@ -157,13 +204,16 @@ class _HomeShellState extends State<HomeShell> {
                   color: isSelected
                       ? Colors.white
                       : Colors.grey[600],
-                  size: 26,
+                  size: 24,
                 ),
-            const SizedBox(height: 6),
+            const SizedBox(height: 4),
             Text(
               label,
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: TextStyle(
-                fontSize: 13,
+                fontSize: 11,
                 fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
                 color: isSelected
                     ? Colors.white
@@ -180,22 +230,30 @@ class _HomeShellState extends State<HomeShell> {
   Widget build(BuildContext context) {
     final authRepo = GetIt.I<AuthRepository>();
 
-    return ListenableBuilder(
-      listenable: GetIt.I<ActiveProfileService>(),
-      builder: (context, _) {
-        final currentProfileId = GetIt.I<ActiveProfileService>().id;
+    return BlocBuilder<AuthCubit, AuthState>(
+      builder: (context, authState) {
+        final isSpecialist = authState.userRole == 'SPECIALIST';
         
-        // Update tabs when profile changes
-        final updatedTabs = [
-          ProfilesTab(shouldOpenCreateDialog: widget.shouldOpenCreateDialog),
-          currentProfileId != null 
-            ? ModulesTab(profileId: currentProfileId)
-            : const _PlaceholderModulesTab(),
-          const AccountTab(),
-          const SettingsPage(),
-        ];
-        
-        return BlocListener<AuthCubit, AuthState>(
+        return ListenableBuilder(
+          listenable: GetIt.I<ActiveProfileService>(),
+          builder: (context, _) {
+            final currentProfileId = GetIt.I<ActiveProfileService>().id;
+            
+            // Update tabs when profile changes
+            final updatedTabs = <Widget>[
+              ProfilesTab(shouldOpenCreateDialog: widget.shouldOpenCreateDialog),
+              currentProfileId != null 
+                ? ModulesTab(profileId: currentProfileId)
+                : const _PlaceholderModulesTab(),
+              // Add specialist tab only for specialist users
+              if (isSpecialist && currentProfileId != null)
+                SpecialistTab(profileId: currentProfileId)
+              else if (isSpecialist)
+                const _PlaceholderModulesTab(),
+              const AccountTab(),
+            ];
+            
+            return BlocListener<AuthCubit, AuthState>(
           listenWhen: (prev, curr) => prev.authenticated && !curr.authenticated,
           listener: (context, state) {
             // Log out -> LogopedyApp te duce automat la LoginPage
@@ -219,7 +277,7 @@ class _HomeShellState extends State<HomeShell> {
                   ),
                   child: SafeArea(
                     child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceAround,
                         children: [
@@ -227,6 +285,9 @@ class _HomeShellState extends State<HomeShell> {
                           _buildNavItem(0, Icons.group_outlined, Icons.group, 'Profile', null),
                           // Modules tab
                           _buildNavItem(1, Icons.menu_book_outlined, Icons.menu_book, 'Module', null),
+                          // Specialist tab (only for specialists)
+                          if (isSpecialist)
+                            _buildNavItem(2, Icons.school_outlined, Icons.school, 'Specialist', null),
                           // Account tab with initials
                           FutureBuilder<UserResponseDto?>(
                             future: authRepo.getCurrentUser().then<UserResponseDto?>((value) => value).catchError((_) => Future.value(null)),
@@ -259,9 +320,10 @@ class _HomeShellState extends State<HomeShell> {
                                     accountInitials = session.email![0].toUpperCase();
                                   }
                                   
-                                  final isSelected = _index == 2;
+                                  final accountIndex = isSpecialist ? 3 : 2;
+                                  final isSelected = _index == accountIndex;
                                   return _buildNavItem(
-                                    2,
+                                    accountIndex,
                                     Icons.person_outline,
                                     Icons.person,
                                     'Contul meu',
@@ -271,8 +333,6 @@ class _HomeShellState extends State<HomeShell> {
                               );
                             },
                           ),
-                          // Settings tab
-                          _buildNavItem(3, Icons.settings_outlined, Icons.settings, 'Setări', null),
                         ],
                       ),
                     ),
@@ -280,7 +340,9 @@ class _HomeShellState extends State<HomeShell> {
                 );
               },
             ),
-          ),
+            ),
+        );
+        },
       );
       },
     );

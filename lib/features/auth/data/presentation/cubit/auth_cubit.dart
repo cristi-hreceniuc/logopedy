@@ -19,7 +19,13 @@ class AuthCubit extends Cubit<AuthState> {
   Future<void> checkSession() async {
     emit(const AuthState.loading());
     final ok = await _repo.isSessionValid();
-    emit(ok ? const AuthState.authenticated() : const AuthState.unauthenticated());
+    if (ok) {
+      // Try to get user role from session
+      final userRole = await _repo.getUserRole();
+      emit(AuthState.authenticated(role: userRole));
+    } else {
+      emit(const AuthState.unauthenticated());
+    }
     final pid = await GetIt.I<SecureStore>().readActiveProfileId();
     GetIt.I<DioClient>().setActiveProfile(pid);
   }
@@ -27,8 +33,8 @@ class AuthCubit extends Cubit<AuthState> {
   Future<void> login(String email, String password) async {
     emit(const AuthState.loading());
     try {
-      await _repo.login(LoginRequest(email: email, password: password));
-      emit(const AuthState.authenticated());
+      final response = await _repo.login(LoginRequest(email: email, password: password));
+      emit(AuthState.authenticated(role: response.userRole));
     } on DioException catch (e) {
       final errorMsg = _niceError(e);
       emit(AuthState.error(errorMsg));

@@ -48,6 +48,7 @@ class AuthApi {
     final r = await _dio.post(AppConfig.loginPath, data: {
       'email': email,
       'password': password,
+      'platform': 'MOBILE',
     }, options: Options(headers: {'Authorization': null}));
     return r.data as Map<String, dynamic>;
   }

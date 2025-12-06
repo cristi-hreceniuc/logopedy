@@ -13,6 +13,7 @@ class AuthState extends Equatable {
 
   final String? info;   // mesaje informative (non-eroare)
   final String? error;  // mesaje de eroare afișabile
+  final String? userRole; // USER, SPECIALIST, PREMIUM, etc.
 
   const AuthState({
     this.loading = false,
@@ -22,12 +23,13 @@ class AuthState extends Equatable {
     this.resetOk = false,
     this.info,
     this.error,
+    this.userRole,
   });
 
   // ---- shortcut factories ca în proiectul tău ----
   const AuthState.unauthenticated() : this();
   const AuthState.loading() : this(loading: true);
-  const AuthState.authenticated() : this(authenticated: true);
+  const AuthState.authenticated({String? role}) : this(authenticated: true, userRole: role);
   const AuthState.signupSuccess() : this(signupOk: true);
   const AuthState.resetSent() : this(forgotSent: true); // compat: numele vechi folosit la pasul 1
   const AuthState.resetOk() : this(resetOk: true);
@@ -37,16 +39,18 @@ class AuthState extends Equatable {
         signupOk = false,
         forgotSent = false,
         resetOk = false,
-        error = null;
+        error = null,
+        userRole = null;
   const AuthState.error(this.error)
       : loading = false,
         authenticated = false,
         signupOk = false,
         forgotSent = false,
         resetOk = false,
-        info = null;
+        info = null,
+        userRole = null;
 
   @override
   List<Object?> get props =>
-      [loading, authenticated, signupOk, forgotSent, resetOk, info, error];
+      [loading, authenticated, signupOk, forgotSent, resetOk, info, error, userRole];
 }

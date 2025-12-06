@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:get_it/get_it.dart';
 import 'package:logopedy/features/profiles/presentation/profile_picker_sheet.dart';
+import 'core/services/s3_service.dart';
 import 'core/state/active_profile.dart';
 import 'core/storage/secure_storage.dart';
 import 'core/theme/app_theme.dart';
@@ -23,6 +24,7 @@ class LogopedyApp extends StatelessWidget {
         return MaterialApp(
           title: 'Logopedy',
           debugShowCheckedModeBanner: false,
+          navigatorKey: NavigationService.navigatorKey,
           theme: AppTheme.light(),
           darkTheme: AppTheme.dark(),
           themeMode: themeMode,

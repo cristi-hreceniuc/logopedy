@@ -18,6 +18,7 @@ class _RegisterPageState extends State<RegisterPage> {
   final _first = TextEditingController();
   final _last = TextEditingController();
   String _gender = 'male';
+  String _userRole = 'USER';
   bool _obscure = true;
   String? _errorMessage;
 
@@ -115,6 +116,17 @@ class _RegisterPageState extends State<RegisterPage> {
                   decoration: const InputDecoration(labelText: 'Gen'),
                 ),
                 const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  value: _userRole,
+                  items: const [
+                    DropdownMenuItem(value: 'USER', child: Text('Utilizator')),
+                    DropdownMenuItem(value: 'SPECIALIST', child: Text('Specialist')),
+                    DropdownMenuItem(value: 'PREMIUM', child: Text('Premium')),
+                  ],
+                  onChanged: (v) => setState(() => _userRole = v ?? 'USER'),
+                  decoration: const InputDecoration(labelText: 'Tip cont'),
+                ),
+                const SizedBox(height: 12),
                 AuthTextField(
                   controller: _email,
                   label: 'Email',
@@ -150,6 +162,7 @@ class _RegisterPageState extends State<RegisterPage> {
                           firstName: _first.text.trim(),
                           lastName: _last.text.trim(),
                           gender: _gender,
+                          userRole: _userRole,
                         ),
                       );
                     }

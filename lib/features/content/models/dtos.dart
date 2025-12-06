@@ -8,6 +8,7 @@ class ModuleDto {
   final String? introText;
   final int position;
   final bool isPremium;
+  final String? targetAudience; // CHILDREN or SPECIALIST
 
   ModuleDto({
     required this.id,
@@ -15,6 +16,7 @@ class ModuleDto {
     this.introText,
     required this.position,
     required this.isPremium,
+    this.targetAudience,
   });
 
   factory ModuleDto.fromJson(Map<String, dynamic> j) => ModuleDto(
@@ -23,6 +25,7 @@ class ModuleDto {
     introText: j['introText'],
     position: j['position'],
     isPremium: j['isPremium'] ?? false,
+    targetAudience: j['targetAudience'],
   );
 }
 

@@ -4,6 +4,7 @@ import 'package:logopedy/features/auth/data/models/user_response_dto.dart';
 import '../../../../core/storage/secure_storage.dart';
 import '../auth_api.dart';
 import '../models/login_request.dart';
+import '../models/login_response.dart';
 import '../models/signup_request.dart';
 
 class AuthRepository {
@@ -19,14 +20,16 @@ class AuthRepository {
     return exp.isAfter(DateTime.now().toUtc().add(const Duration(seconds: 5)));
   }
 
-  Future<void> login(LoginRequest req) async {
+  Future<LoginResponse> login(LoginRequest req) async {
     final data = await _api.login(req.email, req.password);
     // răspuns BE:
-    // { token, expiresIn(ms), refreshToken, refreshExpiresIn(ms), user: {...} (opțional) }
+    // { token, expiresIn(ms), refreshToken, refreshExpiresIn(ms), user: {fullName, email, userRole} }
     final access = data['token'] as String;
     final accessMs = (data['expiresIn'] as num).toInt();
     final refresh = data['refreshToken'] as String;
     final refreshMs = (data['refreshExpiresIn'] as num).toInt();
+    
+    final loginResponse = LoginResponse.fromJson(data);
 
     final now = DateTime.now().toUtc();
     await _store.saveSession(
@@ -35,9 +38,23 @@ class AuthRepository {
       refreshToken: refresh,
       refreshExpiresAt: now.add(Duration(milliseconds: refreshMs)),
     );
+    
+    // Store user role if available
+    if (loginResponse.userRole != null) {
+      await _store.writeKey('user_role', loginResponse.userRole!);
+    }
+    
+    return loginResponse;
+  }
+  
+  Future<String?> getUserRole() async {
+    return _store.readKey('user_role');
   }
 
-  Future<void> logout() async => _store.clear();
+  Future<void> logout() async {
+    await _store.deleteKey('user_role');
+    await _store.clear();
+  }
 
   // compatibile cu flow-ul tău existent:
   Future<UserDto> signup(SignupRequest req) => _api.signup(req);

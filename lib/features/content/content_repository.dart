@@ -9,8 +9,8 @@ class ContentRepository {
   ContentRepository(DioClient client) : _api = ContentApi(client.dio);
   final ContentApi _api;
 
-  Future<List<ModuleDto>> modules(int profileId) async =>
-      (await _api.listModules(profileId))
+  Future<List<ModuleDto>> modules(int profileId, {String? targetAudience}) async =>
+      (await _api.listModules(profileId, targetAudience: targetAudience))
           .map((e) => ModuleDto.fromJson(e))
           .toList()
           .cast<ModuleDto>();

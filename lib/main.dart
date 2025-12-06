@@ -3,6 +3,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:get_it/get_it.dart';
 
 import 'core/network/dio_client.dart';
+import 'core/services/audio_cache_service.dart';
+import 'core/services/s3_service.dart';
 import 'core/state/active_profile.dart';
 import 'core/storage/secure_storage.dart';
 import 'features/auth/data/auth_api.dart';
@@ -18,6 +20,13 @@ final sl = GetIt.instance;
 Future<void> _setupDI() async {
   sl.registerLazySingleton<SecureStore>(() => SecureStore());
   sl.registerLazySingleton<DioClient>(() => DioClient(sl<SecureStore>()));
+  
+  // Initialize audio cache service
+  final audioCache = AudioCacheService(sl<DioClient>().dio);
+  await audioCache.initialize();
+  sl.registerLazySingleton<AudioCacheService>(() => audioCache);
+  
+  sl.registerLazySingleton<S3Service>(() => S3Service(sl<DioClient>()));
   sl.registerLazySingleton<AuthApi>(() => AuthApi(sl<DioClient>().dio));
   sl.registerLazySingleton<AuthRepository>(() => AuthRepository(sl<AuthApi>(), sl<SecureStore>()));
   sl.registerFactory<AuthCubit>(() => AuthCubit(sl<AuthRepository>()));

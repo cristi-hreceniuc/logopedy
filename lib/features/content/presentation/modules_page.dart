@@ -11,8 +11,13 @@ import '../models/modules_details_dto.dart';
 import 'submodule_page.dart';
 
 class ModulesPage extends StatefulWidget {
-  const ModulesPage({super.key, required this.profileId});
+  const ModulesPage({
+    super.key,
+    required this.profileId,
+    this.targetAudience = 'CHILDREN',
+  });
   final int profileId;
+  final String targetAudience;
 
   @override
   State<ModulesPage> createState() => _ModulesPageState();
@@ -26,7 +31,7 @@ class _ModulesPageState extends State<ModulesPage> {
   @override
   void initState() {
     super.initState();
-    _f = repo.modules(widget.profileId);
+    _f = repo.modules(widget.profileId, targetAudience: widget.targetAudience);
     _loadPremiumStatus();
   }
 
@@ -44,14 +49,14 @@ class _ModulesPageState extends State<ModulesPage> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.profileId != widget.profileId) {
       setState(() {
-        _f = repo.modules(widget.profileId);
+        _f = repo.modules(widget.profileId, targetAudience: widget.targetAudience);
       });
     }
   }
 
   Future<void> _refreshModules() async {
     setState(() {
-      _f = repo.modules(widget.profileId);
+      _f = repo.modules(widget.profileId, targetAudience: widget.targetAudience);
     });
   }
 

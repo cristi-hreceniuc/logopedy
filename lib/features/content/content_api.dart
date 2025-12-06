@@ -6,8 +6,11 @@ class ContentApi {
   ContentApi(this._dio);
   final Dio _dio;
 
-  Future<List<dynamic>> listModules(int profileId) async {
-    final r = await _dio.get(AppConfig.modulesPath(profileId));
+  Future<List<dynamic>> listModules(int profileId, {String? targetAudience}) async {
+    final r = await _dio.get(
+      AppConfig.modulesPath(profileId),
+      queryParameters: targetAudience != null ? {'targetAudience': targetAudience} : null,
+    );
     return r.data as List;
   }
 
