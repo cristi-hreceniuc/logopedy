@@ -37,7 +37,7 @@ class _HomeShellState extends State<HomeShell> {
     super.initState();
     // If no active profile, navigate to profiles tab and auto-select first profile
     if (widget.profileId == null) {
-      _index = 0; // Profiles tab
+      // Will be set to profiles tab index after we know if user is specialist
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _autoSelectFirstProfile();
       });
@@ -89,6 +89,14 @@ class _HomeShellState extends State<HomeShell> {
     if (_hasAutoSelected) return;
     
     try {
+      final authState = context.read<AuthCubit>().state;
+      final isSpecialist = authState.userRole == 'SPECIALIST';
+      
+      // Set to profiles tab based on user role
+      setState(() {
+        _index = isSpecialist ? 1 : 0;
+      });
+      
       final profilesRepo = ProfilesRepository(GetIt.I<DioClient>());
       final profiles = await profilesRepo.listProfiles();
       
@@ -104,6 +112,13 @@ class _HomeShellState extends State<HomeShell> {
         
         // Start prefetching for this profile
         _startImagePrefetching(firstProfile.id);
+        
+        // Navigate to specialist tab if specialist user
+        if (isSpecialist && mounted) {
+          setState(() {
+            _index = 0; // Specialist tab
+          });
+        }
       } else if (profiles.isEmpty && mounted && widget.profileId == null) {
         // No profiles exist and no active profile - this will trigger the create dialog
         // The ProfilesTab will handle opening the dialog automatically
@@ -152,25 +167,33 @@ class _HomeShellState extends State<HomeShell> {
   ) {
     final isSelected = _index == index;
     final currentProfileId = GetIt.I<ActiveProfileService>().id;
+    final authState = context.read<AuthCubit>().state;
+    final isSpecialist = authState.userRole == 'SPECIALIST';
     
     // Prevent navigation to modules or specialist tabs if no active profile
-    final canNavigateToModules = (index != 1 && index != 2) || currentProfileId != null;
+    // For specialists: index 0 is specialist, index 2 is modules
+    // For non-specialists: index 1 is modules
+    final needsProfile = isSpecialist ? (index == 0 || index == 2) : (index == 1);
+    final canNavigateToModules = !needsProfile || currentProfileId != null;
     
     return GestureDetector(
       onTap: () {
         if (canNavigateToModules) {
           setState(() => _index = index);
         } else {
-          // Show message when trying to access modules without profile
+          // Show message when trying to access modules/specialist without profile
+          final message = (isSpecialist && (index == 0 || index == 2))
+              ? 'Te rugăm să creezi un profil pentru a accesa conținutul'
+              : 'Te rugăm să creezi un profil pentru a accesa modulele';
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Te rugăm să creezi un profil pentru a accesa modulele'),
-              backgroundColor: Color(0xFFEA2233),
-              duration: Duration(seconds: 2),
+            SnackBar(
+              content: Text(message),
+              backgroundColor: const Color(0xFFEA2233),
+              duration: const Duration(seconds: 2),
             ),
           );
           // Navigate to profiles tab instead
-          setState(() => _index = 0);
+          setState(() => _index = isSpecialist ? 1 : 0);
         }
       },
       child: Container(
@@ -241,15 +264,15 @@ class _HomeShellState extends State<HomeShell> {
             
             // Update tabs when profile changes
             final updatedTabs = <Widget>[
-              ProfilesTab(shouldOpenCreateDialog: widget.shouldOpenCreateDialog),
-              currentProfileId != null 
-                ? ModulesTab(profileId: currentProfileId)
-                : const _PlaceholderModulesTab(),
-              // Add specialist tab only for specialist users
+              // Add specialist tab first for specialist users
               if (isSpecialist && currentProfileId != null)
                 SpecialistTab(profileId: currentProfileId)
               else if (isSpecialist)
                 const _PlaceholderModulesTab(),
+              ProfilesTab(shouldOpenCreateDialog: widget.shouldOpenCreateDialog),
+              currentProfileId != null 
+                ? ModulesTab(profileId: currentProfileId)
+                : const _PlaceholderModulesTab(),
               const AccountTab(),
             ];
             
@@ -281,13 +304,13 @@ class _HomeShellState extends State<HomeShell> {
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceAround,
                         children: [
-                          // Profile tab with icon
-                          _buildNavItem(0, Icons.group_outlined, Icons.group, 'Profile', null),
-                          // Modules tab
-                          _buildNavItem(1, Icons.menu_book_outlined, Icons.menu_book, 'Module', null),
-                          // Specialist tab (only for specialists)
+                          // Specialist tab (only for specialists) - first item
                           if (isSpecialist)
-                            _buildNavItem(2, Icons.school_outlined, Icons.school, 'Specialist', null),
+                            _buildNavItem(0, Icons.school_outlined, Icons.school, 'Specialist', null),
+                          // Profile tab with icon
+                          _buildNavItem(isSpecialist ? 1 : 0, Icons.group_outlined, Icons.group, 'Profile', null),
+                          // Modules tab
+                          _buildNavItem(isSpecialist ? 2 : 1, Icons.menu_book_outlined, Icons.menu_book, 'Module', null),
                           // Account tab with initials
                           FutureBuilder<UserResponseDto?>(
                             future: authRepo.getCurrentUser().then<UserResponseDto?>((value) => value).catchError((_) => Future.value(null)),

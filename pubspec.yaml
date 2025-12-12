@@ -1,6 +1,6 @@
 name: logopedy
 description: "Aplicatie logopedica"
-version: 1.0.0+1
+version: 2.0.1+1
 
 environment:
   sdk: ^3.9.2
@@ -48,9 +48,7 @@ flutter:
     - assets/images/signup_image.png
     - assets/images/forgot_password.png
     - assets/images/reset_password.png
-    - assets/images/applause.gif
     - assets/images/finish_lesson.png
-    - assets/images/finish_submodule copy.png
+    - assets/images/finish_submodule.png
     - assets/images/finish_module.png
     - assets/images/
-    - assets/audio/

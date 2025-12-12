@@ -4,6 +4,7 @@ import 'package:get_it/get_it.dart';
 
 import '../../../core/network/dio_client.dart';
 import '../../../core/utils/snackbar_utils.dart';
+import '../../auth/data/presentation/cubit/auth_cubit.dart';
 import '../../profiles/selected_profile_cubit.dart';
 import '../content_repository.dart';
 import '../models/dtos.dart';
@@ -66,6 +67,8 @@ class _SubmodulePageState extends State<SubmodulePage> {
   Widget build(BuildContext context) {
     final activePid = context.watch<SelectedProfileCubit>().state;
     final cs = Theme.of(context).colorScheme;
+    final authState = context.watch<AuthCubit>().state;
+    final isSpecialist = authState.userRole == 'SPECIALIST';
 
     return Scaffold(
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -194,9 +197,12 @@ class _SubmodulePageState extends State<SubmodulePage> {
             itemBuilder: (_, i) {
               final l = sub.lessons[i];
               // dacă ai LessonLiteWithStatus, l.status există; altfel fallback: prima deblocată
-              final isLocked = (l is LessonLiteWithStatus)
-                  ? l.status == 'LOCKED'
-                  : i > 0;
+              // For specialists, all lessons are unlocked
+              final isLocked = isSpecialist 
+                  ? false 
+                  : (l is LessonLiteWithStatus)
+                      ? l.status == 'LOCKED'
+                      : i > 0;
                         final isDone = (l is LessonLiteWithStatus) && l.status == 'DONE';
 
                         return Material(
@@ -216,6 +222,7 @@ class _SubmodulePageState extends State<SubmodulePage> {
                         profileId: pid,
                         lessonId: l.id,
                         title: l.title,
+                        isAlreadyDone: isDone,
                       ),
                     ),
                   );
