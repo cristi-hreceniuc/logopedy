@@ -1,6 +1,6 @@
 name: logopedy
 description: "Aplicatie logopedica"
-version: 2.0.1+1
+version: 2.0.1+2
 
 environment:
   sdk: ^3.9.2

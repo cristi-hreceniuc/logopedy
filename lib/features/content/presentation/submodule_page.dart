@@ -8,8 +8,10 @@ import '../../auth/data/presentation/cubit/auth_cubit.dart';
 import '../../profiles/selected_profile_cubit.dart';
 import '../content_repository.dart';
 import '../models/dtos.dart';
+import '../models/submodule_list_dto.dart';
 import '../models/enums.dart';
 import 'lesson_player_page.dart';
+import 'part_page.dart';
 
 class SubmodulePage extends StatefulWidget {
   const SubmodulePage({
@@ -29,12 +31,12 @@ class SubmodulePage extends StatefulWidget {
 
 class _SubmodulePageState extends State<SubmodulePage> {
   late final repo = ContentRepository(GetIt.I<DioClient>());
-  late Future<SubmoduleDto> _f;
+  late Future<SubmoduleListDto> _f;
 
   @override
   void initState() {
     super.initState();
-    _f = repo.submodule(widget.profileId, widget.submoduleId);
+    _f = repo.submoduleWithParts(widget.profileId, widget.submoduleId);
   }
 
   @override
@@ -43,7 +45,7 @@ class _SubmodulePageState extends State<SubmodulePage> {
     // Refresh if profileId or submoduleId changed
     if (oldWidget.profileId != widget.profileId || oldWidget.submoduleId != widget.submoduleId) {
       setState(() {
-        _f = repo.submodule(widget.profileId, widget.submoduleId, forceRefresh: true);
+        _f = repo.submoduleWithParts(widget.profileId, widget.submoduleId, forceRefresh: true);
       });
     }
   }
@@ -59,7 +61,7 @@ class _SubmodulePageState extends State<SubmodulePage> {
     setState(() {
       // Refresh with the active profile ID and force refresh to bypass cache
       // This ensures we get the latest lesson completion status from the backend
-      _f = repo.submodule(pid, widget.submoduleId, forceRefresh: true);
+      _f = repo.submoduleWithParts(pid, widget.submoduleId, forceRefresh: true);
     });
   }
 
@@ -86,7 +88,7 @@ class _SubmodulePageState extends State<SubmodulePage> {
       body: SafeArea(
         top: true,
         bottom: true,
-        child: FutureBuilder<SubmoduleDto>(
+        child: FutureBuilder<SubmoduleListDto>(
         future: _f,
         builder: (c, s) {
               if (!s.hasData) {
@@ -98,11 +100,9 @@ class _SubmodulePageState extends State<SubmodulePage> {
               }
           final sub = s.data!;
 
-              // Calculate progress - ensure we're using the active profile's data
-              final totalLessons = sub.lessons.length;
-              final completedLessons = sub.lessons.where((l) =>
-                l is LessonLiteWithStatus && l.status == 'DONE'
-              ).length;
+              // Calculate progress from parts
+              final totalLessons = sub.parts.fold<int>(0, (sum, p) => sum + p.totalLessons);
+              final completedLessons = sub.parts.fold<int>(0, (sum, p) => sum + p.completedLessons);
               final progress = totalLessons > 0 ? completedLessons / totalLessons : 0.0;
 
               return Column(
@@ -131,13 +131,13 @@ class _SubmodulePageState extends State<SubmodulePage> {
                               Container(
                                 padding: const EdgeInsets.all(12),
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFFEA2233).withOpacity(0.1),
+                                  color: const Color(0xFF4CAF50).withOpacity(0.1),
                                   borderRadius: BorderRadius.circular(16),
                                 ),
-                                child: Icon(
+                                child: const Icon(
                                   Icons.track_changes_rounded,
                                   size: 28,
-                                  color: const Color(0xFFEA2233),
+                                  color: Color(0xFF4CAF50),
                                 ),
                               ),
                               const SizedBox(width: 16),
@@ -171,9 +171,9 @@ class _SubmodulePageState extends State<SubmodulePage> {
                             value: progress,
                             borderRadius: BorderRadius.circular(8),
                             minHeight: 10,
-                            backgroundColor: const Color(0xFFEA2233).withOpacity(0.1),
+                            backgroundColor: const Color(0xFF4CAF50).withOpacity(0.1),
                             valueColor: const AlwaysStoppedAnimation<Color>(
-                              Color(0xFFEA2233),
+                              Color(0xFF4CAF50),
                             ),
                           ),
                           const SizedBox(height: 8),
@@ -188,68 +188,51 @@ class _SubmodulePageState extends State<SubmodulePage> {
                         ],
                       ),
                     ),
-                  // Lessons list
+                  // Parts list
                   Expanded(
                     child: ListView.separated(
                       padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-            itemCount: sub.lessons.length,
+                      itemCount: sub.parts.length,
                       separatorBuilder: (_, __) => const SizedBox(height: 12),
-            itemBuilder: (_, i) {
-              final l = sub.lessons[i];
-              // dacă ai LessonLiteWithStatus, l.status există; altfel fallback: prima deblocată
-              // For specialists, all lessons are unlocked
-              final isLocked = isSpecialist 
-                  ? false 
-                  : (l is LessonLiteWithStatus)
-                      ? l.status == 'LOCKED'
-                      : i > 0;
-                        final isDone = (l is LessonLiteWithStatus) && l.status == 'DONE';
+                      itemBuilder: (_, i) {
+                        final part = sub.parts[i];
+                        final partProgress = part.totalLessons > 0 
+                            ? part.completedLessons / part.totalLessons 
+                            : 0.0;
 
                         return Material(
                           color: Colors.transparent,
                           child: InkWell(
-                onTap: () async {
-                  if (isLocked) {
-                                SnackBarUtils.showInfo(context, 'Deblochează mai întâi lecția anterioară.');
-                    return;
-                  }
+                            onTap: () async {
+                              final pid = activePid ?? widget.profileId;
+                              final changed = await Navigator.of(context).push<bool>(
+                                MaterialPageRoute(
+                                  builder: (_) => PartPage(
+                                    profileId: pid,
+                                    partId: part.id,
+                                    title: part.name,
+                                  ),
+                                ),
+                              );
 
-                  // Use active profile ID if available, otherwise use widget.profileId
-                  final pid = activePid ?? widget.profileId;
-                  final changed = await Navigator.of(context).push<bool>(
-                    MaterialPageRoute(
-                      builder: (_) => LessonPlayerPage(
-                        profileId: pid,
-                        lessonId: l.id,
-                        title: l.title,
-                        isAlreadyDone: isDone,
-                      ),
-                    ),
-                  );
-
-                  // Always refresh when returning from lesson to show updated progress
-                  // This ensures the last lesson completion is reflected
-                  // Add a delay to ensure backend has processed the update
-                  debugPrint('🔄 Returning from lesson ${l.id}, changed=$changed');
-                  if (mounted && changed == true) {
-                    // Wait longer to ensure backend has processed the lesson completion
-                    // This is especially important for the last lesson in a submodule
-                    await Future.delayed(const Duration(milliseconds: 1000));
-                    if (mounted) {
-                      debugPrint('🔄 Triggering refresh after lesson completion');
-                      _refresh();
-                    }
-                  }
-                },
+                              debugPrint('🔄 Returning from part ${part.id}, changed=$changed');
+                              if (mounted && changed == true) {
+                                await Future.delayed(const Duration(milliseconds: 500));
+                                if (mounted) {
+                                  debugPrint('🔄 Triggering refresh after returning from part');
+                                  _refresh();
+                                }
+                              }
+                            },
                             borderRadius: BorderRadius.circular(20),
                             child: Container(
-                              padding: const EdgeInsets.all(16),
+                              padding: const EdgeInsets.all(20),
                               decoration: BoxDecoration(
                                 color: cs.surface,
                                 borderRadius: BorderRadius.circular(20),
-                                border: isDone
+                                border: part.isCompleted
                                     ? Border.all(
-                                        color: const Color(0xFFEA2233).withOpacity(0.3),
+                                        color: const Color(0xFF4CAF50).withOpacity(0.3),
                                         width: 2,
                                       )
                                     : null,
@@ -261,79 +244,94 @@ class _SubmodulePageState extends State<SubmodulePage> {
                                   ),
                                 ],
                               ),
-                              child: Row(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Container(
-                                    padding: const EdgeInsets.all(10),
-                                    decoration: BoxDecoration(
-                                      color: isLocked
-                                          ? Colors.grey.withOpacity(0.1)
-                                          : isDone
-                                              ? const Color(0xFFEA2233).withOpacity(0.1)
-                                              : const Color(0xFF2D72D2).withOpacity(0.1),
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    child: Icon(
-                                      isLocked
-                                          ? Icons.lock_outline_rounded
-                                          : isDone
+                                  Row(
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.all(12),
+                                        decoration: BoxDecoration(
+                                          color: part.isCompleted
+                                              ? const Color(0xFF4CAF50).withOpacity(0.1)
+                                              : part.isInProgress
+                                                  ? const Color(0xFF2D72D2).withOpacity(0.1)
+                                                  : Colors.grey.withOpacity(0.1),
+                                          borderRadius: BorderRadius.circular(14),
+                                        ),
+                                        child: Icon(
+                                          part.isCompleted
                                               ? Icons.check_circle_rounded
-                                              : Icons.play_circle_filled_rounded,
-                                      size: 28,
-                                      color: isLocked
-                                          ? Colors.grey[600]
-                                          : isDone
-                                              ? const Color(0xFFEA2233)
+                                              : part.isInProgress
+                                                  ? Icons.play_circle_filled_rounded
+                                                  : Icons.folder_rounded,
+                                          size: 30,
+                                          color: part.isCompleted
+                                              ? const Color(0xFF4CAF50)
+                                              : part.isInProgress
+                                                  ? const Color(0xFF2D72D2)
+                                                  : Colors.grey[600],
+                                        ),
+                                      ),
+                                      const SizedBox(width: 16),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              part.name,
+                                              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                                                fontWeight: FontWeight.w800,
+                                                color: cs.onSurface,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 6),
+                                            Text(
+                                              '${part.completedLessons}/${part.totalLessons} lecții',
+                                              style: TextStyle(
+                                                color: Colors.grey[600],
+                                                fontSize: 14,
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Icon(
+                                        Icons.chevron_right_rounded,
+                                        size: 28,
+                                        color: part.isCompleted
+                                            ? const Color(0xFF4CAF50)
+                                            : const Color(0xFF2D72D2),
+                                      ),
+                                    ],
+                                  ),
+                                  if (part.totalLessons > 0) ...[
+                                    const SizedBox(height: 16),
+                                      LinearProgressIndicator(
+                                        value: partProgress,
+                                        borderRadius: BorderRadius.circular(6),
+                                        minHeight: 8,
+                                        backgroundColor: part.isCompleted
+                                            ? const Color(0xFF4CAF50).withOpacity(0.1)
+                                            : const Color(0xFF2D72D2).withOpacity(0.1),
+                                        valueColor: AlwaysStoppedAnimation<Color>(
+                                          part.isCompleted
+                                              ? const Color(0xFF4CAF50)
                                               : const Color(0xFF2D72D2),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 16),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          l.title,
-                                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                            fontWeight: FontWeight.w700,
-                                            color: cs.onSurface,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 4),
-                                        Text(
-                                          l.lessonType.romanianDescription,
-                                          style: TextStyle(
-                                            color: Colors.grey[600],
-                                            fontSize: 13,
-                                            fontWeight: FontWeight.w500,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  if (isDone)
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xFFEA2233).withOpacity(0.1),
-                                        borderRadius: BorderRadius.circular(12),
-                                      ),
-                                      child: Text(
-                                        'Complet',
-                                        style: TextStyle(
-                                          color: const Color(0xFFEA2233),
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.w700,
                                         ),
                                       ),
-                                    )
-                                  else
-                                    Icon(
-                                      Icons.chevron_right_rounded,
-                                      color: isLocked ? Colors.grey[400] : const Color(0xFF2D72D2),
-                                      size: 24,
+                                    const SizedBox(height: 6),
+                                    Text(
+                                      '${(partProgress * 100).round()}% complet',
+                                      style: TextStyle(
+                                        color: Colors.grey[600],
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                      ),
                                     ),
+                                  ],
                                 ],
                               ),
                             ),

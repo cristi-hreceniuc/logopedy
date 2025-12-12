@@ -29,6 +29,13 @@ class ContentApi {
     return r.data;
   }
 
+  Future<Map<String,dynamic>> getPart(int profileId, int partId) async {
+    final url = AppConfig.partPath(profileId, partId);
+    final r = await _dio.get(url);
+    print('[GET] $url');
+    return r.data;
+  }
+
   Future<Map<String,dynamic>> getLesson(int profileId, int lessonId) async {
     final url = AppConfig.lessonPath(profileId, lessonId);
     final r = await _dio.get(AppConfig.lessonPath(profileId, lessonId));
