@@ -11,6 +11,12 @@ class AuthState extends Equatable {
   /// Pasul 2: parola a fost resetată cu succes
   final bool resetOk;
 
+  /// Registration OTP: OTP has been sent to email
+  final bool registerOtpSent;
+  
+  /// Email for pending registration (used for OTP verification)
+  final String? pendingRegistrationEmail;
+
   final String? info;   // mesaje informative (non-eroare)
   final String? error;  // mesaje de eroare afișabile
   final String? userRole; // USER, SPECIALIST, PREMIUM, etc.
@@ -21,6 +27,8 @@ class AuthState extends Equatable {
     this.signupOk = false,
     this.forgotSent = false,
     this.resetOk = false,
+    this.registerOtpSent = false,
+    this.pendingRegistrationEmail,
     this.info,
     this.error,
     this.userRole,
@@ -33,12 +41,25 @@ class AuthState extends Equatable {
   const AuthState.signupSuccess() : this(signupOk: true);
   const AuthState.resetSent() : this(forgotSent: true); // compat: numele vechi folosit la pasul 1
   const AuthState.resetOk() : this(resetOk: true);
+  const AuthState.registerOtpSent(String email) 
+      : loading = false,
+        authenticated = false,
+        signupOk = false,
+        forgotSent = false,
+        resetOk = false,
+        registerOtpSent = true,
+        pendingRegistrationEmail = email,
+        info = null,
+        error = null,
+        userRole = null;
   const AuthState.info(this.info)
       : loading = false,
         authenticated = false,
         signupOk = false,
         forgotSent = false,
         resetOk = false,
+        registerOtpSent = false,
+        pendingRegistrationEmail = null,
         error = null,
         userRole = null;
   const AuthState.error(this.error)
@@ -47,10 +68,12 @@ class AuthState extends Equatable {
         signupOk = false,
         forgotSent = false,
         resetOk = false,
+        registerOtpSent = false,
+        pendingRegistrationEmail = null,
         info = null,
         userRole = null;
 
   @override
   List<Object?> get props =>
-      [loading, authenticated, signupOk, forgotSent, resetOk, info, error, userRole];
+      [loading, authenticated, signupOk, forgotSent, resetOk, registerOtpSent, pendingRegistrationEmail, info, error, userRole];
 }

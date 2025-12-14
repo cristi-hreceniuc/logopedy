@@ -1,13 +1,17 @@
 // lib/features/profiles/presentation/profile_details_page.dart
+import 'dart:io';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:get_it/get_it.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 
 import '../../../core/network/dio_client.dart';
+import '../../../core/services/image_upload_service.dart';
 import '../../../core/storage/secure_storage.dart';
 import '../../../core/utils/snackbar_utils.dart';
 import '../../../core/state/active_profile.dart';
+import '../../../widgets/profile_avatar.dart';
 import '../models/profile_model.dart';
 import '../profile_repository.dart';
 import '../selected_profile_cubit.dart';
@@ -24,6 +28,7 @@ class _ProfileDetailsPageState extends State<ProfileDetailsPage> {
   late final repo = ProfilesRepository(GetIt.I<DioClient>());
   late Future<List<LessonProgressDto>> _f;
   late Future<ProfileCardDto> _profileDetails;
+  bool _isUploadingImage = false;
   
   // Track expanded state for modules and submodules (collapsed by default)
   final Set<int> _expandedModules = <int>{};
@@ -34,6 +39,62 @@ class _ProfileDetailsPageState extends State<ProfileDetailsPage> {
     super.initState();
     _f = repo.lessonProgress(widget.profile.id);
     _profileDetails = repo.getProfileDetails(widget.profile.id);
+  }
+
+  bool _avatarWasUpdated = false;
+  String? _newAvatarUrl; // Store the new avatar URL temporarily
+  int _avatarUpdateCounter = 0; // Counter to force widget rebuild
+
+  Future<void> _uploadProfileAvatar(File imageFile) async {
+    setState(() {
+      _isUploadingImage = true;
+    });
+
+    try {
+      final imageUploadService = ImageUploadService(GetIt.I<DioClient>());
+      final s3Key = await imageUploadService.uploadProfileAvatar(widget.profile.id, imageFile);
+      
+      debugPrint('✅ Avatar uploaded, S3 key: $s3Key');
+
+      if (mounted) {
+        _avatarWasUpdated = true; // Mark that avatar was updated
+        
+        // Wait a moment for backend to process
+        await Future.delayed(const Duration(milliseconds: 500));
+        
+        // Fetch fresh profile data to get new presigned URL
+        final newProfile = await repo.getProfileDetails(widget.profile.id);
+        debugPrint('✅ New profile data fetched, avatarUri: ${newProfile.avatarUri}');
+        
+        // Clear ALL cached images for this profile
+        if (widget.profile.avatarUri != null && widget.profile.avatarUri!.isNotEmpty) {
+          await CachedNetworkImage.evictFromCache(widget.profile.avatarUri!);
+          debugPrint('🗑️ Cleared cache for old avatar: ${widget.profile.avatarUri}');
+        }
+        if (newProfile.avatarUri != null && newProfile.avatarUri!.isNotEmpty) {
+          await CachedNetworkImage.evictFromCache(newProfile.avatarUri!);
+          debugPrint('🗑️ Pre-cleared cache for new avatar: ${newProfile.avatarUri}');
+        }
+        
+        if (mounted) {
+          setState(() {
+            _newAvatarUrl = newProfile.avatarUri;
+            _profileDetails = Future.value(newProfile);
+            _avatarUpdateCounter++; // Increment to force rebuild
+            _isUploadingImage = false;
+          });
+          SnackBarUtils.showSuccess(context, 'Avatarul a fost încărcat cu succes');
+        }
+      }
+    } catch (e) {
+      debugPrint('❌ Error uploading avatar: $e');
+      if (mounted) {
+        setState(() {
+          _isUploadingImage = false;
+        });
+        SnackBarUtils.showError(context, 'Eroare la încărcarea imaginii: $e');
+      }
+    }
   }
 
   Future<void> _selectThisProfile() async {
@@ -197,9 +258,16 @@ class _ProfileDetailsPageState extends State<ProfileDetailsPage> {
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-            backgroundColor: Colors.transparent,
-            elevation: 0,
-            title: Text(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () {
+            // Return true if avatar was updated so profiles list will refresh
+            Navigator.of(context).pop(_avatarWasUpdated);
+          },
+        ),
+        title: Text(
               widget.profile.name,
               style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                 fontWeight: FontWeight.w800,
@@ -286,50 +354,27 @@ class _ProfileDetailsPageState extends State<ProfileDetailsPage> {
                         ),
                         child: Column(
                           children: [
-                            // Avatar
-                            Stack(
-                              alignment: Alignment.center,
-                              children: [
-                                Container(
-                                  width: 100,
-                                  height: 100,
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    gradient: const LinearGradient(
-                                      colors: [Color(0xFFEA2233), Color(0xFF2D72D2)],
-                                      begin: Alignment.topLeft,
-                                      end: Alignment.bottomRight,
-                                    ),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: const Color(0xFFEA2233).withOpacity(0.3),
-                                        blurRadius: 20,
-                                        offset: const Offset(0, 8),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                Container(
-                                  width: 90,
-                                  height: 90,
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    color: Colors.white,
-                                  ),
-                                  child: Center(
-                                    child: Text(
-                                      _getProfileInitials(profile.name),
-                                      style: const TextStyle(
-                                        fontSize: 36,
-                                        fontWeight: FontWeight.w800,
-                                        color: Color(0xFFEA2233),
-                                        letterSpacing: 1,
+                            // Avatar with upload functionality
+                            _isUploadingImage
+                                ? const SizedBox(
+                                    width: 100,
+                                    height: 100,
+                                    child: Center(
+                                      child: CircularProgressIndicator(
+                                        valueColor: AlwaysStoppedAnimation<Color>(
+                                          Color(0xFFEA2233),
+                                        ),
                                       ),
                                     ),
+                                  )
+                                : ProfileAvatar(
+                                    key: ValueKey('profile-avatar-${profile.id}-$_avatarUpdateCounter'),
+                                    imageUrl: _newAvatarUrl ?? profile.avatarUri,
+                                    initials: _getProfileInitials(profile.name),
+                                    size: 100,
+                                    showEditButton: true,
+                                    onImageSelected: _uploadProfileAvatar,
                                   ),
-                                ),
-                              ],
-                            ),
                             const SizedBox(height: 20),
                             Text(
                               profile.name,

@@ -1,9 +1,11 @@
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:get_it/get_it.dart';
 
 import 'core/network/dio_client.dart';
 import 'core/services/audio_cache_service.dart';
+import 'core/services/push_notification_service.dart';
 import 'core/services/s3_service.dart';
 import 'core/state/active_profile.dart';
 import 'core/storage/secure_storage.dart';
@@ -34,16 +36,43 @@ Future<void> _setupDI() async {
 }
 
 Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  
+  // Initialize Firebase first (required)
+  try {
+    await Firebase.initializeApp();
+    debugPrint('✅ Firebase initialized');
+  } catch (e) {
+    debugPrint('❌ Firebase initialization error: $e');
+  }
+  
+  // Initialize Push Notifications (non-blocking - app should work without it)
+  PushNotificationService? pushService;
+  try {
+    pushService = PushNotificationService();
+    await pushService.initialize();
+    debugPrint('✅ Push notifications initialized');
+  } catch (e) {
+    debugPrint('❌ Push notification initialization error: $e');
+    // Continue without push notifications
+  }
+  
   late final AuthCubit authCubit;
   late final SelectedProfileCubit selectedProfileCubit;
   
   try {
-    WidgetsFlutterBinding.ensureInitialized();
     await _setupDI();
+    debugPrint('✅ DI setup complete');
+    
+    // Register push notification service in DI (only if initialized)
+    if (pushService != null) {
+      sl.registerLazySingleton<PushNotificationService>(() => pushService!);
+    }
 
     // creează o singură instanță de AuthCubit din DI
     authCubit = sl<AuthCubit>();
     await authCubit.checkSession(); // rulează o singură dată la boot
+    debugPrint('✅ Auth session checked');
 
     selectedProfileCubit = SelectedProfileCubit();
     final savedProfileId = await sl<SecureStore>().readActiveProfileId();
@@ -54,11 +83,24 @@ Future<void> main() async {
     
     final active = sl<ActiveProfileService>();
     await active.load();
+    debugPrint('✅ All initialization complete');
   } catch (e, stackTrace) {
     // Log error for debugging but don't crash the app
-    debugPrint('Error in main(): $e');
+    debugPrint('❌ Error in main(): $e');
     debugPrint('Stack trace: $stackTrace');
-    rethrow;
+    
+    // Create fallback cubits if initialization failed
+    try {
+      if (!sl.isRegistered<AuthCubit>()) {
+        authCubit = AuthCubit(sl<AuthRepository>());
+      } else {
+        authCubit = sl<AuthCubit>();
+      }
+      selectedProfileCubit = SelectedProfileCubit();
+    } catch (fallbackError) {
+      debugPrint('❌ Fallback initialization also failed: $fallbackError');
+      rethrow;
+    }
   }
 
   runApp(

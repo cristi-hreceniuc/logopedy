@@ -27,12 +27,15 @@ class _ModulesPageState extends State<ModulesPage> {
   late final repo = ContentRepository(GetIt.I<DioClient>());
   late Future<List<ModuleDto>> _f;
   bool? _isPremium;
+  Map<int, double> _moduleProgress = {};
+  bool _progressLoaded = false;
 
   @override
   void initState() {
     super.initState();
     _f = repo.modules(widget.profileId, targetAudience: widget.targetAudience);
     _loadPremiumStatus();
+    _loadAllModuleProgress();
   }
 
   Future<void> _loadPremiumStatus() async {
@@ -44,53 +47,94 @@ class _ModulesPageState extends State<ModulesPage> {
     }
   }
 
+  Future<void> _loadAllModuleProgress() async {
+    try {
+      final modules = await _f;
+      final Map<int, double> progressMap = {};
+      
+      // Load all module progress in parallel
+      await Future.wait(modules.map((m) async {
+        try {
+          final details = await repo.moduleDetails(widget.profileId, m.id);
+
+          if (details.submodules.isEmpty) {
+            progressMap[m.id] = 0.0;
+            return;
+          }
+
+          // Load all submodules in parallel and collect results
+          // Use submoduleWithParts to get parts with totalLessons/completedLessons
+          final subResults = await Future.wait(details.submodules.map((sub) async {
+            try {
+              final submoduleData = await repo.submoduleWithParts(widget.profileId, sub.id);
+              // Sum lessons from all parts in this submodule
+              int total = 0;
+              int completed = 0;
+              for (final part in submoduleData.parts) {
+                total += part.totalLessons;
+                completed += part.completedLessons;
+              }
+              return [completed, total];
+            } catch (e) {
+              debugPrint('📊 Error loading submodule ${sub.id}: $e');
+              return [0, 0];
+            }
+          }));
+
+          // Sum all lessons across all submodules
+          int totalLessons = 0;
+          int completedLessons = 0;
+          for (final result in subResults) {
+            completedLessons += result[0];
+            totalLessons += result[1];
+          }
+
+          final progress = totalLessons > 0
+              ? completedLessons / totalLessons
+              : 0.0;
+          progressMap[m.id] = progress;
+        } catch (e) {
+          debugPrint('📊 Error loading module ${m.id}: $e');
+          progressMap[m.id] = 0.0;
+        }
+      }));
+
+      if (mounted) {
+        setState(() {
+          _moduleProgress = progressMap;
+          _progressLoaded = true;
+        });
+      }
+    } catch (e) {
+      debugPrint('📊 _loadAllModuleProgress ERROR: $e');
+      if (mounted) {
+        setState(() {
+          _progressLoaded = true;
+        });
+      }
+    }
+  }
+
   @override
   void didUpdateWidget(ModulesPage oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.profileId != widget.profileId) {
       setState(() {
         _f = repo.modules(widget.profileId, targetAudience: widget.targetAudience);
+        _moduleProgress = {};
+        _progressLoaded = false;
       });
+      _loadAllModuleProgress();
     }
   }
 
   Future<void> _refreshModules() async {
     setState(() {
       _f = repo.modules(widget.profileId, targetAudience: widget.targetAudience);
+      _moduleProgress = {};
+      _progressLoaded = false;
     });
-  }
-
-  Future<double> _getModuleProgress(ModuleDto module) async {
-    try {
-      final details = await repo.moduleDetails(widget.profileId, module.id);
-      if (details.submodules.isEmpty) return 0.0;
-
-      int completedSubmodules = 0;
-      for (final sub in details.submodules) {
-        try {
-          final submoduleData = await repo.submodule(widget.profileId, sub.id);
-          final totalLessons = submoduleData.lessons.length;
-          if (totalLessons == 0) continue;
-          
-          final completedLessons = submoduleData.lessons.where((l) =>
-            l is LessonLiteWithStatus && l.status == 'DONE'
-          ).length;
-          
-          if (completedLessons == totalLessons) {
-            completedSubmodules++;
-          }
-        } catch (e) {
-          // Skip submodules that can't be loaded
-          continue;
-        }
-      }
-
-      return details.submodules.isNotEmpty
-          ? completedSubmodules / details.submodules.length
-          : 0.0;
-    } catch (e) {
-      return 0.0;
-    }
+    _loadAllModuleProgress();
   }
 
   Future<void> _openModule(ModuleDto m) async {
@@ -159,7 +203,7 @@ class _ModulesPageState extends State<ModulesPage> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         title: Text(
-          'Module',
+          widget.targetAudience == 'SPECIALIST' ? 'Module specialist' : 'Module',
           style: Theme.of(context).textTheme.headlineSmall?.copyWith(
             fontWeight: FontWeight.w800,
             color: cs.onSurface,
@@ -223,13 +267,9 @@ class _ModulesPageState extends State<ModulesPage> {
                   final isPremiumModule = m.isPremium;
                   final hasPremiumAccess = _isPremium == true;
                   final isLocked = isPremiumModule && !hasPremiumAccess;
-                  
-                  return FutureBuilder<double>(
-                    future: _getModuleProgress(m),
-                    builder: (context, progressSnapshot) {
-                      final progress = progressSnapshot.data ?? 0.0;
+                  final progress = _moduleProgress[m.id] ?? 0.0;
 
-                      return Material(
+                  return Material(
                         color: Colors.transparent,
                         child: InkWell(
                           onTap: () => _openModule(m),
@@ -361,7 +401,7 @@ class _ModulesPageState extends State<ModulesPage> {
                                       ),
                                     ],
                                   ),
-                                  if (progress > 0 || progressSnapshot.connectionState == ConnectionState.done) ...[
+                                  if (progress > 0 || _progressLoaded) ...[
                                     const SizedBox(height: 16),
                                     LinearProgressIndicator(
                                       value: progress,
@@ -394,8 +434,6 @@ class _ModulesPageState extends State<ModulesPage> {
                           ),
                         ),
                       );
-                    },
-                  );
                 },
               );
             },
@@ -406,7 +444,7 @@ class _ModulesPageState extends State<ModulesPage> {
 }
 
 // Submodule Selection Page
-class _SubmoduleSelectionPage extends StatelessWidget {
+class _SubmoduleSelectionPage extends StatefulWidget {
   final int profileId;
   final String moduleTitle;
   final List<SubmoduleLite> submodules;
@@ -418,30 +456,45 @@ class _SubmoduleSelectionPage extends StatelessWidget {
   });
 
   @override
+  State<_SubmoduleSelectionPage> createState() => _SubmoduleSelectionPageState();
+}
+
+class _SubmoduleSelectionPageState extends State<_SubmoduleSelectionPage> {
+  // Track if any progress was made during this session (for back navigation)
+  bool _progressMade = false;
+
+  @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        title: Text(
-          moduleTitle,
-          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-            fontWeight: FontWeight.w800,
-            color: cs.onSurface,
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        // Return progress state when user navigates back
+        Navigator.of(context).pop(_progressMade);
+      },
+      child: Scaffold(
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          title: Text(
+            widget.moduleTitle,
+            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+              fontWeight: FontWeight.w800,
+              color: cs.onSurface,
+            ),
           ),
         ),
-      ),
-      body: SafeArea(
-        top: true,
-        bottom: true,
-        child: ListView.separated(
+        body: SafeArea(
+          top: true,
+          bottom: true,
+          child: ListView.separated(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-            itemCount: submodules.length,
+            itemCount: widget.submodules.length,
             separatorBuilder: (_, __) => const SizedBox(height: 16),
             itemBuilder: (_, i) {
-              final s = submodules[i];
+              final s = widget.submodules[i];
               return Material(
                 color: Colors.transparent,
                 child: InkWell(
@@ -450,18 +503,16 @@ class _SubmoduleSelectionPage extends StatelessWidget {
                       context,
                       MaterialPageRoute(
                         builder: (_) => SubmodulePage(
-                          profileId: profileId,
+                          profileId: widget.profileId,
                           submoduleId: s.id,
                           title: s.title,
                         ),
                       ),
                     );
                     
-                    // Refresh modules page when returning from submodule
-                    // This ensures progress updates are reflected
-                    if (result == true && context.mounted) {
-                      // Return true to signal parent modules page to refresh
-                      Navigator.of(context).pop(true);
+                    // Track that progress was made when returning from submodule
+                    if (result == true && mounted) {
+                      _progressMade = true;
                     }
                   },
                   borderRadius: BorderRadius.circular(20),
@@ -534,6 +585,7 @@ class _SubmoduleSelectionPage extends StatelessWidget {
             },
           ),
         ),
+      ),
     );
   }
 }

@@ -62,6 +62,56 @@ class AuthCubit extends Cubit<AuthState> {
     }
   }
 
+  // === REGISTRATION WITH OTP VERIFICATION ===
+
+  /// Step 1: Request OTP for registration
+  Future<void> requestRegistrationOtp(SignupRequest req) async {
+    emit(const AuthState.loading());
+    try {
+      await _repo.requestRegistrationOtp(req);
+      emit(AuthState.registerOtpSent(req.email));
+    } on DioException catch (e) {
+      emit(AuthState.error(_niceError(e)));
+    } on Exception catch (e) {
+      emit(AuthState.error(_niceError(e)));
+    } catch (e) {
+      emit(AuthState.error(_niceError(e)));
+    }
+  }
+
+  /// Step 2: Verify OTP and complete registration
+  Future<void> verifyRegistrationOtp({
+    required String email,
+    required String otp,
+  }) async {
+    emit(const AuthState.loading());
+    try {
+      await _repo.verifyRegistrationOtp(email: email, otp: otp);
+      emit(const AuthState.signupSuccess());
+    } on DioException catch (e) {
+      emit(AuthState.error(_niceError(e)));
+    } on Exception catch (e) {
+      emit(AuthState.error(_niceError(e)));
+    } catch (e) {
+      emit(AuthState.error(_niceError(e)));
+    }
+  }
+
+  /// Resend OTP for pending registration
+  Future<void> resendRegistrationOtp(String email) async {
+    emit(const AuthState.loading());
+    try {
+      await _repo.resendRegistrationOtp(email);
+      emit(AuthState.registerOtpSent(email));
+    } on DioException catch (e) {
+      emit(AuthState.error(_niceError(e)));
+    } on Exception catch (e) {
+      emit(AuthState.error(_niceError(e)));
+    } catch (e) {
+      emit(AuthState.error(_niceError(e)));
+    }
+  }
+
   // === RESET PAROLĂ – noul flow în 2 pași ===
 
   /// Pasul 1: trimite cod pe email (POST /api/v1/auth/forgot1)

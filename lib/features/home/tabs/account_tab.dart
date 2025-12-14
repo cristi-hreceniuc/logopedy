@@ -1,8 +1,14 @@
+import 'dart:io';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:get_it/get_it.dart';
 import 'package:intl/intl.dart';
+import '../../../core/network/dio_client.dart';
+import '../../../core/services/image_upload_service.dart';
+import '../../../core/services/s3_service.dart';
 import '../../../core/utils/snackbar_utils.dart';
+import '../../../widgets/profile_avatar.dart';
 import '../../auth/data/presentation/cubit/auth_cubit.dart';
 import '../../auth/data/domain/auth_repository.dart';
 import '../../auth/data/models/user_response_dto.dart';
@@ -10,8 +16,49 @@ import '../../session/session_info.dart';
 import '../../theme/theme_cubit.dart';
 import '../../../widgets/app_version.dart';
 
-class AccountTab extends StatelessWidget {
+class AccountTab extends StatefulWidget {
   const AccountTab({super.key});
+
+  @override
+  State<AccountTab> createState() => _AccountTabState();
+}
+
+class _AccountTabState extends State<AccountTab> {
+  bool _isUploadingImage = false;
+
+  Future<void> _uploadProfileImage(File imageFile, UserResponseDto? user) async {
+    if (user == null) return;
+
+    setState(() {
+      _isUploadingImage = true;
+    });
+
+    try {
+      // Clear the old cached image first
+      if (user.profileImageUrl != null && user.profileImageUrl!.isNotEmpty) {
+        await CachedNetworkImage.evictFromCache(user.profileImageUrl!);
+        debugPrint('🗑️ Cleared cache for old profile image: ${user.profileImageUrl}');
+      }
+
+      final imageUploadService = ImageUploadService(GetIt.I<DioClient>());
+      final s3Key = await imageUploadService.uploadUserProfileImage(imageFile);
+
+      if (mounted) {
+        SnackBarUtils.showSuccess(context, 'Imaginea de profil a fost încărcată cu succes');
+        // Trigger a rebuild by refreshing the user data
+        setState(() {
+          _isUploadingImage = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isUploadingImage = false;
+        });
+        SnackBarUtils.showError(context, 'Eroare la încărcarea imaginii: $e');
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -47,97 +94,70 @@ class AccountTab extends StatelessWidget {
                 final displayUser = user ?? _mapSessionToUser(sessionInfo);
 
           return ListView(
-                  padding: const EdgeInsets.fromLTRB(16, 24, 16, 24),
-                  children: [
-                    // Header Section with Avatar
-                    Container(
-                      padding: const EdgeInsets.all(24),
-                      decoration: BoxDecoration(
-                        color: cs.surface,
-                        borderRadius: BorderRadius.circular(24),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.08),
-                            blurRadius: 16,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
-                      ),
-                      child: Column(
-                        children: [
-                          // Avatar
-                          Stack(
-                            alignment: Alignment.center,
-                            children: [
-                              Container(
-                                width: 100,
-                                height: 100,
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  gradient: LinearGradient(
-                                    colors: [
-                                      const Color(0xFFEA2233),
-                                      const Color(0xFF2D72D2),
-                                    ],
-                                    begin: Alignment.topLeft,
-                                    end: Alignment.bottomRight,
-                                  ),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: const Color(0xFFEA2233).withOpacity(0.3),
-                                      blurRadius: 20,
-                                      offset: const Offset(0, 8),
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+                    children: [
+                      // Header Section with Avatar
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: cs.surface,
+                          borderRadius: BorderRadius.circular(20),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.08),
+                              blurRadius: 12,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: Column(
+                          children: [
+                            // Avatar with upload functionality
+                            _isUploadingImage
+                                ? const SizedBox(
+                                    width: 80,
+                                    height: 80,
+                                    child: Center(
+                                      child: CircularProgressIndicator(
+                                        valueColor: AlwaysStoppedAnimation<Color>(
+                                          Color(0xFFEA2233),
+                                        ),
+                                      ),
                                     ),
-                                  ],
-                                ),
-                              ),
-                              Container(
-                                width: 90,
-                                height: 90,
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  color: cs.surface,
-                                ),
-                                child: Center(
-                                  child: Text(
-                                    _getInitials(displayUser),
-                                    style: const TextStyle(
-                                      fontSize: 36,
-                                      fontWeight: FontWeight.w800,
-                                      color: Color(0xFFEA2233),
-                                      letterSpacing: 1,
-                                    ),
+                                  )
+                                : ProfileAvatar(
+                                    imageUrl: displayUser?.profileImageUrl,
+                                    initials: _getInitials(displayUser),
+                                    size: 80,
+                                    showEditButton: true,
+                                    onImageSelected: (file) => _uploadProfileImage(file, displayUser),
                                   ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 20),
+                            const SizedBox(height: 12),
                           // Name
                           Text(
                             _getDisplayName(displayUser),
-                            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                            style: Theme.of(context).textTheme.titleLarge?.copyWith(
                               fontWeight: FontWeight.w800,
                               color: cs.onSurface,
                             ),
                           ),
-                          const SizedBox(height: 6),
+                          const SizedBox(height: 4),
                           // Email
                           if (displayUser?.email != null && displayUser!.email.isNotEmpty)
                             Text(
                               displayUser.email,
-                              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
                                 color: Colors.grey[600],
                                 fontWeight: FontWeight.w500,
                               ),
                             ),
                           if (displayUser?.isPremium == true) ...[
-                            const SizedBox(height: 12),
+                            const SizedBox(height: 8),
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                               decoration: BoxDecoration(
                                 color: const Color(0xFFEA2233).withOpacity(0.1),
-                                borderRadius: BorderRadius.circular(20),
+                                borderRadius: BorderRadius.circular(16),
                                 border: Border.all(
                                   color: const Color(0xFFEA2233).withOpacity(0.3),
                                 ),
@@ -145,13 +165,14 @@ class AccountTab extends StatelessWidget {
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
             children: [
-                                  Icon(Icons.star_rounded, size: 16, color: const Color(0xFFEA2233)),
-                                  const SizedBox(width: 6),
+                                  Icon(Icons.star_rounded, size: 14, color: const Color(0xFFEA2233)),
+                                  const SizedBox(width: 4),
                                   Text(
                                     'Premium',
                                     style: TextStyle(
                                       color: const Color(0xFFEA2233),
                                       fontWeight: FontWeight.w700,
+                                      fontSize: 12,
                                     ),
                                   ),
                                 ],
@@ -162,39 +183,39 @@ class AccountTab extends StatelessWidget {
                       ),
                     ),
 
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 12),
 
                     // Status Card
                     Container(
-                      padding: const EdgeInsets.all(20),
+                      padding: const EdgeInsets.all(14),
                       decoration: BoxDecoration(
                         color: cs.surface,
-                        borderRadius: BorderRadius.circular(20),
+                        borderRadius: BorderRadius.circular(16),
                         boxShadow: [
                           BoxShadow(
                             color: Colors.black.withOpacity(0.08),
-                            blurRadius: 12,
-                            offset: const Offset(0, 4),
+                            blurRadius: 10,
+                            offset: const Offset(0, 3),
                           ),
                         ],
                       ),
                       child: Row(
                 children: [
                           Container(
-                            padding: const EdgeInsets.all(12),
+                            padding: const EdgeInsets.all(8),
                             decoration: BoxDecoration(
                               color: (displayUser?.isPremium ?? false)
                                   ? const Color(0xFFEA2233).withOpacity(0.1)
                                   : const Color(0xFF2D72D2).withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(16),
+                              borderRadius: BorderRadius.circular(12),
                             ),
                             child: Icon(
                               (displayUser?.isPremium ?? false) ? Icons.star_rounded : Icons.person_outline_rounded,
-                              size: 28,
+                              size: 22,
                               color: (displayUser?.isPremium ?? false) ? const Color(0xFFEA2233) : const Color(0xFF2D72D2),
                             ),
                           ),
-                          const SizedBox(width: 16),
+                          const SizedBox(width: 12),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -204,12 +225,13 @@ class AccountTab extends StatelessWidget {
                                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                                     color: Colors.grey[600],
                                     fontWeight: FontWeight.w500,
+                                    fontSize: 11,
                                   ),
                         ),
-                        const SizedBox(height: 4),
+                        const SizedBox(height: 2),
                                 Text(
                                   (displayUser?.isPremium ?? false) ? 'Premium' : 'Standard',
-                                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
                                     fontWeight: FontWeight.w700,
                                     color: (displayUser?.isPremium ?? false) ? const Color(0xFFEA2233) : const Color(0xFF2D72D2),
                                   ),
@@ -219,24 +241,24 @@ class AccountTab extends StatelessWidget {
                           ),
                           if (displayUser?.isPremium == true)
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                               decoration: BoxDecoration(
                                 gradient: const LinearGradient(
                                   colors: [Color(0xFFEA2233), Color(0xFFD21828)],
                                 ),
-                                borderRadius: BorderRadius.circular(20),
+                                borderRadius: BorderRadius.circular(16),
                               ),
                               child: const Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Icon(Icons.check_circle_rounded, size: 16, color: Colors.white),
+                                  Icon(Icons.check_circle_rounded, size: 14, color: Colors.white),
                                   SizedBox(width: 4),
                                   Text(
                                     'Activ',
                                   style: TextStyle(
                                       color: Colors.white,
                                       fontWeight: FontWeight.w700,
-                                      fontSize: 12,
+                                      fontSize: 11,
                                     ),
                           ),
                       ],
@@ -246,109 +268,75 @@ class AccountTab extends StatelessWidget {
                       ),
                     ),
 
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 12),
 
-                    // Account Details Card
-                    Container(
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        color: cs.surface,
-                        borderRadius: BorderRadius.circular(20),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.08),
-                            blurRadius: 12,
-                            offset: const Offset(0, 4),
+                    // Account Details Card (Collapsible)
+                    _CollapsibleSection(
+                      title: 'Detalii cont',
+                      icon: Icons.info_outline_rounded,
+                      iconColor: const Color(0xFF2D72D2),
+                      initiallyExpanded: false,
+                      children: [
+                        if (displayUser?.firstName != null && displayUser!.firstName!.isNotEmpty)
+                          _DetailRow(
+                            icon: Icons.person_outline_rounded,
+                            iconColor: const Color(0xFF2D72D2),
+                            label: 'Prenume',
+                            value: displayUser.firstName!,
+                          ),
+                        if (displayUser?.firstName != null && displayUser!.firstName!.isNotEmpty)
+                          const SizedBox(height: 10),
+                        if (displayUser?.lastName != null && displayUser!.lastName!.isNotEmpty)
+                          _DetailRow(
+                            icon: Icons.person_outline_rounded,
+                            iconColor: const Color(0xFF2D72D2),
+                            label: 'Nume',
+                            value: displayUser.lastName!,
+                          ),
+                        if (displayUser?.lastName != null && displayUser!.lastName!.isNotEmpty)
+                          const SizedBox(height: 10),
+                        _DetailRow(
+                          icon: Icons.email_outlined,
+                          iconColor: const Color(0xFF2D72D2),
+                          label: 'Email',
+                          value: displayUser?.email ?? '—',
+                        ),
+                        if (displayUser?.gender != null && displayUser!.gender!.isNotEmpty) ...[
+                          const SizedBox(height: 10),
+                          _DetailRow(
+                            icon: Icons.wc_rounded,
+                            iconColor: const Color(0xFFEA2233),
+                            label: 'Gen',
+                            value: _getGenderLabel(displayUser.gender!),
                           ),
                         ],
-                      ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                          Row(
-                            children: [
-                              Icon(Icons.info_outline_rounded, color: const Color(0xFF2D72D2), size: 24),
-                              const SizedBox(width: 12),
-                              Text(
-                                'Detalii cont',
-                                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                                  fontWeight: FontWeight.w700,
-                                  color: cs.onSurface,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 20),
-                          if (displayUser?.firstName != null && displayUser!.firstName!.isNotEmpty)
-                            _DetailRow(
-                              icon: Icons.person_outline_rounded,
-                              iconColor: const Color(0xFF2D72D2),
-                              label: 'Prenume',
-                              value: displayUser.firstName!,
-                            ),
-                          if (displayUser?.firstName != null && displayUser!.firstName!.isNotEmpty)
-                            const SizedBox(height: 16),
-                          if (displayUser?.lastName != null && displayUser!.lastName!.isNotEmpty)
-                            _DetailRow(
-                              icon: Icons.person_outline_rounded,
-                              iconColor: const Color(0xFF2D72D2),
-                              label: 'Nume',
-                              value: displayUser.lastName!,
-                            ),
-                          if (displayUser?.lastName != null && displayUser!.lastName!.isNotEmpty)
-                            const SizedBox(height: 16),
+                        if (displayUser?.createdAt != null) ...[
+                          const SizedBox(height: 10),
                           _DetailRow(
-                            icon: Icons.email_outlined,
+                            icon: Icons.calendar_today_outlined,
                             iconColor: const Color(0xFF2D72D2),
-                            label: 'Email',
-                            value: displayUser?.email ?? '—',
+                            label: 'Data înregistrării',
+                            value: _formatDate(displayUser!.createdAt),
                           ),
-                          if (displayUser?.gender != null && displayUser!.gender!.isNotEmpty) ...[
-                            const SizedBox(height: 16),
-                            _DetailRow(
-                              icon: Icons.wc_rounded,
-                              iconColor: const Color(0xFFEA2233),
-                              label: 'Gen',
-                              value: _getGenderLabel(displayUser.gender!),
-                            ),
-                          ],
-                          if (displayUser?.createdAt != null) ...[
-                            const SizedBox(height: 16),
-                            _DetailRow(
-                              icon: Icons.calendar_today_outlined,
-                              iconColor: const Color(0xFF2D72D2),
-                              label: 'Data înregistrării',
-                              value: _formatDate(displayUser!.createdAt),
-                            ),
-                          ],
-                          if (displayUser?.role != null && displayUser!.role!.isNotEmpty) ...[
-                            const SizedBox(height: 16),
-                            _DetailRow(
-                              icon: Icons.verified_user_outlined,
-                              iconColor: const Color(0xFFEA2233),
-                              label: 'Rol',
-                              value: displayUser!.role!,
-                            ),
-                          ],
-                          if (displayUser?.status != null && displayUser!.status!.isNotEmpty) ...[
-                            const SizedBox(height: 16),
-                            _DetailRow(
-                              icon: Icons.info_outline_rounded,
-                              iconColor: const Color(0xFF2D72D2),
-                          label: 'Status',
-                              value: displayUser!.status!,
-                            ),
-                          ],
-                    ],
-                  ),
-                ),
+                        ],
+                        if (displayUser?.role != null && displayUser!.role!.isNotEmpty) ...[
+                          const SizedBox(height: 10),
+                          _DetailRow(
+                            icon: Icons.verified_user_outlined,
+                            iconColor: const Color(0xFFEA2233),
+                            label: 'Rol',
+                            value: _capitalizeFirst(displayUser!.role!),
+                          ),
+                        ],
+                      ],
+                    ),
 
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 12),
 
                     // Tip of the Day Card
-                    _TipOfTheDayCard(),
+                    const _TipOfTheDayCard(),
 
-              const SizedBox(height: 24),
+              const SizedBox(height: 16),
 
               // App Settings Section
               _SettingsSection(
@@ -377,11 +365,14 @@ class AccountTab extends StatelessWidget {
                 ],
               ),
 
-              const SizedBox(height: 24),
+              const SizedBox(height: 12),
 
-              // Legal & Information Section
-              _SettingsSection(
+              // Legal & Information Section (Collapsible, collapsed by default)
+              _CollapsibleSettingsSection(
                 title: 'Informații și Legal',
+                icon: Icons.gavel_rounded,
+                iconColor: const Color(0xFF2D72D2),
+                initiallyExpanded: false,
                 children: [
                   _SettingsTile(
                     icon: Icons.description_outlined,
@@ -422,99 +413,92 @@ class AccountTab extends StatelessWidget {
                 ],
               ),
 
-              const SizedBox(height: 24),
+              const SizedBox(height: 16),
               BlocBuilder<AuthCubit, AuthState>(
                 builder: (context, st) {
                     return Container(
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(16),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.red.withOpacity(0.2),
-                            blurRadius: 12,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
-                      ),
-                      child: FilledButton.icon(
+                      child: OutlinedButton(
                         onPressed: st.loading
                             ? null
                             : () => _deleteAccount(context),
-                        icon: const Icon(Icons.delete_outline_rounded),
-                        label: const Text('Șterge contul'),
-                        style: FilledButton.styleFrom(
-                          backgroundColor: Colors.red,
-                          foregroundColor: Colors.white,
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: cs.error,
+                          side: BorderSide(color: cs.error.withOpacity(0.5)),
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
+                            borderRadius: BorderRadius.circular(12),
                           ),
-                          padding: const EdgeInsets.symmetric(vertical: 18),
-                          textStyle: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                          ),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.delete_outline_rounded, size: 18, color: cs.error),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Șterge contul',
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w500,
+                                color: cs.error,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     );
                   },
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 10),
                 BlocBuilder<AuthCubit, AuthState>(
                   builder: (context, st) {
-                    return Container(
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(16),
-                        boxShadow: [
-                          BoxShadow(
-                            color: const Color(0xFFEA2233).withOpacity(0.3),
-                            blurRadius: 12,
-                            offset: const Offset(0, 4),
+                    return FilledButton(
+                      onPressed: st.loading
+                          ? null
+                          : () => context.read<AuthCubit>().logout(),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: cs.primary,
+                        foregroundColor: cs.onPrimary,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          st.loading
+                              ? SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    valueColor: AlwaysStoppedAnimation<Color>(cs.onPrimary),
+                                  ),
+                                )
+                              : Icon(Icons.logout_rounded, size: 18, color: cs.onPrimary),
+                          const SizedBox(width: 8),
+                          Text(
+                            st.loading ? 'Se deconectează...' : 'Deconectează-te',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w500,
+                              color: cs.onPrimary,
+                            ),
                           ),
                         ],
                       ),
-                      child: FilledButton.icon(
-                        onPressed: st.loading
-                            ? null
-                            : () => context.read<AuthCubit>().logout(),
-                        icon: st.loading
-                            ? const SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                                ),
-                              )
-                            : const Icon(Icons.logout_rounded),
-                        label: Text(st.loading ? 'Se deconectează...' : 'Deconectează-te'),
-                        style: FilledButton.styleFrom(
-                          backgroundColor: const Color(0xFFEA2233),
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          padding: const EdgeInsets.symmetric(vertical: 18),
-                          textStyle: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ),
-                  );
+                    );
                 },
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 16),
               // App Version in bottom-right corner
               Align(
                 alignment: Alignment.centerRight,
-                child: Padding(
-                  padding: const EdgeInsets.only(right: 16),
-                  child: AppVersion(
-                    style: TextStyle(
-                      color: Colors.grey[600],
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
-                    ),
+                child: AppVersion(
+                  style: TextStyle(
+                    color: Colors.grey[600],
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
               ),
@@ -652,6 +636,11 @@ String _getGenderLabel(String gender) {
     return 'Altul';
   }
   return gender;
+  }
+
+  String _capitalizeFirst(String text) {
+    if (text.isEmpty) return text;
+    return text[0].toUpperCase() + text.substring(1).toLowerCase();
   }
 
   void _showTermsAndConditions(BuildContext context) {
@@ -898,14 +887,14 @@ class _DetailRow extends StatelessWidget {
     return Row(
       children: [
         Container(
-          padding: const EdgeInsets.all(8),
+          padding: const EdgeInsets.all(6),
           decoration: BoxDecoration(
             color: iconColor.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(8),
           ),
-          child: Icon(icon, color: iconColor, size: 20),
+          child: Icon(icon, color: iconColor, size: 16),
         ),
-        const SizedBox(width: 12),
+        const SizedBox(width: 10),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -914,15 +903,15 @@ class _DetailRow extends StatelessWidget {
                 label,
                 style: TextStyle(
                   color: Colors.grey[600],
-                  fontSize: 13,
+                  fontSize: 11,
                   fontWeight: FontWeight.w500,
                 ),
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: 2),
               Text(
                 value,
                 style: TextStyle(
-                  fontSize: 15,
+                  fontSize: 13,
                   fontWeight: FontWeight.w600,
                   color: Theme.of(context).colorScheme.onSurface,
                 ),
@@ -984,7 +973,7 @@ class _TipOfTheDayCard extends StatelessWidget {
     final tip = _getTipOfTheDay();
 
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
           colors: [
@@ -994,12 +983,12 @@ class _TipOfTheDayCard extends StatelessWidget {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
             color: const Color(0xFF2D72D2).withOpacity(0.3),
-            blurRadius: 16,
-            offset: const Offset(0, 6),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
@@ -1009,36 +998,36 @@ class _TipOfTheDayCard extends StatelessWidget {
           Row(
             children: [
               Container(
-                padding: const EdgeInsets.all(10),
+                padding: const EdgeInsets.all(6),
                 decoration: BoxDecoration(
                   color: Colors.white.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(8),
                 ),
                 child: const Icon(
                   Icons.lightbulb_outline_rounded,
                   color: Colors.white,
-                  size: 24,
+                  size: 18,
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 8),
               const Text(
                 'Sfatul zilei',
                 style: TextStyle(
                   color: Colors.white,
-                  fontSize: 18,
+                  fontSize: 15,
                   fontWeight: FontWeight.w700,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 10),
           Text(
             tip,
             style: const TextStyle(
               color: Colors.white,
-              fontSize: 15,
+              fontSize: 13,
               fontWeight: FontWeight.w500,
-              height: 1.5,
+              height: 1.4,
             ),
           ),
         ],
@@ -1065,12 +1054,12 @@ class _SettingsSection extends StatelessWidget {
         color: cs.brightness == Brightness.dark
             ? const Color(0xFF1B1B20)
             : Colors.white,
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.08),
-            blurRadius: 16,
-            offset: const Offset(0, 4),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
           ),
         ],
       ),
@@ -1078,11 +1067,11 @@ class _SettingsSection extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
+            padding: const EdgeInsets.fromLTRB(14, 12, 14, 6),
             child: Text(
               title,
               style: TextStyle(
-                fontSize: 14,
+                fontSize: 12,
                 fontWeight: FontWeight.w700,
                 color: cs.brightness == Brightness.dark
                     ? Colors.white.withOpacity(0.7)
@@ -1092,6 +1081,280 @@ class _SettingsSection extends StatelessWidget {
             ),
           ),
           ...children,
+        ],
+      ),
+    );
+  }
+}
+
+class _CollapsibleSection extends StatefulWidget {
+  final String title;
+  final IconData icon;
+  final Color iconColor;
+  final List<Widget> children;
+  final bool initiallyExpanded;
+
+  const _CollapsibleSection({
+    required this.title,
+    required this.icon,
+    required this.iconColor,
+    required this.children,
+    this.initiallyExpanded = true,
+  });
+
+  @override
+  State<_CollapsibleSection> createState() => _CollapsibleSectionState();
+}
+
+class _CollapsibleSectionState extends State<_CollapsibleSection>
+    with SingleTickerProviderStateMixin {
+  late bool _isExpanded;
+  late AnimationController _controller;
+  late Animation<double> _iconTurns;
+  late Animation<double> _heightFactor;
+
+  @override
+  void initState() {
+    super.initState();
+    _isExpanded = widget.initiallyExpanded;
+    _controller = AnimationController(
+      duration: const Duration(milliseconds: 200),
+      vsync: this,
+    );
+    _iconTurns = Tween<double>(begin: 0.0, end: 0.5).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+    );
+    _heightFactor = CurvedAnimation(parent: _controller, curve: Curves.easeInOut);
+    if (_isExpanded) {
+      _controller.value = 1.0;
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _handleTap() {
+    setState(() {
+      _isExpanded = !_isExpanded;
+      if (_isExpanded) {
+        _controller.forward();
+      } else {
+        _controller.reverse();
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: cs.surface,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          InkWell(
+            onTap: _handleTap,
+            borderRadius: BorderRadius.circular(8),
+            child: Row(
+              children: [
+                Icon(widget.icon, color: widget.iconColor, size: 20),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    widget.title,
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: cs.onSurface,
+                    ),
+                  ),
+                ),
+                RotationTransition(
+                  turns: _iconTurns,
+                  child: Icon(
+                    Icons.keyboard_arrow_down_rounded,
+                    color: Colors.grey[500],
+                    size: 24,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          ClipRect(
+            child: AnimatedBuilder(
+              animation: _heightFactor,
+              builder: (context, child) {
+                return Align(
+                  alignment: Alignment.topCenter,
+                  heightFactor: _heightFactor.value,
+                  child: child,
+                );
+              },
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(height: 12),
+                  ...widget.children,
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CollapsibleSettingsSection extends StatefulWidget {
+  final String title;
+  final IconData icon;
+  final Color iconColor;
+  final List<Widget> children;
+  final bool initiallyExpanded;
+
+  const _CollapsibleSettingsSection({
+    required this.title,
+    required this.icon,
+    required this.iconColor,
+    required this.children,
+    this.initiallyExpanded = true,
+  });
+
+  @override
+  State<_CollapsibleSettingsSection> createState() =>
+      _CollapsibleSettingsSectionState();
+}
+
+class _CollapsibleSettingsSectionState extends State<_CollapsibleSettingsSection>
+    with SingleTickerProviderStateMixin {
+  late bool _isExpanded;
+  late AnimationController _controller;
+  late Animation<double> _iconTurns;
+  late Animation<double> _heightFactor;
+
+  @override
+  void initState() {
+    super.initState();
+    _isExpanded = widget.initiallyExpanded;
+    _controller = AnimationController(
+      duration: const Duration(milliseconds: 200),
+      vsync: this,
+    );
+    _iconTurns = Tween<double>(begin: 0.0, end: 0.5).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+    );
+    _heightFactor = CurvedAnimation(parent: _controller, curve: Curves.easeInOut);
+    if (_isExpanded) {
+      _controller.value = 1.0;
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _handleTap() {
+    setState(() {
+      _isExpanded = !_isExpanded;
+      if (_isExpanded) {
+        _controller.forward();
+      } else {
+        _controller.reverse();
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: cs.brightness == Brightness.dark
+            ? const Color(0xFF1B1B20)
+            : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          InkWell(
+            onTap: _handleTap,
+            borderRadius: BorderRadius.circular(16),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: widget.iconColor.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(widget.icon, color: widget.iconColor, size: 18),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      widget.title,
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: cs.onSurface,
+                      ),
+                    ),
+                  ),
+                  RotationTransition(
+                    turns: _iconTurns,
+                    child: Icon(
+                      Icons.keyboard_arrow_down_rounded,
+                      color: Colors.grey[500],
+                      size: 24,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          ClipRect(
+            child: AnimatedBuilder(
+              animation: _heightFactor,
+              builder: (context, child) {
+                return Align(
+                  alignment: Alignment.topCenter,
+                  heightFactor: _heightFactor.value,
+                  child: child,
+                );
+              },
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: widget.children,
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -1119,37 +1382,38 @@ class _SettingsTile extends StatelessWidget {
 
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(12),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         child: Row(
           children: [
             Container(
-              padding: const EdgeInsets.all(10),
+              padding: const EdgeInsets.all(6),
               decoration: BoxDecoration(
                 color: iconColor.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(8),
               ),
-              child: Icon(icon, color: iconColor, size: 24),
+              child: Icon(icon, color: iconColor, size: 18),
             ),
-            const SizedBox(width: 16),
+            const SizedBox(width: 10),
             Expanded(
               child: Text(
                 title,
                 style: TextStyle(
-                  fontSize: 16,
+                  fontSize: 14,
                   fontWeight: FontWeight.w600,
                   color: cs.onSurface,
                 ),
               ),
             ),
             if (trailing != null) ...[
-              const SizedBox(width: 12),
+              const SizedBox(width: 8),
               trailing!,
             ] else if (onTap != null) ...[
               Icon(
                 Icons.chevron_right_rounded,
                 color: Colors.grey[400],
+                size: 20,
               ),
             ],
           ],

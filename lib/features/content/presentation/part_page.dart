@@ -31,6 +31,9 @@ class PartPage extends StatefulWidget {
 class _PartPageState extends State<PartPage> {
   late final repo = ContentRepository(GetIt.I<DioClient>());
   late Future<PartDto> _f;
+  
+  // Track if any progress was made during this session (for back navigation)
+  bool _progressMade = false;
 
   @override
   void initState() {
@@ -67,20 +70,27 @@ class _PartPageState extends State<PartPage> {
     final authState = context.watch<AuthCubit>().state;
     final isSpecialist = authState.userRole == 'SPECIALIST';
 
-    return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        title: Text(
-          widget.title,
-          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-            fontWeight: FontWeight.w800,
-            color: cs.onSurface,
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        // Return progress state when user navigates back
+        Navigator.of(context).pop(_progressMade);
+      },
+      child: Scaffold(
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          title: Text(
+            widget.title,
+            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+              fontWeight: FontWeight.w800,
+              color: cs.onSurface,
+            ),
           ),
         ),
-      ),
-      body: SafeArea(
+        body: SafeArea(
         top: true,
         bottom: true,
         child: FutureBuilder<PartDto>(
@@ -219,6 +229,8 @@ class _PartPageState extends State<PartPage> {
 
                             debugPrint('🔄 Returning from lesson ${l.id}, changed=$changed');
                             if (mounted && changed == true) {
+                              // Track that progress was made
+                              _progressMade = true;
                               await Future.delayed(const Duration(milliseconds: 1000));
                               if (mounted) {
                                 debugPrint('🔄 Triggering refresh after lesson completion');
@@ -316,6 +328,7 @@ class _PartPageState extends State<PartPage> {
               ],
             );
           },
+        ),
         ),
       ),
     );

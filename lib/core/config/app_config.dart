@@ -9,6 +9,11 @@ class AppConfig {
   static const String signupPath = '/api/v1/auth/register';
   static const String forgotPasswordPath = '/api/v1/auth/forgot1';
   static const String resetPasswordPath = '/api/v1/auth/reset1';
+  
+  // registration with OTP verification
+  static const String registerRequestOtpPath = '/api/v1/auth/register/request-otp';
+  static const String registerVerifyOtpPath = '/api/v1/auth/register/verify-otp';
+  static const String registerResendOtpPath = '/api/v1/auth/register/resend-otp';
 
   // content
   static String modulesPath(int profileId) => '/api/profiles/$profileId/modules';
@@ -30,4 +35,7 @@ class AppConfig {
   // users
   static String deleteUserPath(String userId) => '/api/v1/users/$userId';
 
+  // notifications
+  static const String registerFcmTokenPath = '/api/v1/notifications/register-token';
+  static const String unregisterFcmTokenPath = '/api/v1/notifications/unregister-token';
 }

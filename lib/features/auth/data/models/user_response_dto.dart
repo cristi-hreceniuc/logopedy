@@ -10,6 +10,7 @@ class UserResponseDto {
   final String? role;
   final String? status;
   final bool isPremium;
+  final String? profileImageUrl;
 
   UserResponseDto({
     required this.id,
@@ -23,6 +24,7 @@ class UserResponseDto {
     this.role,
     this.status,
     required this.isPremium,
+    this.profileImageUrl,
   });
 
   factory UserResponseDto.fromJson(Map<String, dynamic> json) {
@@ -38,6 +40,7 @@ class UserResponseDto {
       role: json['role']?.toString(),
       status: json['status']?.toString(),
       isPremium: json['isPremium'] == true || json['isPremium'] == 'true',
+      profileImageUrl: json['profileImageUrl']?.toString(),
     );
   }
 
@@ -54,6 +57,7 @@ class UserResponseDto {
       'role': role,
       'status': status,
       'isPremium': isPremium,
+      'profileImageUrl': profileImageUrl,
     };
   }
 

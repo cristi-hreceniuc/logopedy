@@ -322,6 +322,9 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
   
   // Hint overlay state
   bool _showHint = false;
+  
+  // Track if any progress was made during this session (for back navigation)
+  bool _progressMade = false;
 
   @override
   void initState() {
@@ -986,6 +989,9 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
         done: true,
       );
       if (!mounted) return;
+      
+      // Mark that progress was made (lesson completed)
+      _progressMade = true;
 
       // Debug: Log the response to see what flags are set
       debugPrint('🎉 API Response: endOfLesson=${resp.endOfLesson}, endOfSubmodule=${resp.endOfSubmodule}, endOfModule=${resp.endOfModule}');
@@ -1160,31 +1166,38 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        title: Text(
-          widget.title,
-          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-            fontWeight: FontWeight.w800,
-            color: cs.onSurface,
-          ),
-        ),
-        actions: [
-          // Information button for hint
-          if (_data?.hint != null && _data!.hint!.isNotEmpty)
-            IconButton(
-              icon: const Icon(Icons.info_outline_rounded),
-              onPressed: _showHintOverlay,
-              tooltip: 'Afișează indiciu',
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        // Return progress state when user navigates back
+        Navigator.of(context).pop(_progressMade);
+      },
+      child: Scaffold(
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          title: Text(
+            widget.title,
+            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+              fontWeight: FontWeight.w800,
+              color: cs.onSurface,
             ),
-          _buildTimerIndicator(),
-          const SizedBox(width: 16),
-        ],
-      ),
-      body: Stack(
+          ),
+          actions: [
+            // Information button for hint
+            if (_data?.hint != null && _data!.hint!.isNotEmpty)
+              IconButton(
+                icon: const Icon(Icons.info_outline_rounded),
+                onPressed: _showHintOverlay,
+                tooltip: 'Afișează indiciu',
+              ),
+            _buildTimerIndicator(),
+            const SizedBox(width: 16),
+          ],
+        ),
+        body: Stack(
         children: [
           SafeArea(
             top: true,
@@ -1212,6 +1225,7 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
               },
             ),
         ],
+      ),
       ),
     );
   }
@@ -1684,21 +1698,31 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
                             const SizedBox(height: 20),
                           ],
                           if (imgUri.isNotEmpty) ...[
-                            Container(
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(20),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withOpacity(0.1),
-                                    blurRadius: 12,
-                                    offset: const Offset(0, 4),
+                            LayoutBuilder(
+                              builder: (context, constraints) {
+                                final orientation = MediaQuery.of(context).orientation;
+                                // Responsive image size based on orientation
+                                final imageSize = orientation == Orientation.landscape
+                                    ? 160.0 // Smaller in landscape
+                                    : 240.0; // Normal in portrait
+                                
+                                return Container(
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(20),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withOpacity(0.1),
+                                        blurRadius: 12,
+                                        offset: const Offset(0, 4),
+                                      ),
+                                    ],
                                   ),
-                                ],
-                              ),
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.circular(20),
-                                child: _buildImage(imgUri, width: 240, height: 240),
-                              ),
+                                  child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(20),
+                                    child: _buildImage(imgUri, width: imageSize, height: imageSize),
+                                  ),
+                                );
+                              },
                             ),
                             const SizedBox(height: 24),
                           ],
@@ -2134,21 +2158,31 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
                           const SizedBox(height: 24),
 
                           if (imgUrl.isNotEmpty) ...[
-                            Container(
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(20),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withOpacity(0.1),
-                                    blurRadius: 12,
-                                    offset: const Offset(0, 4),
+                            LayoutBuilder(
+                              builder: (context, constraints) {
+                                final orientation = MediaQuery.of(context).orientation;
+                                // Responsive image size based on orientation
+                                final imageSize = orientation == Orientation.landscape
+                                    ? 160.0 // Smaller in landscape
+                                    : 240.0; // Normal in portrait
+                                
+                                return Container(
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(20),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withOpacity(0.1),
+                                        blurRadius: 12,
+                                        offset: const Offset(0, 4),
+                                      ),
+                                    ],
                                   ),
-                                ],
-                              ),
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.circular(20),
-                                child: _buildImage(imgUrl, width: 240, height: 240),
-                              ),
+                                  child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(20),
+                                    child: _buildImage(imgUrl, width: imageSize, height: imageSize),
+                                  ),
+                                );
+                              },
                             ),
                             const SizedBox(height: 24),
                           ],
@@ -2639,21 +2673,31 @@ class _ImageRevealWordWidgetState extends State<_ImageRevealWordWidget> {
                     const SizedBox(height: 24),
 
                     if (widget.imgUrl.isNotEmpty) ...[
-                      Container(
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(20),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.1),
-                              blurRadius: 12,
-                              offset: const Offset(0, 4),
+                      LayoutBuilder(
+                        builder: (context, constraints) {
+                          final orientation = MediaQuery.of(context).orientation;
+                          // Responsive image size based on orientation
+                          final imageSize = orientation == Orientation.landscape
+                              ? 180.0 // Smaller in landscape
+                              : 260.0; // Normal in portrait
+                          
+                          return Container(
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(20),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.1),
+                                  blurRadius: 12,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ],
                             ),
-                          ],
-                        ),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(20),
-                          child: widget.buildImage(widget.imgUrl, width: 260, height: 260),
-                        ),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(20),
+                              child: widget.buildImage(widget.imgUrl, width: imageSize, height: imageSize),
+                            ),
+                          );
+                        },
                       ),
                       const SizedBox(height: 24),
                     ],
@@ -2963,9 +3007,22 @@ class _ImageSelectionWidgetState extends State<_ImageSelectionWidget> with Singl
                             final showCorrect = isSelected && _isCorrect;
                             final showWrong = isSelected && !_isCorrect;
 
-                            // Calculate square size based on screen width
-                            final screenWidth = MediaQuery.of(context).size.width;
-                            final imageSize = (screenWidth - 88) / 2; // 88 = padding (16*2) + container padding (24*2) + spacing (12) + borders
+                            // Calculate square size based on available space, considering orientation
+                            final availableWidth = constraints.maxWidth - 48; // container padding
+                            final availableHeight = constraints.maxHeight - 150; // space for question and padding
+                            final orientation = MediaQuery.of(context).orientation;
+                            
+                            // Determine optimal size based on orientation and available space
+                            double imageSize;
+                            if (orientation == Orientation.landscape) {
+                              // In landscape: make images smaller to fit better, use height constraint
+                              final maxByHeight = (availableHeight - 24) / 2; // 2 rows max
+                              final maxByWidth = (availableWidth - 12) / 3; // 3 columns
+                              imageSize = (maxByHeight < maxByWidth ? maxByHeight : maxByWidth).clamp(80.0, 140.0);
+                            } else {
+                              // In portrait: use width-based calculation
+                              imageSize = ((availableWidth - 12) / 2).clamp(120.0, 200.0); // 2 columns
+                            }
 
                             return GestureDetector(
                               onTap: _hasSelectedCorrectAnswer ? null : () => _handleImageTap(index),
@@ -3767,8 +3824,19 @@ class _FindMissingLetterWidgetState extends State<_FindMissingLetterWidget> {
             child: LayoutBuilder(
               builder: (context, constraints) {
                 // Calculate available space for image to fit everything on one screen
-                final screenWidth = MediaQuery.of(context).size.width;
-                final imageSize = (screenWidth * 0.40).clamp(120.0, 180.0);
+                final orientation = MediaQuery.of(context).orientation;
+                final availableWidth = constraints.maxWidth - 40; // padding
+                final availableHeight = constraints.maxHeight - 250; // space for text and buttons
+                
+                // Determine optimal image size based on orientation
+                double imageSize;
+                if (orientation == Orientation.landscape) {
+                  // In landscape: use smaller size to fit everything
+                  imageSize = (availableHeight * 0.35).clamp(80.0, 120.0);
+                } else {
+                  // In portrait: more space available
+                  imageSize = (availableWidth * 0.40).clamp(120.0, 180.0);
+                }
 
                 return Container(
                   decoration: BoxDecoration(
@@ -4179,9 +4247,22 @@ class _FindNonIntruderWidgetState extends State<_FindNonIntruderWidget> {
                             final showCorrect = isSelected && _isCorrect && _selectedIndices.length == 2;
                             final showWrong = isSelected && _showError && _selectedIndices.length == 2;
 
-                            // Calculate square size based on screen width
-                            final screenWidth = MediaQuery.of(context).size.width;
-                            final imageSize = (screenWidth - 88) / 2; // 88 = padding (16*2) + container padding (24*2) + spacing (12) + borders
+                            // Calculate square size based on available space, considering orientation
+                            final availableWidth = constraints.maxWidth - 48; // container padding
+                            final availableHeight = constraints.maxHeight - 200; // space for question, text, and padding
+                            final orientation = MediaQuery.of(context).orientation;
+                            
+                            // Determine optimal size based on orientation and available space
+                            double imageSize;
+                            if (orientation == Orientation.landscape) {
+                              // In landscape: make images smaller to fit better
+                              final maxByHeight = (availableHeight - 24) / 2; // 2 rows max
+                              final maxByWidth = (availableWidth - 12) / 3; // 3 columns
+                              imageSize = (maxByHeight < maxByWidth ? maxByHeight : maxByWidth).clamp(80.0, 140.0);
+                            } else {
+                              // In portrait: use width-based calculation
+                              imageSize = ((availableWidth - 12) / 2).clamp(120.0, 200.0); // 2 columns
+                            }
 
                             return GestureDetector(
                               onTap: () => _handleImageTap(index),

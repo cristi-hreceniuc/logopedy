@@ -151,6 +151,7 @@ class AuthScaffold extends StatelessWidget {
     this.subtitle,
     this.maxWidth = 520,
     this.showBack = false,
+    this.onBack,
   });
 
   final String illustrationAsset;
@@ -159,6 +160,7 @@ class AuthScaffold extends StatelessWidget {
   final String? subtitle;
   final double maxWidth;
   final bool showBack;
+  final VoidCallback? onBack;
 
   @override
   Widget build(BuildContext context) {
@@ -193,7 +195,7 @@ class AuthScaffold extends StatelessWidget {
           leading: showBack
               ? IconButton(
             icon: const Icon(Icons.arrow_back),
-            onPressed: () => Navigator.of(context).maybePop(),
+            onPressed: onBack ?? () => Navigator.of(context).maybePop(),
           )
               : null,
         ),

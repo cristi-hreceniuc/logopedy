@@ -50,5 +50,18 @@
 		<key>NSAllowsArbitraryLoads</key>
 		<true/>
 	</dict>
+	<key>NSCameraUsageDescription</key>
+	<string>Logopedy necesită acces la cameră pentru a face poze de profil.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Logopedy necesită acces la galeria foto pentru a selecta imagini de profil.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Logopedy necesită permisiunea de a salva imagini în galeria foto.</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>fetch</string>
+		<string>remote-notification</string>
+	</array>
+	<key>FirebaseAppDelegateProxyEnabled</key>
+	<false/>
 </dict>
 </plist>

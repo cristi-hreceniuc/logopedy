@@ -18,6 +18,30 @@ class AuthApi {
     return UserDto.fromJson(res.data as Map<String, dynamic>);
   }
 
+  /// Step 1: Request OTP for registration
+  Future<void> requestRegistrationOtp(SignupRequest req) async {
+    await _dio.post(AppConfig.registerRequestOtpPath, data: req.toJson());
+  }
+
+  /// Step 2: Verify OTP and complete registration
+  Future<UserDto> verifyRegistrationOtp({
+    required String email,
+    required String otp,
+  }) async {
+    final res = await _dio.post(AppConfig.registerVerifyOtpPath, data: {
+      'email': email,
+      'otp': otp,
+    });
+    return UserDto.fromJson(res.data as Map<String, dynamic>);
+  }
+
+  /// Resend OTP for pending registration
+  Future<void> resendRegistrationOtp(String email) async {
+    await _dio.post(AppConfig.registerResendOtpPath, data: {
+      'email': email,
+    });
+  }
+
   Future<void> forgot1({
     required String email,
   }) async {
@@ -60,5 +84,20 @@ class AuthApi {
   Future<UserResponseDto> getCurrentUser() async {
     final res = await _dio.get('/api/v1/users/me');
     return UserResponseDto.fromJson(res.data as Map<String, dynamic>);
+  }
+
+  /// Register FCM token with backend for push notifications
+  Future<void> registerFcmToken(String token, {String? deviceInfo}) async {
+    await _dio.post(AppConfig.registerFcmTokenPath, data: {
+      'fcmToken': token,
+      'deviceInfo': deviceInfo,
+    });
+  }
+
+  /// Unregister FCM token (call on logout)
+  Future<void> unregisterFcmToken(String token) async {
+    await _dio.delete(AppConfig.unregisterFcmTokenPath, data: {
+      'fcmToken': token,
+    });
   }
 }

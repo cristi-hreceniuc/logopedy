@@ -90,3 +90,6 @@ class PartDto {
   /// Check if part is in progress
   bool get isInProgress => completedLessons > 0 && completedLessons < totalLessons;
 }
+
+
+
