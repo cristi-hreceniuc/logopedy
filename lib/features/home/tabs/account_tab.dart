@@ -6,7 +6,6 @@ import 'package:get_it/get_it.dart';
 import 'package:intl/intl.dart';
 import '../../../core/network/dio_client.dart';
 import '../../../core/services/image_upload_service.dart';
-import '../../../core/services/s3_service.dart';
 import '../../../core/utils/snackbar_utils.dart';
 import '../../../widgets/profile_avatar.dart';
 import '../../auth/data/presentation/cubit/auth_cubit.dart';
@@ -325,7 +324,7 @@ class _AccountTabState extends State<AccountTab> {
                             icon: Icons.verified_user_outlined,
                             iconColor: const Color(0xFFEA2233),
                             label: 'Rol',
-                            value: _capitalizeFirst(displayUser!.role!),
+                            value: _capitalizeFirst(displayUser.role!),
                           ),
                         ],
                       ],

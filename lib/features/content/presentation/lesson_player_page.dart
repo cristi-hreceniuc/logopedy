@@ -2,7 +2,6 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-import 'dart:typed_data';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:dio/dio.dart';
@@ -11,6 +10,7 @@ import 'package:get_it/get_it.dart';
 
 import '../../../core/network/dio_client.dart';
 import '../../../core/services/audio_cache_service.dart';
+import '../../../core/services/feedback_service.dart';
 import '../../../core/services/s3_service.dart';
 import '../../../core/utils/snackbar_utils.dart';
 import '../content_repository.dart';
@@ -37,7 +37,7 @@ class LessonPlayerPage extends StatefulWidget {
 
 // ——— Cards comune ———
 class _TitleCard extends StatelessWidget {
-  const _TitleCard(this.title, {super.key});
+  const _TitleCard(this.title);
 
   final String title;
 
@@ -65,7 +65,7 @@ class _TitleCard extends StatelessWidget {
 }
 
 class _BodyCard extends StatelessWidget {
-  const _BodyCard({super.key, required this.child});
+  const _BodyCard({required this.child});
 
   final Widget child;
 
@@ -309,6 +309,7 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
   late final ContentRepository _repo = ContentRepository(GetIt.I<DioClient>());
   late final S3Service _s3 = GetIt.I<S3Service>();
   late final AudioCacheService _audioCache = GetIt.I<AudioCacheService>();
+  late final FeedbackService _feedback = GetIt.I<FeedbackService>();
   final _player = AudioPlayer();
 
   LessonDto? _data;
@@ -409,6 +410,9 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
   
   void _showHintOverlay() {
     if (_data?.hint == null || _data!.hint!.isEmpty) return;
+    
+    // Play hint feedback
+    _feedback.hint();
     
     // Hide previous hint if showing, then show new one
     if (_showHint) {
@@ -726,6 +730,9 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
   Future<void> _playAudio(String uriOrKey, {bool waitForCompletion = false}) async {
     if (uriOrKey.isEmpty) return;
     
+    // Play audio start feedback
+    _feedback.audioPlay();
+    
     try {
       // Stop any currently playing audio
       await _player.stop();
@@ -759,7 +766,7 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
           }
           
           final fileSize = await file.length();
-          debugPrint('🎵 Playing cached file: $localPath (${fileSize} bytes)');
+          debugPrint('🎵 Playing cached file: $localPath ($fileSize bytes)');
           
           // Use file:// URL for iOS compatibility
           final fileUrl = Uri.file(localPath).toString();
@@ -786,7 +793,7 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
           }
           
           final fileSize = await file.length();
-          debugPrint('🎵 Playing cached file: $localPath (${fileSize} bytes)');
+          debugPrint('🎵 Playing cached file: $localPath ($fileSize bytes)');
           
           // Verify we can read the file
           try {
@@ -840,22 +847,33 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
   Future<void> _showCompletionDialog(bool endOfLesson, bool endOfSubmodule, bool endOfModule) async {
     debugPrint('🎉 _showCompletionDialog() called - endOfLesson: $endOfLesson, endOfSubmodule: $endOfSubmodule, endOfModule: $endOfModule');
     
+    // Play celebration feedback based on achievement level
+    if (endOfModule) {
+      _feedback.moduleComplete();
+    } else if (endOfSubmodule) {
+      _feedback.submoduleComplete();
+    } else if (endOfLesson) {
+      _feedback.lessonComplete();
+    }
+    
     // Determine which image and message to show
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final suffix = isDark ? '_dark' : '';
     String imagePath;
     String message;
     
     if (endOfModule) {
-      imagePath = 'assets/images/finish_module.png';
+      imagePath = 'assets/images/finish_module$suffix.png';
       message = 'Excelent! Ai terminat modulul!';
     } else if (endOfSubmodule) {
-      imagePath = 'assets/images/finish_submodule.png';
+      imagePath = 'assets/images/finish_submodule$suffix.png';
       message = 'Felicitări! Ai terminat submodulul!';
     } else if (endOfLesson) {
-      imagePath = 'assets/images/finish_lesson.png';
+      imagePath = 'assets/images/finish_lesson$suffix.png';
       message = 'Bravo! Ai terminat lecția!';
     } else {
       // Fallback - show lesson completion
-      imagePath = 'assets/images/finish_lesson.png';
+      imagePath = 'assets/images/finish_lesson$suffix.png';
       message = 'Bravo! Ai terminat lecția!';
     }
     
@@ -904,7 +922,7 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
                 },
                 borderRadius: BorderRadius.circular(20),
                 child: Padding(
-                  padding: const EdgeInsets.all(24),
+                  padding: const EdgeInsets.fromLTRB(24, 32, 24, 24),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -917,13 +935,13 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
                         },
                         child: Image.asset(
                           imagePath,
-                          width: 220,
+                          width: 300,
                           fit: BoxFit.contain,
                           errorBuilder: (context, error, stackTrace) {
                             debugPrint('🎉 Error loading $imagePath: $error');
                             return Container(
-                              width: 220,
-                              height: 220,
+                              width: 300,
+                              height: 300,
                               color: Colors.red.withOpacity(0.3),
                               child: const Center(
                                 child: Text('Image Error', style: TextStyle(color: Colors.white)),
@@ -944,7 +962,7 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
                           textAlign: TextAlign.center,
                           style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                             fontWeight: FontWeight.w700,
-                            color: Colors.black87,
+                            color: Theme.of(context).colorScheme.onSurface,
                           ),
                         ),
                       ),
@@ -958,7 +976,7 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
                         child: Text(
                           'Apasă oriunde pentru a continua',
                           style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: Colors.grey.shade600,
+                            color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
                             fontStyle: FontStyle.italic,
                           ),
                         ),
@@ -1032,7 +1050,7 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
         debugPrint('🎉 End flags - endOfSubmodule: ${resp.endOfSubmodule}, endOfModule: ${resp.endOfModule}');
         
         if (targetLessonId != null) {
-          final nextLessonId = targetLessonId!; // Non-null variable for clarity
+          final nextLessonId = targetLessonId; // Non-null variable for clarity
           debugPrint('🎉 Attempting to navigate to next lesson: $nextLessonId');
           // Verify the lesson exists before navigating (to prevent 404 errors)
           try {
@@ -1352,7 +1370,7 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
       // 2) Text + subinstrucțiuni (bullets)
       case ScreenType.readTextWithSub:
         {
-          List<String> _sxList(Map? p, List<String> keys) {
+          List<String> sxList(Map? p, List<String> keys) {
             final List<dynamic> raw = () {
               for (final k in keys) {
                 final v = p?[k];
@@ -1364,8 +1382,9 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
             return raw
                 .map((e) {
                   if (e is String) return _decodeBase64String(e);
-                  if (e is Map && e['text'] is String)
+                  if (e is Map && e['text'] is String) {
                     return _decodeBase64String(e['text'] as String);
+                  }
                   return '';
                 })
                 .where((e) => e.isNotEmpty)
@@ -1375,7 +1394,7 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
           final title = _s(p, 'title');
           final text = _s(p, 'text');
           final subtitle = _s(p, 'subtitle');
-          final bullets = _sxList(p, [
+          final bullets = sxList(p, [
             'subs',
             'bullets',
             'items',
@@ -1660,7 +1679,7 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
           ); // [{ text, audio:{uri} }, ...]
           final next = _asString(_buttons(p)['nextLabel'], 'Următorul');
 
-          Future<void> _play(String uri) async {
+          Future<void> play(String uri) async {
             await _playAudio(uri);
           }
 
@@ -2058,7 +2077,7 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
       case ScreenType.imageMissingLetter:
         {
           // helpers
-          String _imgUrl(Map p) {
+          String imgUrl0(Map p) {
             // încearcă pe rând: imageUrl, image.uri, image (string simplu)
             final m = (p['image'] as Map?)?.cast<String, dynamic>();
             final cand = [
@@ -2079,7 +2098,7 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
             return cand; // deja complet
           }
 
-          InlineSpan _coloredMasked(
+          InlineSpan coloredMasked(
             String masked,
             String sol,
             TextStyle base,
@@ -2087,8 +2106,9 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
           ) {
             // Ex: "__cap" + "s" -> "scap" cu primul 's' colorat
             final idx = masked.indexOf('_');
-            if (idx < 0 || sol.isEmpty)
+            if (idx < 0 || sol.isEmpty) {
               return TextSpan(text: masked, style: base);
+            }
             final replaced = masked.replaceFirst('_', sol);
             return TextSpan(
               children: [
@@ -2101,7 +2121,7 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
 
           final cs = Theme.of(context).colorScheme;
           final title = _s(p, 'title', 'Completează');
-          final imgUrl = _imgUrl(p);
+          final imgUrl = imgUrl0(p);
 
           // masca poate veni ca 'masked', 'word' sau chiar 'subtitle'
           final masked = _s(p, 'masked', _s(p, 'word', _s(p, 'subtitle'))).toUpperCase();
@@ -2205,7 +2225,7 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
                                         child: RichText(
                                           textAlign: TextAlign.center,
                                           text: revealed
-                                              ? _coloredMasked(
+                                              ? coloredMasked(
                                                   masked,
                                                   solution,
                                                   wordStyle,
@@ -2312,7 +2332,7 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
       case ScreenType.imageRevealWord:
         {
           // ---- helpers
-          String _imgUrl(Map p) {
+          String imgUrl0(Map p) {
             final m = (p['image'] as Map?)?.cast<String, dynamic>();
             final cand = [
               _s(p, 'imageUrl'),
@@ -2332,7 +2352,7 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
           // ---- payload
           final title = _s(p, 'title', 'Denumeste imaginea');
           final subtitle = _s(p, 'subtitle', 'Ce vezi în imagine?');
-          final imgUrl = _imgUrl(p);
+          final imgUrl = imgUrl0(p);
 
           // răspunsul corect poate fi în mai multe chei
           final correctWord = [
@@ -2577,6 +2597,7 @@ class _ImageRevealWordWidgetState extends State<_ImageRevealWordWidget> {
   void _onTextChanged() {
     if (_isCorrect && !_hasCalledCorrectAnswer) {
       _hasCalledCorrectAnswer = true;
+      GetIt.I<FeedbackService>().correctAnswer();
       widget.onCorrectAnswer();
     } else if (!_isCorrect && _hasCalledCorrectAnswer) {
       _hasCalledCorrectAnswer = false;
@@ -2616,6 +2637,7 @@ class _ImageRevealWordWidgetState extends State<_ImageRevealWordWidget> {
   }
 
   void _handleReveal() {
+    GetIt.I<FeedbackService>().reveal();
     setState(() {
       _revealed = true;
       widget.payload['revealed'] = true;
@@ -2909,6 +2931,10 @@ class _ImageSelectionWidgetState extends State<_ImageSelectionWidget> with Singl
     
     final image = _shuffledImages[index];
     final correct = image['correct'] == true;
+    
+    // Play selection feedback
+    final feedback = GetIt.I<FeedbackService>();
+    feedback.imageSelect();
 
     setState(() {
       _selectedIndex = index;
@@ -2918,6 +2944,7 @@ class _ImageSelectionWidgetState extends State<_ImageSelectionWidget> with Singl
 
     if (correct) {
       // Correct answer - user can proceed and timer completes
+      feedback.correctAnswer();
       _hasSelectedCorrectAnswer = true;
       widget.onCorrectAnswer();
       Future.delayed(const Duration(milliseconds: 500), () {
@@ -2926,6 +2953,7 @@ class _ImageSelectionWidgetState extends State<_ImageSelectionWidget> with Singl
         }
       });
     } else {
+      feedback.wrongAnswer();
       // Show error message with fade animation
       _errorAnimationController.forward().then((_) {
         // Auto-hide error after 2 seconds with fade out
@@ -2996,111 +3024,111 @@ class _ImageSelectionWidgetState extends State<_ImageSelectionWidget> with Singl
                           const SizedBox(height: 20),
                           // Display images in a grid layout
                           Flexible(
-                        child: Wrap(
-                          spacing: 12,
-                          runSpacing: 12,
-                          alignment: WrapAlignment.center,
-                          children: List.generate(_shuffledImages.length, (index) {
-                            final image = _shuffledImages[index];
-                            final s3Key = image['s3Key']?.toString() ?? image['uri']?.toString() ?? '';
-                            final isSelected = _selectedIndex == index;
-                            final showCorrect = isSelected && _isCorrect;
-                            final showWrong = isSelected && !_isCorrect;
+                            child: Wrap(
+                              spacing: 12,
+                              runSpacing: 12,
+                              alignment: WrapAlignment.center,
+                              children: List.generate(_shuffledImages.length, (index) {
+                                final image = _shuffledImages[index];
+                                final s3Key = image['s3Key']?.toString() ?? image['uri']?.toString() ?? '';
+                                final isSelected = _selectedIndex == index;
+                                final showCorrect = isSelected && _isCorrect;
+                                final showWrong = isSelected && !_isCorrect;
 
-                            // Calculate square size based on available space, considering orientation
-                            final availableWidth = constraints.maxWidth - 48; // container padding
-                            final availableHeight = constraints.maxHeight - 150; // space for question and padding
-                            final orientation = MediaQuery.of(context).orientation;
-                            
-                            // Determine optimal size based on orientation and available space
-                            double imageSize;
-                            if (orientation == Orientation.landscape) {
-                              // In landscape: make images smaller to fit better, use height constraint
-                              final maxByHeight = (availableHeight - 24) / 2; // 2 rows max
-                              final maxByWidth = (availableWidth - 12) / 3; // 3 columns
-                              imageSize = (maxByHeight < maxByWidth ? maxByHeight : maxByWidth).clamp(80.0, 140.0);
-                            } else {
-                              // In portrait: use width-based calculation
-                              imageSize = ((availableWidth - 12) / 2).clamp(120.0, 200.0); // 2 columns
-                            }
+                                // Calculate square size based on available space, considering orientation
+                                final availableWidth = constraints.maxWidth - 48; // container padding
+                                final availableHeight = constraints.maxHeight - 150; // space for question and padding
+                                final orientation = MediaQuery.of(context).orientation;
 
-                            return GestureDetector(
-                              onTap: _hasSelectedCorrectAnswer ? null : () => _handleImageTap(index),
-                              child: Opacity(
-                                opacity: _hasSelectedCorrectAnswer && !isSelected ? 0.4 : 1.0,
-                                child: Container(
-                                  width: imageSize,
-                                  height: imageSize,
-                                  clipBehavior: Clip.hardEdge,
-                                  decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(20),
-                                  border: Border.all(
-                                    color: showCorrect
-                                        ? Colors.green
-                                        : showWrong
-                                            ? Colors.red
-                                            : isSelected
-                                                ? const Color(0xFFEA2233)
-                                                : Colors.grey[300]!,
-                                    width: showCorrect || showWrong ? 3 : 2,
-                                  ),
-                                  boxShadow: [
-                                    if (isSelected)
-                                      BoxShadow(
-                                        color: (showCorrect
-                                                ? Colors.green
-                                                : showWrong
-                                                    ? Colors.red
-                                                    : const Color(0xFFEA2233))
-                                            .withOpacity(0.3),
-                                        blurRadius: 12,
-                                        offset: const Offset(0, 4),
+                                // Determine optimal size based on orientation and available space
+                                double imageSize;
+                                if (orientation == Orientation.landscape) {
+                                  // In landscape: make images smaller to fit better, use height constraint
+                                  final maxByHeight = (availableHeight - 24) / 2; // 2 rows max
+                                  final maxByWidth = (availableWidth - 12) / 3; // 3 columns
+                                  imageSize = (maxByHeight < maxByWidth ? maxByHeight : maxByWidth).clamp(80.0, 140.0);
+                                } else {
+                                  // In portrait: use width-based calculation
+                                  imageSize = ((availableWidth - 24) / 2).clamp(100.0, 160.0); // 2 columns
+                                }
+
+                                return GestureDetector(
+                                  onTap: _hasSelectedCorrectAnswer ? null : () => _handleImageTap(index),
+                                  child: Opacity(
+                                    opacity: _hasSelectedCorrectAnswer && !isSelected ? 0.4 : 1.0,
+                                    child: Container(
+                                      width: imageSize,
+                                      height: imageSize,
+                                      clipBehavior: Clip.hardEdge,
+                                      decoration: BoxDecoration(
+                                        borderRadius: BorderRadius.circular(20),
+                                        border: Border.all(
+                                          color: showCorrect
+                                              ? Colors.green
+                                              : showWrong
+                                                  ? Colors.red
+                                                  : isSelected
+                                                      ? const Color(0xFFEA2233)
+                                                      : Colors.grey[300]!,
+                                          width: showCorrect || showWrong ? 3 : 2,
+                                        ),
+                                        boxShadow: [
+                                          if (isSelected)
+                                            BoxShadow(
+                                              color: (showCorrect
+                                                      ? Colors.green
+                                                      : showWrong
+                                                          ? Colors.red
+                                                          : const Color(0xFFEA2233))
+                                                  .withOpacity(0.3),
+                                              blurRadius: 12,
+                                              offset: const Offset(0, 4),
+                                            ),
+                                        ],
                                       ),
-                                  ],
-                                ),
-                                child: ClipRRect(
-                                  borderRadius: BorderRadius.circular(18),
-                                  child: Stack(
-                                    fit: StackFit.expand,
-                                    children: [
-                                      widget.buildImage(s3Key, width: imageSize, height: imageSize, fit: BoxFit.contain),
-                                      if (showCorrect)
-                                        Positioned(
-                                          top: 8,
-                                          right: 8,
-                                          child: Container(
-                                            padding: const EdgeInsets.all(8),
-                                            decoration: const BoxDecoration(
-                                              color: Colors.green,
-                                              shape: BoxShape.circle,
-                                            ),
-                                            child: const Icon(Icons.check, color: Colors.white, size: 24),
-                                          ),
+                                      child: ClipRRect(
+                                        borderRadius: BorderRadius.circular(18),
+                                        child: Stack(
+                                          fit: StackFit.expand,
+                                          children: [
+                                            widget.buildImage(s3Key, width: imageSize, height: imageSize, fit: BoxFit.contain),
+                                            if (showCorrect)
+                                              Positioned(
+                                                top: 8,
+                                                right: 8,
+                                                child: Container(
+                                                  padding: const EdgeInsets.all(8),
+                                                  decoration: const BoxDecoration(
+                                                    color: Colors.green,
+                                                    shape: BoxShape.circle,
+                                                  ),
+                                                  child: const Icon(Icons.check, color: Colors.white, size: 24),
+                                                ),
+                                              ),
+                                            if (showWrong)
+                                              Positioned(
+                                                top: 8,
+                                                right: 8,
+                                                child: Container(
+                                                  padding: const EdgeInsets.all(8),
+                                                  decoration: const BoxDecoration(
+                                                    color: Colors.red,
+                                                    shape: BoxShape.circle,
+                                                  ),
+                                                  child: const Icon(Icons.close, color: Colors.white, size: 24),
+                                                ),
+                                              ),
+                                          ],
                                         ),
-                                      if (showWrong)
-                                        Positioned(
-                                          top: 8,
-                                          right: 8,
-                                          child: Container(
-                                            padding: const EdgeInsets.all(8),
-                                            decoration: const BoxDecoration(
-                                              color: Colors.red,
-                                              shape: BoxShape.circle,
-                                            ),
-                                            child: const Icon(Icons.close, color: Colors.white, size: 24),
-                                          ),
-                                        ),
-                                    ],
+                                      ),
+                                    ),
                                   ),
-                                ),
-                              ),
+                                );
+                              }),
                             ),
-                            );
-                          }),
-                        ),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
                       // Error message overlay - positioned at bottom
                       if (_showError)
                         Positioned(
@@ -3292,9 +3320,11 @@ class _FindSoundWidgetState extends State<_FindSoundWidget> with SingleTickerPro
   void _handleSyllableTap(int index) {
     final syllable = widget.syllables[index];
     final correct = syllable['correct'] == true;
+    final feedback = GetIt.I<FeedbackService>();
     
     // If this syllable was already marked wrong, show error feedback
     if (_wrongAnswers.contains(index)) {
+      feedback.wrongAnswer();
       _showWrongAnswerFeedback(index);
       return;
     }
@@ -3303,10 +3333,14 @@ class _FindSoundWidgetState extends State<_FindSoundWidget> with SingleTickerPro
     if (_isCorrect) {
       // Only allow tapping wrong syllables to show error
       if (!correct) {
+        feedback.wrongAnswer();
         _showWrongAnswerFeedback(index);
       }
       return;
     }
+    
+    // Play selection feedback
+    feedback.selection();
 
     setState(() {
       _selectedIndex = index;
@@ -3320,8 +3354,10 @@ class _FindSoundWidgetState extends State<_FindSoundWidget> with SingleTickerPro
     });
 
     if (correct) {
+      feedback.correctAnswer();
       widget.onCorrectAnswer();
     } else {
+      feedback.wrongAnswer();
       // Animate the error for new wrong answers
       _errorAnimationController.forward().then((_) {
         Future.delayed(const Duration(milliseconds: 1200), () {
@@ -3745,20 +3781,6 @@ class _FindMissingLetterWidgetState extends State<_FindMissingLetterWidget> {
     _letterOptions = [correctLetter, ...distractors]..shuffle();
   }
 
-  String _normalize(String text) {
-    // Remove diacritics and convert to lowercase for comparison
-    return text
-        .toLowerCase()
-        .replaceAll('ă', 'a')
-        .replaceAll('â', 'a')
-        .replaceAll('î', 'i')
-        .replaceAll('ș', 's')
-        .replaceAll('ş', 's')
-        .replaceAll('ț', 't')
-        .replaceAll('ţ', 't')
-        .trim();
-  }
-
   /// Returns the word with the selected letter filled in (replaces _ or __ with the letter)
   String _getDisplayWord() {
     if (_selectedIndex == null) {
@@ -3773,7 +3795,12 @@ class _FindMissingLetterWidgetState extends State<_FindMissingLetterWidget> {
     if (_disabledIndices.contains(index) || _isCorrect) return;
 
     final selectedLetter = _letterOptions[index];
-    final correct = _normalize(selectedLetter) == _normalize(widget.correctLetter);
+    // Compare case-insensitive but keep diacritics distinct (Ș ≠ S, Ț ≠ T, etc.)
+    final correct = selectedLetter.toLowerCase() == widget.correctLetter.toLowerCase();
+    
+    // Play feedback based on correctness
+    final feedback = GetIt.I<FeedbackService>();
+    feedback.letterSelect();
 
     setState(() {
       _selectedIndex = index;
@@ -3782,6 +3809,7 @@ class _FindMissingLetterWidgetState extends State<_FindMissingLetterWidget> {
     });
 
     if (correct) {
+      feedback.correctAnswer();
       widget.onCorrectAnswer();
       Future.delayed(const Duration(milliseconds: 500), () {
         if (mounted) {
@@ -3789,6 +3817,7 @@ class _FindMissingLetterWidgetState extends State<_FindMissingLetterWidget> {
         }
       });
     } else {
+      feedback.wrongAnswer();
       // Mark this letter as disabled and hide error after delay
       Future.delayed(const Duration(milliseconds: 800), () {
         if (mounted) {
@@ -3832,10 +3861,10 @@ class _FindMissingLetterWidgetState extends State<_FindMissingLetterWidget> {
                 double imageSize;
                 if (orientation == Orientation.landscape) {
                   // In landscape: use smaller size to fit everything
-                  imageSize = (availableHeight * 0.35).clamp(80.0, 120.0);
+                  imageSize = (availableHeight * 0.6).clamp(120.0, 220.0);
                 } else {
                   // In portrait: more space available
-                  imageSize = (availableWidth * 0.40).clamp(120.0, 180.0);
+                  imageSize = (availableWidth * 0.65).clamp(200.0, 340.0);
                 }
 
                 return Container(
@@ -3863,7 +3892,12 @@ class _FindMissingLetterWidgetState extends State<_FindMissingLetterWidget> {
                               maxHeight: imageSize,
                             ),
                             decoration: BoxDecoration(
+                              color: Colors.white,
                               borderRadius: BorderRadius.circular(20),
+                              border: Border.all(
+                                color: cs.outline.withOpacity(0.2),
+                                width: 1,
+                              ),
                               boxShadow: [
                                 BoxShadow(
                                   color: Colors.black.withOpacity(0.1),
@@ -3872,8 +3906,9 @@ class _FindMissingLetterWidgetState extends State<_FindMissingLetterWidget> {
                                 ),
                               ],
                             ),
+                            padding: const EdgeInsets.all(12),
                             child: ClipRRect(
-                              borderRadius: BorderRadius.circular(20),
+                              borderRadius: BorderRadius.circular(12),
                               child: widget.buildImage(widget.imageKey, fit: BoxFit.contain),
                             ),
                           ),
@@ -3916,36 +3951,37 @@ class _FindMissingLetterWidgetState extends State<_FindMissingLetterWidget> {
                           final isSelected = _selectedIndex == index;
                           final showCorrect = isSelected && _isCorrect;
                           final showWrong = isSelected && _showError;
+                          final isDark = Theme.of(context).brightness == Brightness.dark;
 
                           return GestureDetector(
                             onTap: (isDisabled || _isCorrect) ? null : () => _handleLetterTap(index),
                             child: Container(
-                              width: 60,
-                              height: 60,
+                              width: 70,
+                              height: 70,
                               decoration: BoxDecoration(
                                 color: isDisabled
-                                    ? Colors.grey[300]
+                                    ? (isDark ? Colors.grey[800] : Colors.grey[300])
                                     : showCorrect
                                         ? Colors.green
                                         : showWrong
                                             ? Colors.red
-                                            : const Color(0xFF2D72D2).withOpacity(0.1),
+                                            : (isDark ? const Color(0xFF2D72D2) : const Color(0xFF2D72D2).withOpacity(0.1)),
                                 borderRadius: BorderRadius.circular(14),
                                 border: Border.all(
                                   color: isDisabled
-                                      ? Colors.grey[400]!
+                                      ? (isDark ? Colors.grey[700]! : Colors.grey[400]!)
                                       : showCorrect
                                           ? Colors.green
                                           : showWrong
                                               ? Colors.red
-                                              : const Color(0xFF2D72D2).withOpacity(0.3),
+                                              : const Color(0xFF2D72D2),
                                   width: 2,
                                 ),
                                 boxShadow: (isDisabled || showWrong) ? null : [
                                   BoxShadow(
                                     color: showCorrect 
                                         ? Colors.green.withOpacity(0.3)
-                                        : const Color(0xFF2D72D2).withOpacity(0.1),
+                                        : const Color(0xFF2D72D2).withOpacity(isDark ? 0.3 : 0.1),
                                     blurRadius: 8,
                                     offset: const Offset(0, 2),
                                   ),
@@ -3958,8 +3994,8 @@ class _FindMissingLetterWidgetState extends State<_FindMissingLetterWidget> {
                                     fontSize: 28,
                                     fontWeight: FontWeight.w700,
                                     color: isDisabled
-                                        ? Colors.grey[500]
-                                        : (showCorrect || showWrong)
+                                        ? (isDark ? Colors.grey[600] : Colors.grey[500])
+                                        : (showCorrect || showWrong || isDark)
                                             ? Colors.white
                                             : const Color(0xFF17406B),
                                   ),
@@ -4116,6 +4152,9 @@ class _FindNonIntruderWidgetState extends State<_FindNonIntruderWidget> {
   }
 
   void _handleImageTap(int index) {
+    final feedback = GetIt.I<FeedbackService>();
+    feedback.imageSelect();
+    
     setState(() {
       if (_selectedIndices.contains(index)) {
         _selectedIndices.remove(index);
@@ -4141,12 +4180,15 @@ class _FindNonIntruderWidgetState extends State<_FindNonIntruderWidget> {
       });
 
       if (allCorrect) {
+        feedback.correctAnswer();
         widget.onCorrectAnswer();
         Future.delayed(const Duration(milliseconds: 500), () {
           if (mounted) {
             setState(() => _showError = false);
           }
         });
+      } else {
+        feedback.wrongAnswer();
       }
     }
   }
@@ -4470,6 +4512,9 @@ class _FormatWordWidgetState extends State<_FormatWordWidget> {
   void _handleLetterTap(int index) {
     if (_usedIndices.contains(index)) return; // Already used, don't allow re-use
     
+    // Play letter selection feedback
+    GetIt.I<FeedbackService>().letterSelect();
+    
     setState(() {
       _selectedIndices.add(index);
       _usedIndices.add(index);
@@ -4483,6 +4528,9 @@ class _FormatWordWidgetState extends State<_FormatWordWidget> {
   }
 
   void _handleSelectedTap(int tapIndex) {
+    // Play light feedback for removing letters
+    GetIt.I<FeedbackService>().lightTap();
+    
     // Remove this letter and all letters after it from selection
     setState(() {
       // Get indices to remove (from tapIndex to end)
@@ -4499,6 +4547,7 @@ class _FormatWordWidgetState extends State<_FormatWordWidget> {
   void _checkAnswer() {
     final formedWord = _selectedIndices.map((i) => _allLetters[i]).join('');
     final correct = formedWord.toLowerCase() == widget.correctWord.toLowerCase();
+    final feedback = GetIt.I<FeedbackService>();
 
     setState(() {
       _isCorrect = correct;
@@ -4506,6 +4555,7 @@ class _FormatWordWidgetState extends State<_FormatWordWidget> {
     });
 
     if (correct) {
+      feedback.correctAnswer();
       widget.onCorrectAnswer();
       Future.delayed(const Duration(milliseconds: 500), () {
         if (mounted) {
@@ -4513,6 +4563,7 @@ class _FormatWordWidgetState extends State<_FormatWordWidget> {
         }
       });
     } else {
+      feedback.wrongAnswer();
       // Auto-reset after 800ms so user doesn't have to press reset button
       Future.delayed(const Duration(milliseconds: 800), () {
         if (mounted && _showError) {
@@ -4588,9 +4639,20 @@ class _FormatWordWidgetState extends State<_FormatWordWidget> {
                     // Image display - use Expanded to take available space
                     Expanded(
                       flex: 3,
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(16),
-                        child: widget.buildImage(widget.imageKey, fit: BoxFit.contain),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: cs.outline.withOpacity(0.2),
+                            width: 1,
+                          ),
+                        ),
+                        padding: const EdgeInsets.all(8),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: widget.buildImage(widget.imageKey, fit: BoxFit.contain),
+                        ),
                       ),
                     ),
                   ] else ...[
@@ -4635,14 +4697,14 @@ class _FormatWordWidgetState extends State<_FormatWordWidget> {
                           ? Colors.green.withOpacity(0.1)
                           : _showError
                               ? Colors.red.withOpacity(0.1)
-                              : Colors.grey[100],
+                              : cs.surfaceContainerHighest,
                       borderRadius: BorderRadius.circular(16),
                       border: Border.all(
                         color: _isCorrect
                             ? Colors.green
                             : _showError
                                 ? Colors.red
-                                : Colors.grey[300]!,
+                                : cs.outline.withOpacity(0.5),
                         width: 2,
                       ),
                     ),
@@ -4653,7 +4715,7 @@ class _FormatWordWidgetState extends State<_FormatWordWidget> {
                               textAlign: TextAlign.center,
                               style: TextStyle(
                                 fontSize: 20,
-                                color: Colors.grey[400],
+                                color: cs.onSurface.withOpacity(0.4),
                                 fontStyle: FontStyle.italic,
                               ),
                             ),
@@ -4724,20 +4786,20 @@ class _FormatWordWidgetState extends State<_FormatWordWidget> {
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                         decoration: BoxDecoration(
-                          color: Colors.grey[100],
+                          color: cs.surfaceContainerHighest,
                           borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: Colors.grey[300]!),
+                          border: Border.all(color: cs.outline.withOpacity(0.5)),
                         ),
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(Icons.refresh, color: Colors.grey[600], size: 18),
+                            Icon(Icons.refresh, color: cs.onSurface.withOpacity(0.6), size: 18),
                             const SizedBox(width: 6),
                             Text(
                               'Resetează',
                               style: TextStyle(
-                                color: Colors.grey[700],
+                                color: cs.onSurface.withOpacity(0.8),
                                 fontSize: 13,
                                 fontWeight: FontWeight.w600,
                               ),
@@ -4755,6 +4817,7 @@ class _FormatWordWidgetState extends State<_FormatWordWidget> {
                     alignment: WrapAlignment.center,
                     children: List.generate(_allLetters.length, (index) {
                       final isUsed = _usedIndices.contains(index);
+                      final isDark = Theme.of(context).brightness == Brightness.dark;
                       return GestureDetector(
                         onTap: isUsed ? null : () => _handleLetterTap(index),
                         child: Container(
@@ -4762,18 +4825,18 @@ class _FormatWordWidgetState extends State<_FormatWordWidget> {
                           height: letterBoxSize,
                           decoration: BoxDecoration(
                             color: isUsed 
-                                ? Colors.grey[300] 
-                                : const Color(0xFF2D72D2).withOpacity(0.1),
+                                ? (isDark ? Colors.grey[800] : Colors.grey[300])
+                                : (isDark ? const Color(0xFF2D72D2) : const Color(0xFF2D72D2).withOpacity(0.1)),
                             borderRadius: BorderRadius.circular(14),
                             border: Border.all(
                               color: isUsed 
-                                  ? Colors.grey[400]! 
-                                  : const Color(0xFF2D72D2).withOpacity(0.3),
+                                  ? (isDark ? Colors.grey[700]! : Colors.grey[400]!)
+                                  : const Color(0xFF2D72D2),
                               width: 2,
                             ),
                             boxShadow: isUsed ? null : [
                               BoxShadow(
-                                color: const Color(0xFF2D72D2).withOpacity(0.1),
+                                color: const Color(0xFF2D72D2).withOpacity(isDark ? 0.3 : 0.1),
                                 blurRadius: 8,
                                 offset: const Offset(0, 2),
                               ),
@@ -4786,8 +4849,8 @@ class _FormatWordWidgetState extends State<_FormatWordWidget> {
                                 fontSize: letterFontSize,
                                 fontWeight: FontWeight.w700,
                                 color: isUsed 
-                                    ? Colors.grey[500] 
-                                    : const Color(0xFF17406B),
+                                    ? (isDark ? Colors.grey[600] : Colors.grey[500])
+                                    : (isDark ? Colors.white : const Color(0xFF17406B)),
                               ),
                             ),
                           ),

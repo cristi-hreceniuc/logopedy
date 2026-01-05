@@ -1,7 +1,5 @@
 import 'package:dio/dio.dart';
 import '../../../core/config/app_config.dart';
-import 'models/login_request.dart';
-import 'models/login_response.dart';
 import 'models/signup_request.dart';
 import 'models/user_dto.dart';
 import 'models/user_response_dto.dart';

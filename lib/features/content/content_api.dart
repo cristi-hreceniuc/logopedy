@@ -29,8 +29,12 @@ class ContentApi {
     return r.data;
   }
 
-  Future<Map<String,dynamic>> getPart(int profileId, int partId) async {
-    final url = AppConfig.partPath(profileId, partId);
+  Future<Map<String,dynamic>> getPart(int profileId, int partId, {bool forceRefresh = false}) async {
+    final path = AppConfig.partPath(profileId, partId);
+    // Add cache-busting parameter if force refresh is requested
+    final url = forceRefresh 
+        ? '$path?t=${DateTime.now().millisecondsSinceEpoch}'
+        : path;
     final r = await _dio.get(url);
     print('[GET] $url');
     return r.data;

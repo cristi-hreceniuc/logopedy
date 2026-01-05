@@ -2,11 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:get_it/get_it.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
+import '../../core/services/feedback_service.dart';
 import '../auth/data/presentation/cubit/auth_cubit.dart';
 import '../auth/data/domain/auth_repository.dart';
 import '../auth/data/models/user_response_dto.dart';
 import '../profiles/data/profiles_repository.dart';
-import '../profiles/models/profile_model.dart';
 import '../profiles/selected_profile_cubit.dart';
 import '../session/session_info.dart';
 import '../../core/state/active_profile.dart';
@@ -179,8 +179,12 @@ class _HomeShellState extends State<HomeShell> {
     return GestureDetector(
       onTap: () {
         if (canNavigateToModules) {
+          // Play tab switch feedback
+          GetIt.I<FeedbackService>().tabSwitch();
           setState(() => _index = index);
         } else {
+          // Play warning feedback
+          GetIt.I<FeedbackService>().warning();
           // Show message when trying to access modules/specialist without profile
           final message = (isSpecialist && (index == 0 || index == 1))
               ? 'Te rugăm să creezi un profil pentru a accesa conținutul'

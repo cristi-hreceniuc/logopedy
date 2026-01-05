@@ -3,6 +3,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:get_it/get_it.dart';
 import '../../../core/network/dio_client.dart';
+import '../../../core/services/feedback_service.dart';
 import '../../../core/utils/snackbar_utils.dart';
 import '../../../features/session/session_info.dart';
 import '../content_repository.dart';
@@ -138,9 +139,13 @@ class _ModulesPageState extends State<ModulesPage> {
   }
 
   Future<void> _openModule(ModuleDto m) async {
+    // Play navigation feedback
+    GetIt.I<FeedbackService>().navigation();
+    
     // Check if module is premium and user doesn't have premium access
     if (m.isPremium && _isPremium != true) {
       if (!mounted) return;
+      GetIt.I<FeedbackService>().warning();
       SnackBarUtils.showInfo(
         context,
         'Acest modul necesită cont Premium. Contactează administratorul pentru a obține acces.',
@@ -460,8 +465,54 @@ class _SubmoduleSelectionPage extends StatefulWidget {
 }
 
 class _SubmoduleSelectionPageState extends State<_SubmoduleSelectionPage> {
+  late final repo = ContentRepository(GetIt.I<DioClient>());
+  
   // Track if any progress was made during this session (for back navigation)
   bool _progressMade = false;
+  
+  // Progress data for each submodule
+  Map<int, double> _submoduleProgress = {};
+  bool _progressLoaded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSubmoduleProgress();
+  }
+
+  Future<void> _loadSubmoduleProgress() async {
+    if (mounted) {
+      setState(() {
+        _progressLoaded = false;
+      });
+    }
+    
+    final Map<int, double> progressMap = {};
+    
+    await Future.wait(widget.submodules.map((s) async {
+      try {
+        final submoduleData = await repo.submoduleWithParts(widget.profileId, s.id, forceRefresh: true);
+        int total = 0;
+        int completed = 0;
+        for (final part in submoduleData.parts) {
+          total += part.totalLessons;
+          completed += part.completedLessons;
+        }
+        final progress = total > 0 ? completed / total : 0.0;
+        progressMap[s.id] = progress;
+      } catch (e) {
+        debugPrint('📊 Error loading submodule ${s.id} progress: $e');
+        progressMap[s.id] = 0.0;
+      }
+    }));
+
+    if (mounted) {
+      setState(() {
+        _submoduleProgress = progressMap;
+        _progressLoaded = true;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -495,10 +546,17 @@ class _SubmoduleSelectionPageState extends State<_SubmoduleSelectionPage> {
             separatorBuilder: (_, __) => const SizedBox(height: 16),
             itemBuilder: (_, i) {
               final s = widget.submodules[i];
+              final progress = _submoduleProgress[s.id] ?? 0.0;
+              final isCompleted = progress >= 1.0;
+              final isInProgress = progress > 0 && progress < 1.0;
+              
               return Material(
                 color: Colors.transparent,
                 child: InkWell(
                   onTap: () async {
+                    // Play navigation feedback
+                    GetIt.I<FeedbackService>().navigation();
+                    
                     final result = await Navigator.push(
                       context,
                       MaterialPageRoute(
@@ -511,8 +569,14 @@ class _SubmoduleSelectionPageState extends State<_SubmoduleSelectionPage> {
                     );
                     
                     // Track that progress was made when returning from submodule
-                    if (result == true && mounted) {
+                    if (result == true) {
                       _progressMade = true;
+                    }
+                    
+                    // Always refresh progress data after returning from submodule
+                    if (mounted) {
+                      debugPrint('🔄 Refreshing submodule progress after returning from submodule');
+                      _loadSubmoduleProgress();
                     }
                   },
                   borderRadius: BorderRadius.circular(20),
@@ -521,6 +585,12 @@ class _SubmoduleSelectionPageState extends State<_SubmoduleSelectionPage> {
                     decoration: BoxDecoration(
                       color: Theme.of(context).colorScheme.surface,
                       borderRadius: BorderRadius.circular(20),
+                      border: isCompleted
+                          ? Border.all(
+                              color: const Color(0xFF4CAF50).withOpacity(0.3),
+                              width: 2,
+                            )
+                          : null,
                       boxShadow: [
                         BoxShadow(
                           color: Colors.black.withOpacity(0.08),
@@ -529,54 +599,96 @@ class _SubmoduleSelectionPageState extends State<_SubmoduleSelectionPage> {
                         ),
                       ],
                     ),
-                    child: Row(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF2D72D2).withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          child: Icon(
-                            Icons.book_rounded,
-                            size: 28,
-                            color: const Color(0xFF2D72D2),
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                s.title,
-                                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                  fontWeight: FontWeight.w700,
-                                  color: Theme.of(context).colorScheme.onSurface,
-                                ),
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: isCompleted
+                                    ? const Color(0xFF4CAF50).withOpacity(0.1)
+                                    : isInProgress
+                                        ? const Color(0xFF2D72D2).withOpacity(0.1)
+                                        : const Color(0xFF2D72D2).withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(16),
                               ),
-                              if (s.introText != null && s.introText!.isNotEmpty) ...[
-                                const SizedBox(height: 6),
-                                Text(
-                                  s.introText!,
-                                  style: TextStyle(
-                                    color: Colors.grey[600],
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w500,
+                              child: Icon(
+                                isCompleted
+                                    ? Icons.check_circle_rounded
+                                    : isInProgress
+                                        ? Icons.play_circle_filled_rounded
+                                        : Icons.book_rounded,
+                                size: 28,
+                                color: isCompleted
+                                    ? const Color(0xFF4CAF50)
+                                    : const Color(0xFF2D72D2),
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    s.title,
+                                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                      fontWeight: FontWeight.w700,
+                                      color: Theme.of(context).colorScheme.onSurface,
+                                    ),
                                   ),
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ],
-                            ],
+                                  if (s.introText != null && s.introText!.isNotEmpty) ...[
+                                    const SizedBox(height: 6),
+                                    Text(
+                                      s.introText!,
+                                      style: TextStyle(
+                                        color: Colors.grey[600],
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Icon(
+                              Icons.chevron_right_rounded,
+                              color: isCompleted
+                                  ? const Color(0xFF4CAF50)
+                                  : const Color(0xFF2D72D2),
+                              size: 24,
+                            ),
+                          ],
+                        ),
+                        if (_progressLoaded) ...[
+                          const SizedBox(height: 16),
+                          LinearProgressIndicator(
+                            value: progress,
+                            borderRadius: BorderRadius.circular(6),
+                            minHeight: 8,
+                            backgroundColor: isCompleted
+                                ? const Color(0xFF4CAF50).withOpacity(0.1)
+                                : const Color(0xFF2D72D2).withOpacity(0.1),
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              isCompleted
+                                  ? const Color(0xFF4CAF50)
+                                  : const Color(0xFF2D72D2),
+                            ),
                           ),
-                        ),
-                        const SizedBox(width: 12),
-                        Icon(
-                          Icons.chevron_right_rounded,
-                          color: const Color(0xFF2D72D2),
-                          size: 24,
-                        ),
+                          const SizedBox(height: 6),
+                          Text(
+                            '${(progress * 100).round()}% complet',
+                            style: TextStyle(
+                              color: Colors.grey[600],
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                   ),

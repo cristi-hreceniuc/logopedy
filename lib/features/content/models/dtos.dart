@@ -56,12 +56,12 @@ class LessonLiteWithStatus extends LessonLiteDto {
   final String status;
 
   LessonLiteWithStatus({
-    required int id,
-    required String title,
-    required LessonType lessonType,
-    required int position,
+    required super.id,
+    required super.title,
+    required super.lessonType,
+    required super.position,
     required this.status,
-  }) : super(id: id, title: title, lessonType: lessonType, position: position);
+  });
 
   factory LessonLiteWithStatus.fromJson(Map<String, dynamic> j) =>
       LessonLiteWithStatus(

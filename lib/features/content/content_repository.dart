@@ -1,5 +1,4 @@
 // lib/features/content/content_repository.dart
-import 'package:dio/dio.dart';
 import '../../core/network/dio_client.dart';
 import 'content_api.dart';
 import 'models/dtos.dart';
@@ -23,8 +22,8 @@ class ContentRepository {
   Future<SubmoduleListDto> submoduleWithParts(int profileId, int subId, {bool forceRefresh = false}) async =>
       SubmoduleListDto.fromJson(await _api.getSubmodule(profileId, subId, forceRefresh: forceRefresh));
 
-  Future<PartDto> getPart(int profileId, int partId) async =>
-      PartDto.fromJson(await _api.getPart(profileId, partId));
+  Future<PartDto> getPart(int profileId, int partId, {bool forceRefresh = false}) async =>
+      PartDto.fromJson(await _api.getPart(profileId, partId, forceRefresh: forceRefresh));
 
   /// Lecția cu ecrane (pentru player)
   Future<LessonDto> getLesson(int profileId, int lessonId) async =>

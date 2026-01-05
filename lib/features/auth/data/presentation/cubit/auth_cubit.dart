@@ -253,28 +253,28 @@ class AuthCubit extends Cubit<AuthState> {
           case 400:
             // 400 Bad Request - often used for wrong credentials
             return errorMessage != null 
-                ? _translateErrorMessage(errorMessage!)
+                ? _translateErrorMessage(errorMessage)
                 : 'Email sau parolă incorectă. Te rog verifică credențialele și încearcă din nou.';
           case 401:
             // 401 Unauthorized - wrong credentials
             return errorMessage != null 
-                ? _translateErrorMessage(errorMessage!)
+                ? _translateErrorMessage(errorMessage)
                 : 'Email sau parolă incorectă. Te rog verifică credențialele și încearcă din nou.';
           case 403:
             return errorMessage != null 
-                ? _translateErrorMessage(errorMessage!)
+                ? _translateErrorMessage(errorMessage)
                 : 'Acces interzis. Te rog verifică permisiunile tale.';
           case 404:
             return errorMessage != null 
-                ? _translateErrorMessage(errorMessage!)
+                ? _translateErrorMessage(errorMessage)
                 : 'Resursa nu a fost găsită.';
           case 422:
             return errorMessage != null 
-                ? _translateErrorMessage(errorMessage!)
+                ? _translateErrorMessage(errorMessage)
                 : 'Date invalide. Te rog verifică informațiile introduse.';
           case 429:
             return errorMessage != null 
-                ? _translateErrorMessage(errorMessage!)
+                ? _translateErrorMessage(errorMessage)
                 : 'Prea multe încercări. Te rog așteaptă un moment înainte de a încerca din nou.';
           case 500:
             return 'Ceva nu a mers bine. Te rog încearcă din nou mai târziu.';

@@ -2,9 +2,11 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:get_it/get_it.dart';
+import 'package:intl/date_symbol_data_local.dart';
 
 import 'core/network/dio_client.dart';
 import 'core/services/audio_cache_service.dart';
+import 'core/services/feedback_service.dart';
 import 'core/services/push_notification_service.dart';
 import 'core/services/s3_service.dart';
 import 'core/state/active_profile.dart';
@@ -28,6 +30,11 @@ Future<void> _setupDI() async {
   await audioCache.initialize();
   sl.registerLazySingleton<AudioCacheService>(() => audioCache);
   
+  // Initialize feedback service (haptics + sounds)
+  final feedbackService = FeedbackService();
+  await feedbackService.initialize();
+  sl.registerLazySingleton<FeedbackService>(() => feedbackService);
+  
   sl.registerLazySingleton<S3Service>(() => S3Service(sl<DioClient>()));
   sl.registerLazySingleton<AuthApi>(() => AuthApi(sl<DioClient>().dio));
   sl.registerLazySingleton<AuthRepository>(() => AuthRepository(sl<AuthApi>(), sl<SecureStore>()));
@@ -37,6 +44,9 @@ Future<void> _setupDI() async {
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // Initialize Romanian locale for date formatting
+  await initializeDateFormatting('ro_RO');
   
   // Initialize Firebase first (required)
   try {

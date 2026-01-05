@@ -1,6 +1,5 @@
 // lib/features/profiles/data/profiles_api.dart
 import 'package:dio/dio.dart';
-import '../../../core/config/app_config.dart';
 
 class ProfilesApi {
   ProfilesApi(this._dio);

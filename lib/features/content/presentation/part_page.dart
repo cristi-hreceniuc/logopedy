@@ -3,13 +3,12 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:get_it/get_it.dart';
 
 import '../../../core/network/dio_client.dart';
+import '../../../core/services/feedback_service.dart';
 import '../../../core/utils/snackbar_utils.dart';
 import '../../auth/data/presentation/cubit/auth_cubit.dart';
 import '../../profiles/selected_profile_cubit.dart';
 import '../content_repository.dart';
 import '../models/part_dto.dart';
-import '../models/lesson_list_item_dto.dart';
-import '../models/enums.dart';
 import 'lesson_player_page.dart';
 
 class PartPage extends StatefulWidget {
@@ -30,7 +29,8 @@ class PartPage extends StatefulWidget {
 
 class _PartPageState extends State<PartPage> {
   late final repo = ContentRepository(GetIt.I<DioClient>());
-  late Future<PartDto> _f;
+  PartDto? _data;
+  bool _isLoading = true;
   
   // Track if any progress was made during this session (for back navigation)
   bool _progressMade = false;
@@ -38,29 +38,49 @@ class _PartPageState extends State<PartPage> {
   @override
   void initState() {
     super.initState();
-    _f = repo.getPart(widget.profileId, widget.partId);
+    _loadData();
   }
 
   @override
   void didUpdateWidget(PartPage oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.profileId != widget.profileId || oldWidget.partId != widget.partId) {
-      setState(() {
-        _f = repo.getPart(widget.profileId, widget.partId);
-      });
+      _loadData(forceRefresh: true);
+    }
+  }
+
+  Future<void> _loadData({bool forceRefresh = false}) async {
+    if (!mounted) return;
+    
+    final activePid = context.read<SelectedProfileCubit>().state;
+    final pid = activePid ?? widget.profileId;
+    
+    debugPrint('🔄 Loading part ${widget.partId} for profile $pid (forceRefresh: $forceRefresh)');
+    
+    setState(() {
+      _isLoading = true;
+    });
+    
+    try {
+      final data = await repo.getPart(pid, widget.partId, forceRefresh: forceRefresh);
+      if (mounted) {
+        setState(() {
+          _data = data;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('🔄 Error loading part: $e');
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
   void _refresh() {
-    if (!mounted) return;
-    final activePid = context.read<SelectedProfileCubit>().state;
-    final pid = activePid ?? widget.profileId;
-    
-    debugPrint('🔄 Refreshing part ${widget.partId} for profile $pid');
-    
-    setState(() {
-      _f = repo.getPart(pid, widget.partId);
-    });
+    _loadData(forceRefresh: true);
   }
 
   @override
@@ -93,10 +113,9 @@ class _PartPageState extends State<PartPage> {
         body: SafeArea(
         top: true,
         bottom: true,
-        child: FutureBuilder<PartDto>(
-          future: _f,
-          builder: (c, s) {
-            if (!s.hasData) {
+        child: Builder(
+          builder: (c) {
+            if (_isLoading || _data == null) {
               return const Center(
                 child: CircularProgressIndicator(
                   valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFEA2233)),
@@ -104,7 +123,7 @@ class _PartPageState extends State<PartPage> {
               );
             }
             
-            final part = s.data!;
+            final part = _data!;
             final progress = part.totalLessons > 0 
                 ? part.completedLessons / part.totalLessons 
                 : 0.0;
@@ -206,14 +225,20 @@ class _PartPageState extends State<PartPage> {
                           : l.status == 'LOCKED';
                       final isDone = l.status == 'DONE';
 
-                      return Material(
+                        return Material(
                         color: Colors.transparent,
                         child: InkWell(
                           onTap: () async {
+                            final feedback = GetIt.I<FeedbackService>();
+                            
                             if (isLocked) {
+                              feedback.warning();
                               SnackBarUtils.showInfo(context, 'Deblochează mai întâi lecția anterioară.');
                               return;
                             }
+                            
+                            // Play navigation feedback
+                            feedback.navigation();
 
                             final pid = activePid ?? widget.profileId;
                             final changed = await Navigator.of(context).push<bool>(
@@ -228,14 +253,16 @@ class _PartPageState extends State<PartPage> {
                             );
 
                             debugPrint('🔄 Returning from lesson ${l.id}, changed=$changed');
-                            if (mounted && changed == true) {
-                              // Track that progress was made
+                            
+                            // Track progress if changes were made
+                            if (changed == true) {
                               _progressMade = true;
-                              await Future.delayed(const Duration(milliseconds: 1000));
-                              if (mounted) {
-                                debugPrint('🔄 Triggering refresh after lesson completion');
-                                _refresh();
-                              }
+                            }
+                            
+                            // Always refresh when returning from lesson to ensure progress is up to date
+                            if (mounted) {
+                              debugPrint('🔄 Triggering refresh after returning from lesson');
+                              _refresh();
                             }
                           },
                           borderRadius: BorderRadius.circular(20),

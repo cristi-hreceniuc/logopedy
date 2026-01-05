@@ -6,7 +6,7 @@ import 'package:flutter/material.dart';
 ///
 /// Dacă ai deja `logo_light.png` / `logo_dark.png` dar sunt invers, setezi `invert: true`.
 class AppLogo extends StatelessWidget {
-  AppLogo({
+  const AppLogo({
     super.key,
     this.height = 64,
     this.invert = false,

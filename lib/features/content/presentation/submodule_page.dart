@@ -3,14 +3,11 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:get_it/get_it.dart';
 
 import '../../../core/network/dio_client.dart';
-import '../../../core/utils/snackbar_utils.dart';
+import '../../../core/services/feedback_service.dart';
 import '../../auth/data/presentation/cubit/auth_cubit.dart';
 import '../../profiles/selected_profile_cubit.dart';
 import '../content_repository.dart';
-import '../models/dtos.dart';
 import '../models/submodule_list_dto.dart';
-import '../models/enums.dart';
-import 'lesson_player_page.dart';
 import 'part_page.dart';
 
 class SubmodulePage extends StatefulWidget {
@@ -31,7 +28,8 @@ class SubmodulePage extends StatefulWidget {
 
 class _SubmodulePageState extends State<SubmodulePage> {
   late final repo = ContentRepository(GetIt.I<DioClient>());
-  late Future<SubmoduleListDto> _f;
+  SubmoduleListDto? _data;
+  bool _isLoading = true;
   
   // Track if any progress was made during this session (for back navigation)
   bool _progressMade = false;
@@ -39,7 +37,7 @@ class _SubmodulePageState extends State<SubmodulePage> {
   @override
   void initState() {
     super.initState();
-    _f = repo.submoduleWithParts(widget.profileId, widget.submoduleId);
+    _loadData();
   }
 
   @override
@@ -47,25 +45,42 @@ class _SubmodulePageState extends State<SubmodulePage> {
     super.didUpdateWidget(oldWidget);
     // Refresh if profileId or submoduleId changed
     if (oldWidget.profileId != widget.profileId || oldWidget.submoduleId != widget.submoduleId) {
-      setState(() {
-        _f = repo.submoduleWithParts(widget.profileId, widget.submoduleId, forceRefresh: true);
-      });
+      _loadData(forceRefresh: true);
+    }
+  }
+
+  Future<void> _loadData({bool forceRefresh = false}) async {
+    if (!mounted) return;
+    
+    final activePid = context.read<SelectedProfileCubit>().state;
+    final pid = activePid ?? widget.profileId;
+    
+    debugPrint('🔄 Loading submodule ${widget.submoduleId} for profile $pid (forceRefresh: $forceRefresh)');
+    
+    setState(() {
+      _isLoading = true;
+    });
+    
+    try {
+      final data = await repo.submoduleWithParts(pid, widget.submoduleId, forceRefresh: forceRefresh);
+      if (mounted) {
+        setState(() {
+          _data = data;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('🔄 Error loading submodule: $e');
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
   void _refresh() {
-    if (!mounted) return;
-    // Use active profile ID if available, otherwise use widget.profileId
-    final activePid = context.read<SelectedProfileCubit>().state;
-    final pid = activePid ?? widget.profileId;
-    
-    debugPrint('🔄 Refreshing submodule ${widget.submoduleId} for profile $pid (force refresh)');
-    
-    setState(() {
-      // Refresh with the active profile ID and force refresh to bypass cache
-      // This ensures we get the latest lesson completion status from the backend
-      _f = repo.submoduleWithParts(pid, widget.submoduleId, forceRefresh: true);
-    });
+    _loadData(forceRefresh: true);
   }
 
   @override
@@ -98,17 +113,16 @@ class _SubmodulePageState extends State<SubmodulePage> {
         body: SafeArea(
         top: true,
         bottom: true,
-        child: FutureBuilder<SubmoduleListDto>(
-        future: _f,
-        builder: (c, s) {
-              if (!s.hasData) {
+        child: Builder(
+        builder: (c) {
+              if (_isLoading || _data == null) {
                 return const Center(
                   child: CircularProgressIndicator(
                     valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFEA2233)),
                   ),
                 );
               }
-          final sub = s.data!;
+          final sub = _data!;
 
               // Calculate progress from parts
               final totalLessons = sub.parts.fold<int>(0, (sum, p) => sum + p.totalLessons);
@@ -214,6 +228,9 @@ class _SubmodulePageState extends State<SubmodulePage> {
                           color: Colors.transparent,
                           child: InkWell(
                             onTap: () async {
+                              // Play navigation feedback
+                              GetIt.I<FeedbackService>().navigation();
+                              
                               final pid = activePid ?? widget.profileId;
                               final changed = await Navigator.of(context).push<bool>(
                                 MaterialPageRoute(
@@ -226,14 +243,16 @@ class _SubmodulePageState extends State<SubmodulePage> {
                               );
 
                               debugPrint('🔄 Returning from part ${part.id}, changed=$changed');
-                              if (mounted && changed == true) {
-                                // Track that progress was made
+                              
+                              // Track progress if changes were made
+                              if (changed == true) {
                                 _progressMade = true;
-                                await Future.delayed(const Duration(milliseconds: 500));
-                                if (mounted) {
-                                  debugPrint('🔄 Triggering refresh after returning from part');
-                                  _refresh();
-                                }
+                              }
+                              
+                              // Always refresh when returning from part to ensure progress is up to date
+                              if (mounted) {
+                                debugPrint('🔄 Triggering refresh after returning from part');
+                                _refresh();
                               }
                             },
                             borderRadius: BorderRadius.circular(20),

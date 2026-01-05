@@ -1,7 +1,9 @@
 // lib/features/auth/presentation/widgets/auth_ui.dart
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:get_it/get_it.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:logopedy/core/services/feedback_service.dart';
 import 'package:logopedy/core/theme/app_theme.dart';
 
 class AuthColors {
@@ -127,7 +129,11 @@ class AuthPrimaryButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return FilledButton(
       // IMPORTANT: fără UniqueKey – evităm rebuild-uri forțate
-      onPressed: loading ? null : onPressed,
+      onPressed: loading ? null : () {
+        // Play button press feedback
+        GetIt.I<FeedbackService>().buttonPress();
+        onPressed?.call();
+      },
       child: loading
           ? const SizedBox(
         height: 18,
@@ -183,7 +189,7 @@ class AuthScaffold extends StatelessWidget {
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: overlay,
       child: Scaffold(
-        resizeToAvoidBottomInset: true,
+        resizeToAvoidBottomInset: false,
         backgroundColor: cs.surfaceContainerLowest,
         appBar: AppBar(
           elevation: 0,
@@ -195,7 +201,14 @@ class AuthScaffold extends StatelessWidget {
           leading: showBack
               ? IconButton(
             icon: const Icon(Icons.arrow_back),
-            onPressed: onBack ?? () => Navigator.of(context).maybePop(),
+            onPressed: () {
+              GetIt.I<FeedbackService>().navigateBack();
+              if (onBack != null) {
+                onBack!();
+              } else {
+                Navigator.of(context).maybePop();
+              }
+            },
           )
               : null,
         ),
