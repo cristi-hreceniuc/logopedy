@@ -6,6 +6,7 @@ import 'package:get_it/get_it.dart';
 import 'package:intl/intl.dart';
 import '../../../core/network/dio_client.dart';
 import '../../../core/services/image_upload_service.dart';
+import '../../../core/storage/secure_storage.dart';
 import '../../../core/utils/snackbar_utils.dart';
 import '../../../widgets/profile_avatar.dart';
 import '../../auth/data/presentation/cubit/auth_cubit.dart';
@@ -512,6 +513,7 @@ class _AccountTabState extends State<AccountTab> {
   }
 
   Future<void> _deleteAccount(BuildContext context) async {
+    // Step 1: Show initial confirmation dialog
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -526,7 +528,7 @@ class _AccountTabState extends State<AccountTab> {
           ),
         ),
         content: const Text(
-          'Sigur vrei să ștergi contul? Toate datele tale vor fi șterse permanent. Această acțiune nu poate fi anulată.',
+          'Sigur vrei să ștergi contul? Vei primi un cod de verificare pe email pentru a confirma ștergerea. Toate datele tale vor fi șterse permanent. Această acțiune nu poate fi anulată.',
           style: TextStyle(color: Color(0xFF17406B)),
         ),
         actions: [
@@ -554,25 +556,240 @@ class _AccountTabState extends State<AccountTab> {
                   borderRadius: BorderRadius.circular(12),
                 ),
               ),
-              child: const Text('Șterge'),
+              child: const Text('Continuă'),
             ),
           ),
         ],
       ),
     );
 
-    if (confirmed == true && context.mounted) {
-      try {
-        await context.read<AuthCubit>().deleteAccount();
+    if (confirmed != true || !context.mounted) return;
+
+    // Step 2: Request OTP - use repository directly to avoid state changes
+    final repo = GetIt.I<AuthRepository>();
+    final sessionInfo = await SessionInfo.fromStorage();
+    final email = sessionInfo?.email;
+    
+    if (email == null || email.isEmpty) {
+      if (context.mounted) {
+        SnackBarUtils.showError(context, 'Nu s-a putut obține email-ul contului.');
+      }
+      return;
+    }
+    
+    try {
+      await repo.requestDeleteAccountOtp(email);
+    } catch (e) {
+      if (context.mounted) {
+        SnackBarUtils.showError(context, 'Nu s-a putut trimite codul de verificare: $e');
+      }
+      return;
+    }
+    
+    if (!context.mounted) return;
+    
+    // Show info that OTP was sent
+    SnackBarUtils.showSuccess(context, 'Codul de verificare a fost trimis pe email.');
+
+    // Step 3: Show OTP input dialog
+    final otp = await _showOtpInputDialog(context);
+    
+    if (otp == null || otp.isEmpty || !context.mounted) return;
+
+    // Step 4: Confirm deletion with OTP
+    try {
+      await repo.confirmDeleteAccount(email: email, otp: otp);
+      
         if (context.mounted) {
           SnackBarUtils.showSuccess(context, 'Cont șters cu succes');
+        // Clear onboarding status
+        await GetIt.I<SecureStore>().deleteKey('onboarding_completed');
+        // Trigger logout to update UI state
+        context.read<AuthCubit>().logout();
         }
       } catch (e) {
         if (context.mounted) {
-          SnackBarUtils.showError(context, 'Eroare la ștergere: $e');
+        // Extract error message from exception
+        String errorMsg = 'Eroare la ștergerea contului';
+        if (e.toString().contains('Cod invalid')) {
+          errorMsg = 'Cod invalid. Te rog verifică și încearcă din nou.';
+        } else if (e.toString().contains('expirat')) {
+          errorMsg = 'Codul a expirat. Te rog solicită un cod nou.';
+        } else if (e.toString().contains('Prea multe încercări')) {
+          errorMsg = 'Prea multe încercări. Te rog așteaptă și încearcă din nou.';
         }
+        SnackBarUtils.showError(context, errorMsg);
       }
     }
+  }
+
+  Future<String?> _showOtpInputDialog(BuildContext context) async {
+    final otpController = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+    
+    return showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(24),
+          ),
+          title: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.red.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(
+                  Icons.email_outlined,
+                  color: Colors.red,
+                  size: 24,
+                ),
+              ),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Text(
+                  'Verificare cod',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF17406B),
+                    fontSize: 18,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          content: Form(
+            key: formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Am trimis un cod de 6 cifre pe adresa ta de email. Introdu codul pentru a confirma ștergerea contului.',
+                  style: TextStyle(
+                    color: Color(0xFF17406B),
+                    fontSize: 14,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                TextFormField(
+                  controller: otpController,
+                  keyboardType: TextInputType.number,
+                  maxLength: 6,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 8,
+                  ),
+                  decoration: InputDecoration(
+                    hintText: '000000',
+                    hintStyle: TextStyle(
+                      color: Colors.grey[400],
+                      fontSize: 24,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 8,
+                    ),
+                    counterText: '',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: Colors.grey[300]!),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Colors.red, width: 2),
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 16,
+                    ),
+                  ),
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Introdu codul de verificare';
+                    }
+                    if (value.length != 6) {
+                      return 'Codul trebuie să aibă 6 cifre';
+                    }
+                    if (!RegExp(r'^\d{6}$').hasMatch(value)) {
+                      return 'Codul trebuie să conțină doar cifre';
+                    }
+                    return null;
+                  },
+                  autofocus: true,
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.amber.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.amber.withOpacity(0.3)),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.warning_amber_rounded,
+                        color: Colors.amber[700],
+                        size: 20,
+                      ),
+                      const SizedBox(width: 8),
+                      const Expanded(
+                        child: Text(
+                          'Această acțiune este ireversibilă!',
+                          style: TextStyle(
+                            color: Color(0xFF92400E),
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, null),
+              child: const Text('Anulează'),
+            ),
+            Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.red.withOpacity(0.3),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: FilledButton(
+                onPressed: () {
+                  if (formKey.currentState!.validate()) {
+                    Navigator.pop(context, otpController.text);
+                  }
+                },
+                style: FilledButton.styleFrom(
+                  backgroundColor: Colors.red,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: const Text('Șterge contul'),
+              ),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   // Helper to map SessionInfo to UserResponseDto-like structure for fallback

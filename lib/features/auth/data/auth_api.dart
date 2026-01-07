@@ -79,6 +79,24 @@ class AuthApi {
     await _dio.delete(AppConfig.deleteUserPath(userId));
   }
 
+  /// Step 1: Request OTP for account deletion
+  Future<void> requestDeleteAccountOtp(String email) async {
+    await _dio.post(AppConfig.deleteAccountRequestOtpPath, data: {
+      'email': email,
+    });
+  }
+
+  /// Step 2: Verify OTP and delete account
+  Future<void> confirmDeleteAccount({
+    required String email,
+    required String otp,
+  }) async {
+    await _dio.post(AppConfig.deleteAccountConfirmPath, data: {
+      'email': email,
+      'otp': otp,
+    });
+  }
+
   Future<UserResponseDto> getCurrentUser() async {
     final res = await _dio.get('/api/v1/users/me');
     return UserResponseDto.fromJson(res.data as Map<String, dynamic>);

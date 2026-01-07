@@ -17,6 +17,12 @@ class AuthState extends Equatable {
   /// Email for pending registration (used for OTP verification)
   final String? pendingRegistrationEmail;
 
+  /// Delete account OTP: OTP has been sent to email
+  final bool deleteAccountOtpSent;
+  
+  /// Email for pending account deletion (used for OTP verification)
+  final String? pendingDeleteAccountEmail;
+
   final String? info;   // mesaje informative (non-eroare)
   final String? error;  // mesaje de eroare afișabile
   final String? userRole; // USER, SPECIALIST, PREMIUM, etc.
@@ -29,6 +35,8 @@ class AuthState extends Equatable {
     this.resetOk = false,
     this.registerOtpSent = false,
     this.pendingRegistrationEmail,
+    this.deleteAccountOtpSent = false,
+    this.pendingDeleteAccountEmail,
     this.info,
     this.error,
     this.userRole,
@@ -49,6 +57,21 @@ class AuthState extends Equatable {
         resetOk = false,
         registerOtpSent = true,
         pendingRegistrationEmail = email,
+        deleteAccountOtpSent = false,
+        pendingDeleteAccountEmail = null,
+        info = null,
+        error = null,
+        userRole = null;
+  const AuthState.deleteAccountOtpSent(String email) 
+      : loading = false,
+        authenticated = true,  // Keep authenticated to stay on account page
+        signupOk = false,
+        forgotSent = false,
+        resetOk = false,
+        registerOtpSent = false,
+        pendingRegistrationEmail = null,
+        deleteAccountOtpSent = true,
+        pendingDeleteAccountEmail = email,
         info = null,
         error = null,
         userRole = null;
@@ -60,6 +83,8 @@ class AuthState extends Equatable {
         resetOk = false,
         registerOtpSent = false,
         pendingRegistrationEmail = null,
+        deleteAccountOtpSent = false,
+        pendingDeleteAccountEmail = null,
         error = null,
         userRole = null;
   const AuthState.error(this.error)
@@ -70,10 +95,12 @@ class AuthState extends Equatable {
         resetOk = false,
         registerOtpSent = false,
         pendingRegistrationEmail = null,
+        deleteAccountOtpSent = false,
+        pendingDeleteAccountEmail = null,
         info = null,
         userRole = null;
 
   @override
   List<Object?> get props =>
-      [loading, authenticated, signupOk, forgotSent, resetOk, registerOtpSent, pendingRegistrationEmail, info, error, userRole];
+      [loading, authenticated, signupOk, forgotSent, resetOk, registerOtpSent, pendingRegistrationEmail, deleteAccountOtpSent, pendingDeleteAccountEmail, info, error, userRole];
 }

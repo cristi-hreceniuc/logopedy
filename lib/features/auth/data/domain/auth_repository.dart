@@ -174,6 +174,20 @@ class AuthRepository {
     await _api.deleteUser(userId);
   }
 
+  // === DELETE ACCOUNT WITH OTP VERIFICATION ===
+
+  /// Step 1: Request OTP for account deletion
+  Future<void> requestDeleteAccountOtp(String email) => _api.requestDeleteAccountOtp(email);
+
+  /// Step 2: Verify OTP and delete account
+  Future<void> confirmDeleteAccount({
+    required String email,
+    required String otp,
+  }) async {
+    await _api.confirmDeleteAccount(email: email, otp: otp);
+    await _store.clear(); // Clear session after deletion
+  }
+
   Future<UserResponseDto> getCurrentUser() async {
     return _api.getCurrentUser();
   }

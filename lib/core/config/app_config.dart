@@ -34,6 +34,10 @@ class AppConfig {
 
   // users
   static String deleteUserPath(String userId) => '/api/v1/users/$userId';
+  
+  // delete account with OTP
+  static const String deleteAccountRequestOtpPath = '/api/v1/auth/delete-account/request-otp';
+  static const String deleteAccountConfirmPath = '/api/v1/auth/delete-account/confirm';
 
   // notifications
   static const String registerFcmTokenPath = '/api/v1/notifications/register-token';

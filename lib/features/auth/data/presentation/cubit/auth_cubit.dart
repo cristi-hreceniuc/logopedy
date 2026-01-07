@@ -189,6 +189,56 @@ class AuthCubit extends Cubit<AuthState> {
     }
   }
 
+  // === DELETE ACCOUNT WITH OTP VERIFICATION ===
+
+  /// Step 1: Request OTP for account deletion
+  Future<void> requestDeleteAccountOtp() async {
+    emit(const AuthState.loading());
+    try {
+      final sessionInfo = await SessionInfo.fromStorage();
+      final email = sessionInfo?.email;
+      if (email == null || email.isEmpty) {
+        emit(const AuthState.error('Nu s-a putut obține email-ul contului.'));
+        return;
+      }
+      await _repo.requestDeleteAccountOtp(email);
+      emit(AuthState.deleteAccountOtpSent(email));
+    } on DioException catch (e) {
+      emit(AuthState.error(_niceError(e)));
+    } on Exception catch (e) {
+      emit(AuthState.error(_niceError(e)));
+    } catch (e) {
+      emit(AuthState.error(_niceError(e)));
+    }
+  }
+
+  /// Step 2: Verify OTP and delete account
+  Future<void> confirmDeleteAccount(String otp) async {
+    emit(const AuthState.loading());
+    try {
+      final sessionInfo = await SessionInfo.fromStorage();
+      final email = sessionInfo?.email;
+      if (email == null || email.isEmpty) {
+        emit(const AuthState.error('Nu s-a putut obține email-ul contului.'));
+        return;
+      }
+      // Save the email before clearing
+      final store = GetIt.I<SecureStore>();
+      await store.saveRememberedEmail(email);
+      
+      await _repo.confirmDeleteAccount(email: email, otp: otp);
+      // Clear onboarding status so user sees welcome page again if they re-register
+      await GetIt.I<SecureStore>().deleteKey('onboarding_completed');
+      emit(const AuthState.unauthenticated());
+    } on DioException catch (e) {
+      emit(AuthState.error(_niceError(e)));
+    } on Exception catch (e) {
+      emit(AuthState.error(_niceError(e)));
+    } catch (e) {
+      emit(AuthState.error(_niceError(e)));
+    }
+  }
+
   String _niceError(dynamic e) {
     if (e is DioException) {
       final data = e.response?.data;
@@ -381,6 +431,13 @@ class AuthCubit extends Cubit<AuthState> {
         lowerMessage.contains('connection') ||
         lowerMessage.contains('timeout')) {
       return 'Eroare de conexiune. Te rog verifică conexiunea la internet și încearcă din nou.';
+    }
+    
+    // Active account restriction errors
+    if (lowerMessage.contains('Only active accounts') ||
+        lowerMessage.contains('active accounts can log in') ||
+        (lowerMessage.contains('active') && lowerMessage.contains('log in'))) {
+      return 'Doar conturile active pot să se autentifice. Te rog contactează un administrator pentru a-ți activa contul.';
     }
     
     // If the message is already in Romanian or doesn't match common patterns, return as is
