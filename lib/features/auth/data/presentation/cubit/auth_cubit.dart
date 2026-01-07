@@ -18,15 +18,42 @@ class AuthCubit extends Cubit<AuthState> {
 
   Future<void> checkSession() async {
     emit(const AuthState.loading());
+    final store = GetIt.I<SecureStore>();
     final ok = await _repo.isSessionValid();
+    
     if (ok) {
-      // Try to get user role from session
+      // Check if this is a kid session
+      final isKid = await store.readKey('is_kid');
+      if (isKid == 'true') {
+        // Restore kid session
+        final profileIdStr = await store.readKey('kid_profile_id');
+        final profileName = await store.readKey('kid_profile_name');
+        final isPremiumStr = await store.readKey('kid_is_premium');
+        
+        if (profileIdStr != null && profileName != null) {
+          final profileId = int.tryParse(profileIdStr) ?? 0;
+          final isPremium = isPremiumStr == 'true';
+          emit(AuthState.kidAuthenticated(
+            profileId: profileId,
+            profileName: profileName,
+            isPremium: isPremium,
+          ));
+          return;
+        }
+      }
+      
+      // Regular user session
       final userRole = await _repo.getUserRole();
       emit(AuthState.authenticated(role: userRole));
     } else {
+      // Clear any stale kid session data
+      await store.deleteKey('is_kid');
+      await store.deleteKey('kid_profile_id');
+      await store.deleteKey('kid_profile_name');
+      await store.deleteKey('kid_is_premium');
       emit(const AuthState.unauthenticated());
     }
-    final pid = await GetIt.I<SecureStore>().readActiveProfileId();
+    final pid = await store.readActiveProfileId();
     GetIt.I<DioClient>().setActiveProfile(pid);
   }
 

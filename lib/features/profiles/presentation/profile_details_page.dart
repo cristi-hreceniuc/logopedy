@@ -11,6 +11,7 @@ import '../../../core/storage/secure_storage.dart';
 import '../../../core/utils/snackbar_utils.dart';
 import '../../../core/state/active_profile.dart';
 import '../../../widgets/profile_avatar.dart';
+import '../../specialist/presentation/assign_homework_sheet.dart';
 import '../models/profile_model.dart';
 import '../profile_repository.dart';
 import '../selected_profile_cubit.dart';
@@ -513,6 +514,47 @@ class _ProfileDetailsPageState extends State<ProfileDetailsPage> {
                             ),
                           );
                         },
+                      ),
+                      const SizedBox(height: 12),
+                      // Assign Homework Button
+                      Container(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(16),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFF2D72D2).withOpacity(0.2),
+                              blurRadius: 8,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: FilledButton.icon(
+                          onPressed: () {
+                            showModalBottomSheet(
+                              context: context,
+                              isScrollControlled: true,
+                              backgroundColor: Colors.transparent,
+                              builder: (ctx) => AssignHomeworkSheet(
+                                profileId: widget.profile.id,
+                                profileName: widget.profile.name,
+                              ),
+                            );
+                          },
+                          icon: const Icon(Icons.assignment_add),
+                          label: const Text('Adaugă temă'),
+                          style: FilledButton.styleFrom(
+                            backgroundColor: const Color(0xFF2D72D2),
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            textStyle: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
                       ),
                       const SizedBox(height: 16),
                       // Lessons Progress

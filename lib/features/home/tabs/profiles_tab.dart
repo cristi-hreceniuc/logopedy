@@ -16,6 +16,8 @@ import '../../profiles/models/profile_model.dart';
 import '../../profiles/presentation/profile_details_page.dart';
 import '../../profiles/profile_repository.dart';
 import '../../profiles/selected_profile_cubit.dart';
+import '../../specialist/data/keys_api.dart';
+import '../../specialist/models/license_key_dto.dart';
 
 class ProfilesTab extends StatefulWidget {
   const ProfilesTab({super.key, this.shouldOpenCreateDialog = false});
@@ -105,6 +107,11 @@ class _ProfilesTabState extends State<ProfilesTab> {
     bool isUploadingImage = false;
     final formKey = GlobalKey<FormState>();
     
+    // Key selection state
+    List<LicenseKeyDTO>? availableKeys;
+    LicenseKeyDTO? selectedKey;
+    bool isLoadingKeys = true;
+    
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -115,8 +122,30 @@ class _ProfilesTabState extends State<ProfilesTab> {
         final isDark = Theme.of(ctx).brightness == Brightness.dark;
         final titleColor = isDark ? Colors.white : const Color(0xFF17406B);
         
+        // Load available keys
+        void loadAvailableKeys(StateSetter setModalState) async {
+          try {
+            final keysApi = KeysApi(GetIt.I<DioClient>());
+            final keys = await keysApi.listKeys();
+            setModalState(() {
+              availableKeys = keys.where((k) => k.isAvailable).toList();
+              isLoadingKeys = false;
+            });
+          } catch (e) {
+            setModalState(() {
+              availableKeys = [];
+              isLoadingKeys = false;
+            });
+          }
+        }
+        
         return StatefulBuilder(
           builder: (context, setModalState) {
+            // Load keys on first build
+            if (isLoadingKeys && availableKeys == null) {
+              loadAvailableKeys(setModalState);
+            }
+            
             return Container(
               decoration: BoxDecoration(
                 color: cs.surfaceContainerLowest,
@@ -429,6 +458,91 @@ class _ProfilesTabState extends State<ProfilesTab> {
                                   ],
                                 ),
                               ),
+                              const SizedBox(height: 14),
+                              // License key selection (optional)
+                              Container(
+                                padding: const EdgeInsets.all(16),
+                                decoration: BoxDecoration(
+                                  color: cs.surfaceContainerLowest,
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(color: cs.outline.withOpacity(0.5)),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Icon(Icons.key_rounded, color: cs.onSurfaceVariant, size: 18),
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          'Cheie de acces (opțional)',
+                                          style: TextStyle(fontSize: 14, color: cs.onSurfaceVariant),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 8),
+                                    if (isLoadingKeys)
+                                      Center(
+                                        child: SizedBox(
+                                          height: 20,
+                                          width: 20,
+                                          child: CircularProgressIndicator(strokeWidth: 2, color: cs.primary),
+                                        ),
+                                      )
+                                    else if (availableKeys == null || availableKeys!.isEmpty)
+                                      Text(
+                                        'Nu ai chei disponibile',
+                                        style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant.withOpacity(0.7)),
+                                      )
+                                    else
+                                      DropdownButtonFormField<LicenseKeyDTO>(
+                                        value: selectedKey,
+                                        decoration: InputDecoration(
+                                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                          border: OutlineInputBorder(
+                                            borderRadius: BorderRadius.circular(8),
+                                            borderSide: BorderSide(color: cs.outline.withOpacity(0.5)),
+                                          ),
+                                          enabledBorder: OutlineInputBorder(
+                                            borderRadius: BorderRadius.circular(8),
+                                            borderSide: BorderSide(color: cs.outline.withOpacity(0.5)),
+                                          ),
+                                          filled: true,
+                                          fillColor: cs.surface,
+                                        ),
+                                        hint: Text('Selectează o cheie', style: TextStyle(color: cs.onSurfaceVariant)),
+                                        isExpanded: true,
+                                        items: [
+                                          DropdownMenuItem<LicenseKeyDTO>(
+                                            value: null,
+                                            child: Text('Fără cheie', style: TextStyle(color: cs.onSurfaceVariant)),
+                                          ),
+                                          ...availableKeys!.map((key) => DropdownMenuItem<LicenseKeyDTO>(
+                                            value: key,
+                                            child: Text(
+                                              '${key.keyUuid.substring(0, 8)}...',
+                                              style: TextStyle(
+                                                fontFamily: 'monospace',
+                                                fontSize: 13,
+                                                color: cs.onSurface,
+                                              ),
+                                            ),
+                                          )),
+                                        ],
+                                        onChanged: (value) {
+                                          setModalState(() {
+                                            selectedKey = value;
+                                          });
+                                        },
+                                      ),
+                                    const SizedBox(height: 6),
+                                    Text(
+                                      'Asociază o cheie pentru ca copilul să poată accesa aplicația independent.',
+                                      style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant.withOpacity(0.7)),
+                                    ),
+                                  ],
+                                ),
+                              ),
                               const SizedBox(height: 20),
                               // Submit button
                               FilledButton(
@@ -474,13 +588,23 @@ class _ProfilesTabState extends State<ProfilesTab> {
                                         selectedImage!,
                                       );
                                       
+                                      // Activate key if selected
+                                      if (selectedKey != null) {
+                                        try {
+                                          final keysApi = KeysApi(GetIt.I<DioClient>());
+                                          await keysApi.activateKey(selectedKey!.id, tempProfile.id);
+                                        } catch (e) {
+                                          debugPrint('Failed to activate key: $e');
+                                        }
+                                      }
+                                      
                                       setModalState(() {
                                         isUploadingImage = false;
                                       });
                                       
                                       if (!mounted) return;
                                       Navigator.pop(ctx);
-                                      SnackBarUtils.showSuccess(context, 'Profil creat cu avatar');
+                                      SnackBarUtils.showSuccess(context, selectedKey != null ? 'Profil creat cu cheie asociată' : 'Profil creat cu avatar');
                                       
                                       await _refresh();
                                       
@@ -522,9 +646,20 @@ class _ProfilesTabState extends State<ProfilesTab> {
                                     birthDate: selectedBirthday!,
                                     gender: selectedGender!,
                                   );
+                                  
+                                  // Activate key if selected
+                                  if (selectedKey != null) {
+                                    try {
+                                      final keysApi = KeysApi(GetIt.I<DioClient>());
+                                      await keysApi.activateKey(selectedKey!.id, createdProfile.id);
+                                    } catch (e) {
+                                      debugPrint('Failed to activate key: $e');
+                                    }
+                                  }
+                                  
                                   if (!mounted) return;
                                   Navigator.pop(ctx);
-                                  SnackBarUtils.showSuccess(context, 'Profil creat');
+                                  SnackBarUtils.showSuccess(context, selectedKey != null ? 'Profil creat cu cheie asociată' : 'Profil creat');
                                   
                                   await _refresh();
                                   

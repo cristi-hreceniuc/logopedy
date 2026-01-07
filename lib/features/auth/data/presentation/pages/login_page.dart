@@ -8,6 +8,7 @@ import '../../../presentation/widgets/auth_ui.dart';
 import '../cubit/auth_cubit.dart';
 import 'register_page.dart';
 import 'forgot_password_page.dart';
+import '../../../../kid/presentation/kid_login_page.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -234,6 +235,38 @@ class _LoginPageState extends State<LoginPage> {
                       child: const Text('Înregistrează-te'),
                     ),
                   ],
+                ),
+                const SizedBox(height: 16),
+                // Divider with text
+                Row(
+                  children: [
+                    Expanded(child: Divider(color: cs.onSurface.withValues(alpha: 0.2))),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Text(
+                        'sau',
+                        style: TextStyle(color: cs.onSurface.withValues(alpha: 0.5)),
+                      ),
+                    ),
+                    Expanded(child: Divider(color: cs.onSurface.withValues(alpha: 0.2))),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                // Kid login button
+                OutlinedButton.icon(
+                  onPressed: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const KidLoginPage()),
+                    );
+                  },
+                  icon: const Icon(Icons.key),
+                  label: const Text('Am o cheie de acces'),
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size(double.infinity, 48),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
                 ),
               ],
             ),

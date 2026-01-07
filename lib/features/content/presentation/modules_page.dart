@@ -6,9 +6,11 @@ import '../../../core/network/dio_client.dart';
 import '../../../core/services/feedback_service.dart';
 import '../../../core/utils/snackbar_utils.dart';
 import '../../../features/session/session_info.dart';
+import '../../kid/data/kid_api.dart';
 import '../content_repository.dart';
 import '../models/dtos.dart';
 import '../models/modules_details_dto.dart';
+import '../models/submodule_list_dto.dart';
 import 'submodule_page.dart';
 
 class ModulesPage extends StatefulWidget {
@@ -16,9 +18,11 @@ class ModulesPage extends StatefulWidget {
     super.key,
     required this.profileId,
     this.targetAudience = 'CHILDREN',
+    this.isKid = false,
   });
   final int profileId;
   final String targetAudience;
+  final bool isKid;
 
   @override
   State<ModulesPage> createState() => _ModulesPageState();
@@ -26,6 +30,7 @@ class ModulesPage extends StatefulWidget {
 
 class _ModulesPageState extends State<ModulesPage> {
   late final repo = ContentRepository(GetIt.I<DioClient>());
+  late final kidApi = KidApi(GetIt.I<DioClient>());
   late Future<List<ModuleDto>> _f;
   bool? _isPremium;
   Map<int, double> _moduleProgress = {};
@@ -34,9 +39,20 @@ class _ModulesPageState extends State<ModulesPage> {
   @override
   void initState() {
     super.initState();
-    _f = repo.modules(widget.profileId, targetAudience: widget.targetAudience);
+    _f = _loadModules();
     _loadPremiumStatus();
     _loadAllModuleProgress();
+  }
+
+  Future<List<ModuleDto>> _loadModules() async {
+    if (widget.isKid) {
+      // Use kid-specific API
+      final data = await kidApi.listModules();
+      return data.map((e) => ModuleDto.fromJson(e)).toList();
+    } else {
+      // Use regular API
+      return repo.modules(widget.profileId, targetAudience: widget.targetAudience);
+    }
   }
 
   Future<void> _loadPremiumStatus() async {
@@ -56,7 +72,13 @@ class _ModulesPageState extends State<ModulesPage> {
       // Load all module progress in parallel
       await Future.wait(modules.map((m) async {
         try {
-          final details = await repo.moduleDetails(widget.profileId, m.id);
+          final ModuleDetailsDto details;
+          if (widget.isKid) {
+            final data = await kidApi.getModule(m.id);
+            details = ModuleDetailsDto.fromJson(data);
+          } else {
+            details = await repo.moduleDetails(widget.profileId, m.id);
+          }
 
           if (details.submodules.isEmpty) {
             progressMap[m.id] = 0.0;
@@ -67,7 +89,13 @@ class _ModulesPageState extends State<ModulesPage> {
           // Use submoduleWithParts to get parts with totalLessons/completedLessons
           final subResults = await Future.wait(details.submodules.map((sub) async {
             try {
-              final submoduleData = await repo.submoduleWithParts(widget.profileId, sub.id);
+              final SubmoduleListDto submoduleData;
+              if (widget.isKid) {
+                final data = await kidApi.getSubmodule(sub.id);
+                submoduleData = SubmoduleListDto.fromJson(data);
+              } else {
+                submoduleData = await repo.submoduleWithParts(widget.profileId, sub.id);
+              }
               // Sum lessons from all parts in this submodule
               int total = 0;
               int completed = 0;
@@ -121,7 +149,7 @@ class _ModulesPageState extends State<ModulesPage> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.profileId != widget.profileId) {
       setState(() {
-        _f = repo.modules(widget.profileId, targetAudience: widget.targetAudience);
+        _f = _loadModules();
         _moduleProgress = {};
         _progressLoaded = false;
       });
@@ -131,7 +159,7 @@ class _ModulesPageState extends State<ModulesPage> {
 
   Future<void> _refreshModules() async {
     setState(() {
-      _f = repo.modules(widget.profileId, targetAudience: widget.targetAudience);
+      _f = _loadModules();
       _moduleProgress = {};
       _progressLoaded = false;
     });
@@ -156,7 +184,12 @@ class _ModulesPageState extends State<ModulesPage> {
     // 1) ia detaliile modulului (lista de submodule)
     late final ModuleDetailsDto md;
     try {
-      md = await repo.moduleDetails(widget.profileId, m.id);
+      if (widget.isKid) {
+        final data = await kidApi.getModule(m.id);
+        md = ModuleDetailsDto.fromJson(data);
+      } else {
+        md = await repo.moduleDetails(widget.profileId, m.id);
+      }
     } catch (e) {
       if (!mounted) return;
       
@@ -188,6 +221,7 @@ class _ModulesPageState extends State<ModulesPage> {
           profileId: widget.profileId,
           moduleTitle: m.title,
           submodules: md.submodules,
+          isKid: widget.isKid,
         ),
       ),
     );
@@ -453,11 +487,13 @@ class _SubmoduleSelectionPage extends StatefulWidget {
   final int profileId;
   final String moduleTitle;
   final List<SubmoduleLite> submodules;
+  final bool isKid;
 
   const _SubmoduleSelectionPage({
     required this.profileId,
     required this.moduleTitle,
     required this.submodules,
+    this.isKid = false,
   });
 
   @override
@@ -466,6 +502,7 @@ class _SubmoduleSelectionPage extends StatefulWidget {
 
 class _SubmoduleSelectionPageState extends State<_SubmoduleSelectionPage> {
   late final repo = ContentRepository(GetIt.I<DioClient>());
+  late final kidApi = KidApi(GetIt.I<DioClient>());
   
   // Track if any progress was made during this session (for back navigation)
   bool _progressMade = false;
@@ -491,7 +528,13 @@ class _SubmoduleSelectionPageState extends State<_SubmoduleSelectionPage> {
     
     await Future.wait(widget.submodules.map((s) async {
       try {
-        final submoduleData = await repo.submoduleWithParts(widget.profileId, s.id, forceRefresh: true);
+        final SubmoduleListDto submoduleData;
+        if (widget.isKid) {
+          final data = await kidApi.getSubmodule(s.id, forceRefresh: true);
+          submoduleData = SubmoduleListDto.fromJson(data);
+        } else {
+          submoduleData = await repo.submoduleWithParts(widget.profileId, s.id, forceRefresh: true);
+        }
         int total = 0;
         int completed = 0;
         for (final part in submoduleData.parts) {
@@ -564,6 +607,7 @@ class _SubmoduleSelectionPageState extends State<_SubmoduleSelectionPage> {
                           profileId: widget.profileId,
                           submoduleId: s.id,
                           title: s.title,
+                          isKid: widget.isKid,
                         ),
                       ),
                     );

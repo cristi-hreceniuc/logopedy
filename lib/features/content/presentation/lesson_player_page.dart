@@ -13,6 +13,7 @@ import '../../../core/services/audio_cache_service.dart';
 import '../../../core/services/feedback_service.dart';
 import '../../../core/services/s3_service.dart';
 import '../../../core/utils/snackbar_utils.dart';
+import '../../kid/data/kid_api.dart';
 import '../content_repository.dart';
 import '../models/dtos.dart';
 import '../models/enums.dart';
@@ -24,12 +25,14 @@ class LessonPlayerPage extends StatefulWidget {
     required this.lessonId,
     required this.title,
     this.isAlreadyDone = false,
+    this.isKid = false,
   });
 
   final int profileId;
   final int lessonId;
   final String title;
   final bool isAlreadyDone;
+  final bool isKid;
 
   @override
   State<LessonPlayerPage> createState() => _LessonPlayerPageState();
@@ -307,6 +310,7 @@ class _HintOverlayState extends State<_HintOverlay> with SingleTickerProviderSta
 
 class _LessonPlayerPageState extends State<LessonPlayerPage> {
   late final ContentRepository _repo = ContentRepository(GetIt.I<DioClient>());
+  late final KidApi _kidApi = KidApi(GetIt.I<DioClient>());
   late final S3Service _s3 = GetIt.I<S3Service>();
   late final AudioCacheService _audioCache = GetIt.I<AudioCacheService>();
   late final FeedbackService _feedback = GetIt.I<FeedbackService>();
@@ -689,7 +693,13 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
       _error = null;
     });
     try {
-      final d = await _repo.getLesson(widget.profileId, widget.lessonId);
+      final LessonDto d;
+      if (widget.isKid) {
+        final json = await _kidApi.getLesson(widget.lessonId);
+        d = LessonDto.fromJson(json);
+      } else {
+        d = await _repo.getLesson(widget.profileId, widget.lessonId);
+      }
       if (!mounted) return;
       setState(() {
         _data = d;
@@ -836,7 +846,11 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
   /// Check if a lesson exists by trying to load it
   Future<bool> _lessonExists(int lessonId) async {
     try {
-      await _repo.getLesson(widget.profileId, lessonId);
+      if (widget.isKid) {
+        await _kidApi.getLesson(lessonId);
+      } else {
+        await _repo.getLesson(widget.profileId, lessonId);
+      }
       return true;
     } catch (e) {
       debugPrint('🎉 Lesson $lessonId does not exist: $e');
@@ -1000,12 +1014,22 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
   /// Lecțiile actuale au 1 singur ecran -> marcăm DONE și ieșim
   Future<void> _finishLesson({bool skipCompletionDialog = false}) async {
     try {
-      final resp = await _repo.advance(
-        widget.profileId,
-        lessonId: widget.lessonId,
-        screenIndex: 0,
-        done: true,
-      );
+      final AdvanceResp resp;
+      if (widget.isKid) {
+        final json = await _kidApi.advanceProgress(
+          lessonId: widget.lessonId,
+          screenIndex: 0,
+          done: true,
+        );
+        resp = AdvanceResp.fromJson(json);
+      } else {
+        resp = await _repo.advance(
+          widget.profileId,
+          lessonId: widget.lessonId,
+          screenIndex: 0,
+          done: true,
+        );
+      }
       if (!mounted) return;
       
       // Mark that progress was made (lesson completed)

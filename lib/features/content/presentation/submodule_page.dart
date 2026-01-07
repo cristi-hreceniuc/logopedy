@@ -5,6 +5,7 @@ import 'package:get_it/get_it.dart';
 import '../../../core/network/dio_client.dart';
 import '../../../core/services/feedback_service.dart';
 import '../../auth/data/presentation/cubit/auth_cubit.dart';
+import '../../kid/data/kid_api.dart';
 import '../../profiles/selected_profile_cubit.dart';
 import '../content_repository.dart';
 import '../models/submodule_list_dto.dart';
@@ -16,11 +17,13 @@ class SubmodulePage extends StatefulWidget {
     required this.profileId,
     required this.submoduleId,
     required this.title,
+    this.isKid = false,
   });
 
   final int profileId;
   final int submoduleId;
   final String title;
+  final bool isKid;
 
   @override
   State<SubmodulePage> createState() => _SubmodulePageState();
@@ -28,6 +31,7 @@ class SubmodulePage extends StatefulWidget {
 
 class _SubmodulePageState extends State<SubmodulePage> {
   late final repo = ContentRepository(GetIt.I<DioClient>());
+  late final kidApi = KidApi(GetIt.I<DioClient>());
   SubmoduleListDto? _data;
   bool _isLoading = true;
   
@@ -55,14 +59,20 @@ class _SubmodulePageState extends State<SubmodulePage> {
     final activePid = context.read<SelectedProfileCubit>().state;
     final pid = activePid ?? widget.profileId;
     
-    debugPrint('🔄 Loading submodule ${widget.submoduleId} for profile $pid (forceRefresh: $forceRefresh)');
+    debugPrint('🔄 Loading submodule ${widget.submoduleId} for profile $pid (forceRefresh: $forceRefresh, isKid: ${widget.isKid})');
     
     setState(() {
       _isLoading = true;
     });
     
     try {
-      final data = await repo.submoduleWithParts(pid, widget.submoduleId, forceRefresh: forceRefresh);
+      final SubmoduleListDto data;
+      if (widget.isKid) {
+        final json = await kidApi.getSubmodule(widget.submoduleId, forceRefresh: forceRefresh);
+        data = SubmoduleListDto.fromJson(json);
+      } else {
+        data = await repo.submoduleWithParts(pid, widget.submoduleId, forceRefresh: forceRefresh);
+      }
       if (mounted) {
         setState(() {
           _data = data;
@@ -238,6 +248,7 @@ class _SubmodulePageState extends State<SubmodulePage> {
                                     profileId: pid,
                                     partId: part.id,
                                     title: part.name,
+                                    isKid: widget.isKid,
                                   ),
                                 ),
                               );

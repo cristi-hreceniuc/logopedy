@@ -6,6 +6,7 @@ import '../../../core/network/dio_client.dart';
 import '../../../core/services/feedback_service.dart';
 import '../../../core/utils/snackbar_utils.dart';
 import '../../auth/data/presentation/cubit/auth_cubit.dart';
+import '../../kid/data/kid_api.dart';
 import '../../profiles/selected_profile_cubit.dart';
 import '../content_repository.dart';
 import '../models/part_dto.dart';
@@ -17,11 +18,13 @@ class PartPage extends StatefulWidget {
     required this.profileId,
     required this.partId,
     required this.title,
+    this.isKid = false,
   });
 
   final int profileId;
   final int partId;
   final String title;
+  final bool isKid;
 
   @override
   State<PartPage> createState() => _PartPageState();
@@ -29,6 +32,7 @@ class PartPage extends StatefulWidget {
 
 class _PartPageState extends State<PartPage> {
   late final repo = ContentRepository(GetIt.I<DioClient>());
+  late final kidApi = KidApi(GetIt.I<DioClient>());
   PartDto? _data;
   bool _isLoading = true;
   
@@ -55,14 +59,20 @@ class _PartPageState extends State<PartPage> {
     final activePid = context.read<SelectedProfileCubit>().state;
     final pid = activePid ?? widget.profileId;
     
-    debugPrint('🔄 Loading part ${widget.partId} for profile $pid (forceRefresh: $forceRefresh)');
+    debugPrint('🔄 Loading part ${widget.partId} for profile $pid (forceRefresh: $forceRefresh, isKid: ${widget.isKid})');
     
     setState(() {
       _isLoading = true;
     });
     
     try {
-      final data = await repo.getPart(pid, widget.partId, forceRefresh: forceRefresh);
+      final PartDto data;
+      if (widget.isKid) {
+        final json = await kidApi.getPart(widget.partId, forceRefresh: forceRefresh);
+        data = PartDto.fromJson(json);
+      } else {
+        data = await repo.getPart(pid, widget.partId, forceRefresh: forceRefresh);
+      }
       if (mounted) {
         setState(() {
           _data = data;
@@ -248,6 +258,7 @@ class _PartPageState extends State<PartPage> {
                                   lessonId: l.id,
                                   title: l.title,
                                   isAlreadyDone: isDone,
+                                  isKid: widget.isKid,
                                 ),
                               ),
                             );

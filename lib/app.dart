@@ -7,6 +7,7 @@ import 'core/storage/secure_storage.dart';
 import 'core/theme/app_theme.dart';
 import 'core/network/dio_client.dart';
 import 'features/home/home_shell.dart';
+import 'features/kid/presentation/kid_home_shell.dart';
 import 'features/theme/theme_cubit.dart';
 import 'features/auth/data/presentation/cubit/auth_cubit.dart';
 import 'features/auth/data/presentation/pages/login_page.dart';
@@ -34,6 +35,15 @@ class LogopedyApp extends StatelessWidget {
               }
               if (!st.authenticated) {
                 return const LoginPage();
+              }
+              
+              // Handle kid session
+              if (st.isKid && st.kidProfileId != null && st.kidProfileName != null) {
+                return KidHomeShell(
+                  profileId: st.kidProfileId!,
+                  profileName: st.kidProfileName!,
+                  isPremium: st.kidIsPremium ?? false,
+                );
               }
 
               return _OnboardingWrapper();

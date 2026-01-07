@@ -17,6 +17,7 @@ import 'tabs/account_tab.dart';
 import 'tabs/profiles_tab.dart';
 import 'tabs/modules_tab.dart';
 import 'tabs/specialist_tab.dart';
+import '../specialist/presentation/keys_page.dart';
 
 class HomeShell extends StatefulWidget {
   const HomeShell({super.key, this.profileId, this.shouldOpenCreateDialog = false});
@@ -90,11 +91,12 @@ class _HomeShellState extends State<HomeShell> {
     
     try {
       final authState = context.read<AuthCubit>().state;
-      final isSpecialist = authState.userRole == 'SPECIALIST';
+      final isSpecialist = authState.userRole == 'SPECIALIST' || authState.userRole == 'SPECIALIST_BUNDLE';
+      final hasBundle = authState.userRole == 'SPECIALIST_BUNDLE';
       
       // Set to profiles tab based on user role
       setState(() {
-        _index = isSpecialist ? 2 : 1;
+        _index = hasBundle ? 3 : (isSpecialist ? 2 : 1);
       });
       
       final profilesRepo = ProfilesRepository(GetIt.I<DioClient>());
@@ -259,7 +261,8 @@ class _HomeShellState extends State<HomeShell> {
 
     return BlocBuilder<AuthCubit, AuthState>(
       builder: (context, authState) {
-        final isSpecialist = authState.userRole == 'SPECIALIST';
+        final isSpecialist = authState.userRole == 'SPECIALIST' || authState.userRole == 'SPECIALIST_BUNDLE';
+        final hasBundle = authState.userRole == 'SPECIALIST_BUNDLE';
         
         return ListenableBuilder(
           listenable: GetIt.I<ActiveProfileService>(),
@@ -277,6 +280,9 @@ class _HomeShellState extends State<HomeShell> {
               currentProfileId != null 
                 ? ModulesTab(profileId: currentProfileId)
                 : const _PlaceholderModulesTab(),
+              // Keys tab (only for SPECIALIST_BUNDLE)
+              if (hasBundle)
+                const KeysPage(),
               // Profiles tab
               ProfilesTab(shouldOpenCreateDialog: widget.shouldOpenCreateDialog),
               // Account tab
@@ -316,8 +322,11 @@ class _HomeShellState extends State<HomeShell> {
                             _buildNavItem(0, Icons.school_outlined, Icons.school, 'Specialist', null),
                           // Modules tab
                           _buildNavItem(isSpecialist ? 1 : 0, Icons.menu_book_outlined, Icons.menu_book, 'Module', null),
+                          // Keys tab (only for SPECIALIST_BUNDLE)
+                          if (hasBundle)
+                            _buildNavItem(2, Icons.key_outlined, Icons.key, 'Chei', null),
                           // Profile tab with icon
-                          _buildNavItem(isSpecialist ? 2 : 1, Icons.group_outlined, Icons.group, 'Profile', null),
+                          _buildNavItem(hasBundle ? 3 : (isSpecialist ? 2 : 1), Icons.group_outlined, Icons.group, 'Profile', null),
                           // Account tab with initials
                           FutureBuilder<UserResponseDto?>(
                             future: authRepo.getCurrentUser().then<UserResponseDto?>((value) => value).catchError((_) => Future.value(null)),
@@ -350,7 +359,7 @@ class _HomeShellState extends State<HomeShell> {
                                     accountInitials = session.email![0].toUpperCase();
                                   }
                                   
-                                  final accountIndex = isSpecialist ? 3 : 2;
+                                  final accountIndex = hasBundle ? 4 : (isSpecialist ? 3 : 2);
                                   final isSelected = _index == accountIndex;
                                   return _buildNavItem(
                                     accountIndex,
