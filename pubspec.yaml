@@ -1,6 +1,6 @@
 name: logopedy
 description: "Aplicatie logopedica"
-version: 2.2.12+8
+version: 2.4.12+10
 
 environment:
   sdk: ^3.9.2
@@ -29,6 +29,7 @@ dependencies:
   firebase_core: ^4.2.1
   firebase_messaging: ^16.0.4
   flutter_local_notifications: ^19.5.0
+  share_plus: ^10.1.4
 
 dev_dependencies:
   flutter_test:

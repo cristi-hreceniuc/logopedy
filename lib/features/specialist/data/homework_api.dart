@@ -37,5 +37,11 @@ class HomeworkApi {
   Future<void> removeHomework(int homeworkId) async {
     await _client.dio.delete('/api/v1/homework/$homeworkId');
   }
+
+  /// Mark homework as DONE/CLOSED by specialist (archives it)
+  Future<HomeworkDTO> markHomeworkDone(int homeworkId) async {
+    final response = await _client.dio.post('/api/v1/homework/$homeworkId/done');
+    return HomeworkDTO.fromJson(response.data);
+  }
 }
 

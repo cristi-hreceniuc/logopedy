@@ -225,6 +225,13 @@ class PushNotificationService {
           // Navigate to module
         }
         break;
+      case 'homework_completed':
+        // Specialist: a kid marked homework as complete.
+        // Navigation is handled at app layer (if desired); for now we just log.
+        final profileId = message.data['profileId'];
+        final homeworkId = message.data['homeworkId'];
+        debugPrint('Homework completed notification: profileId=$profileId homeworkId=$homeworkId');
+        break;
       default:
         // Default navigation
         break;

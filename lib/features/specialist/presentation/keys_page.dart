@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get_it/get_it.dart';
+import 'package:share_plus/share_plus.dart';
 import '../../../core/network/dio_client.dart';
 import '../../profiles/models/profile_model.dart';
 import '../../profiles/profile_repository.dart';
@@ -36,11 +37,8 @@ class _KeysPageState extends State<KeysPage> {
     });
 
     try {
-      final results = await Future.wait([
-        _api.listKeys(),
-        _api.getKeyStats(),
-      ]);
-      
+      final results = await Future.wait([_api.listKeys(), _api.getKeyStats()]);
+
       if (mounted) {
         setState(() {
           _keys = results[0] as List<LicenseKeyDTO>;
@@ -94,9 +92,9 @@ class _KeysPageState extends State<KeysPage> {
         }
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Eroare: ${e.toString()}')),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('Eroare: ${e.toString()}')));
         }
       }
     }
@@ -112,18 +110,49 @@ class _KeysPageState extends State<KeysPage> {
     );
   }
 
+  void _shareKey(BuildContext ctx, String keyUuid, String? profileName) {
+    final childText = profileName != null && profileName.isNotEmpty
+        ? 'pentru $profileName'
+        : 'pentru copilul tău';
+    
+    final shareText = '''🎓 Iată cheia de licență $childText pentru aplicația Logopedy!
+
+🔑 Cheie: $keyUuid
+
+Pași de activare:
+1. Descarcă aplicația Logopedy
+2. Apasă pe "Am o cheie de acces"
+3. Introdu cheia de mai sus
+
+Mulțumim că folosești Logopedy! 💚''';
+
+    // Get the button position for iPad share sheet anchor
+    final box = ctx.findRenderObject() as RenderBox?;
+    final sharePositionOrigin = box != null
+        ? box.localToGlobal(Offset.zero) & box.size
+        : null;
+
+    Share.share(
+      shareText,
+      subject: 'Cheie Logopedy',
+      sharePositionOrigin: sharePositionOrigin,
+    );
+  }
+
   Future<void> _activateKey(LicenseKeyDTO key) async {
     // Fetch profiles that don't have a key linked (we need to check on server)
     // For now, we'll show all profiles and let the user choose
     final profilesRepo = ProfilesRepository(GetIt.I<DioClient>());
-    
+
     List<ProfileCardDto> profiles;
     try {
       profiles = await profilesRepo.list();
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Eroare la încărcarea profilelor: ${e.toString()}')),
+          SnackBar(
+            content: Text('Eroare la încărcarea profilelor: ${e.toString()}'),
+          ),
         );
       }
       return;
@@ -132,7 +161,9 @@ class _KeysPageState extends State<KeysPage> {
     if (profiles.isEmpty) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Nu ai profile create. Creează un profil mai întâi.')),
+          const SnackBar(
+            content: Text('Nu ai profile create. Creează un profil mai întâi.'),
+          ),
         );
       }
       return;
@@ -152,17 +183,19 @@ class _KeysPageState extends State<KeysPage> {
               final profile = profiles[index];
               return ListTile(
                 leading: CircleAvatar(
-                  backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+                  backgroundColor: const Color(0xFFF2F3F6),
                   child: Text(
-                    profile.name.isNotEmpty ? profile.name[0].toUpperCase() : 'P',
+                    profile.name.isNotEmpty
+                        ? profile.name[0].toUpperCase()
+                        : 'P',
                     style: TextStyle(
-                      color: Theme.of(context).colorScheme.onPrimaryContainer,
+                      color: Theme.of(context).colorScheme.onSurface,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
                 ),
                 title: Text(profile.name),
-                subtitle: profile.premium 
+                subtitle: profile.premium
                     ? Row(
                         children: [
                           Icon(Icons.star, size: 14, color: Colors.amber),
@@ -215,14 +248,18 @@ class _KeysPageState extends State<KeysPage> {
         _loadData();
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Cheia a fost asociată cu "${selectedProfile.name}"')),
+            SnackBar(
+              content: Text(
+                'Cheia a fost asociată cu "${selectedProfile.name}"',
+              ),
+            ),
           );
         }
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Eroare: ${e.toString()}')),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('Eroare: ${e.toString()}')));
         }
       }
     }
@@ -237,32 +274,29 @@ class _KeysPageState extends State<KeysPage> {
         title: const Text('Cheile mele'),
         centerTitle: true,
         actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _loadData,
-          ),
+          IconButton(icon: const Icon(Icons.refresh), onPressed: _loadData),
         ],
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.error_outline, size: 64, color: cs.error),
-                      const SizedBox(height: 16),
-                      Text(_error!),
-                      const SizedBox(height: 16),
-                      FilledButton.icon(
-                        onPressed: _loadData,
-                        icon: const Icon(Icons.refresh),
-                        label: const Text('Reîncearcă'),
-                      ),
-                    ],
+          ? Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.error_outline, size: 64, color: cs.error),
+                  const SizedBox(height: 16),
+                  Text(_error!),
+                  const SizedBox(height: 16),
+                  FilledButton.icon(
+                    onPressed: _loadData,
+                    icon: const Icon(Icons.refresh),
+                    label: const Text('Reîncearcă'),
                   ),
-                )
-              : _buildContent(cs),
+                ],
+              ),
+            )
+          : _buildContent(cs),
     );
   }
 
@@ -312,9 +346,9 @@ class _KeysPageState extends State<KeysPage> {
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
             child: Text(
               'Lista cheilor',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
             ),
           ),
         ),
@@ -334,18 +368,16 @@ class _KeysPageState extends State<KeysPage> {
           )
         else
           SliverList(
-            delegate: SliverChildBuilderDelegate(
-              (context, index) {
-                final key = _keys![index];
-                return _KeyCard(
-                  licenseKey: key,
-                  onCopy: () => _copyKey(key.keyUuid),
-                  onReset: key.isUsed ? () => _resetKey(key) : null,
-                  onActivate: key.isAvailable ? () => _activateKey(key) : null,
-                );
-              },
-              childCount: _keys!.length,
-            ),
+            delegate: SliverChildBuilderDelegate((context, index) {
+              final key = _keys![index];
+              return _KeyCard(
+                licenseKey: key,
+                onCopy: () => _copyKey(key.keyUuid),
+                onShare: (ctx) => _shareKey(ctx, key.keyUuid, key.profileName),
+                onReset: key.isUsed ? () => _resetKey(key) : null,
+                onActivate: key.isAvailable ? () => _activateKey(key) : null,
+              );
+            }, childCount: _keys!.length),
           ),
       ],
     );
@@ -398,12 +430,14 @@ class _StatsCard extends StatelessWidget {
 class _KeyCard extends StatelessWidget {
   final LicenseKeyDTO licenseKey;
   final VoidCallback onCopy;
+  final void Function(BuildContext) onShare;
   final VoidCallback? onReset;
   final VoidCallback? onActivate;
 
   const _KeyCard({
     required this.licenseKey,
     required this.onCopy,
+    required this.onShare,
     this.onReset,
     this.onActivate,
   });
@@ -411,6 +445,9 @@ class _KeyCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final neutralFill =
+        Theme.of(context).inputDecorationTheme.fillColor ??
+        const Color(0xFFF2F3F6);
 
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
@@ -422,11 +459,14 @@ class _KeyCard extends StatelessWidget {
             Row(
               children: [
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: licenseKey.isAvailable
                         ? Colors.green.withOpacity(0.1)
-                        : cs.primaryContainer,
+                        : const Color(0xFFF2F3F6),
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Text(
@@ -436,7 +476,7 @@ class _KeyCard extends StatelessWidget {
                       fontWeight: FontWeight.w600,
                       color: licenseKey.isAvailable
                           ? Colors.green
-                          : cs.onPrimaryContainer,
+                          : cs.onSurface,
                     ),
                   ),
                 ),
@@ -446,20 +486,31 @@ class _KeyCard extends StatelessWidget {
                   onPressed: onCopy,
                   tooltip: 'Copiază cheia',
                 ),
+                Builder(
+                  builder: (btnContext) => IconButton(
+                    icon: const Icon(Icons.share, size: 20),
+                    onPressed: () => onShare(btnContext),
+                    tooltip: 'Trimite cheia',
+                  ),
+                ),
               ],
             ),
             const SizedBox(height: 12),
-            
+
             // Key UUID
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: cs.surfaceContainerHighest.withOpacity(0.5),
+                color: neutralFill,
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Row(
                 children: [
-                  Icon(Icons.key, size: 16, color: cs.onSurface.withOpacity(0.5)),
+                  Icon(
+                    Icons.key,
+                    size: 16,
+                    color: cs.onSurface.withOpacity(0.5),
+                  ),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
@@ -503,9 +554,7 @@ class _KeyCard extends StatelessWidget {
                   onPressed: onReset,
                   icon: const Icon(Icons.refresh, size: 18),
                   label: const Text('Resetează cheia'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: cs.error,
-                  ),
+                  style: OutlinedButton.styleFrom(foregroundColor: cs.error),
                 ),
             ] else if (licenseKey.isAvailable) ...[
               const SizedBox(height: 12),
@@ -534,4 +583,3 @@ class _KeyCard extends StatelessWidget {
     return '${date.day}/${date.month}/${date.year}';
   }
 }
-

@@ -55,12 +55,9 @@ class KidAccountTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    
+
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Contul meu'),
-        centerTitle: true,
-      ),
+      appBar: AppBar(title: const Text('Contul meu'), centerTitle: true),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
@@ -75,22 +72,24 @@ class KidAccountTab extends StatelessWidget {
                     width: 80,
                     height: 80,
                     decoration: BoxDecoration(
-                      color: cs.primaryContainer,
+                      color: const Color(0xFFF2F3F6),
                       shape: BoxShape.circle,
                     ),
                     child: Center(
                       child: Text(
-                        profileName.isNotEmpty ? profileName[0].toUpperCase() : '?',
+                        profileName.isNotEmpty
+                            ? profileName[0].toUpperCase()
+                            : '?',
                         style: TextStyle(
                           fontSize: 36,
                           fontWeight: FontWeight.bold,
-                          color: cs.onPrimaryContainer,
+                          color: cs.onSurface,
                         ),
                       ),
                     ),
                   ),
                   const SizedBox(height: 16),
-                  
+
                   // Name
                   Text(
                     profileName,
@@ -99,14 +98,20 @@ class KidAccountTab extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 8),
-                  
+
                   // Premium badge
                   if (isPremium)
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
                       decoration: BoxDecoration(
                         gradient: LinearGradient(
-                          colors: [Colors.amber.shade600, Colors.orange.shade700],
+                          colors: [
+                            Colors.amber.shade600,
+                            Colors.orange.shade700,
+                          ],
                         ),
                         borderRadius: BorderRadius.circular(20),
                       ),
@@ -144,9 +149,8 @@ class KidAccountTab extends StatelessWidget {
                       const SizedBox(width: 12),
                       Text(
                         'Informații',
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(fontWeight: FontWeight.w600),
                       ),
                     ],
                   ),
@@ -181,4 +185,3 @@ class KidAccountTab extends StatelessWidget {
     );
   }
 }
-

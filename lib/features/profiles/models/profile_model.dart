@@ -76,12 +76,14 @@ class ProfileCardDto {
 class LessonProgressDto {
   final int moduleId; final String moduleTitle;
   final int submoduleId; final String submoduleTitle;
+  final int? partId; final String? partTitle;
   final int lessonId; final String lessonTitle;
   final String status; // LOCKED/UNLOCKED/DONE
 
   LessonProgressDto({
     required this.moduleId, required this.moduleTitle,
     required this.submoduleId, required this.submoduleTitle,
+    this.partId, this.partTitle,
     required this.lessonId, required this.lessonTitle,
     required this.status,
   });
@@ -89,6 +91,7 @@ class LessonProgressDto {
   factory LessonProgressDto.fromJson(Map<String,dynamic> j) => LessonProgressDto(
     moduleId: j['moduleId'], moduleTitle: j['moduleTitle'],
     submoduleId: j['submoduleId'], submoduleTitle: j['submoduleTitle'],
+    partId: j['partId'], partTitle: j['partTitle'],
     lessonId: j['lessonId'], lessonTitle: j['lessonTitle'],
     status: j['status'],
   );

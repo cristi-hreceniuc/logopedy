@@ -11,6 +11,8 @@ import '../../../core/storage/secure_storage.dart';
 import '../../../core/utils/snackbar_utils.dart';
 import '../../../core/state/active_profile.dart';
 import '../../../widgets/profile_avatar.dart';
+import '../../kid/models/homework_dto.dart';
+import '../../specialist/data/homework_api.dart';
 import '../../specialist/presentation/assign_homework_sheet.dart';
 import '../models/profile_model.dart';
 import '../profile_repository.dart';
@@ -26,10 +28,12 @@ class ProfileDetailsPage extends StatefulWidget {
 
 class _ProfileDetailsPageState extends State<ProfileDetailsPage> {
   late final repo = ProfilesRepository(GetIt.I<DioClient>());
+  late final homeworkApi = HomeworkApi(GetIt.I<DioClient>());
   late Future<List<LessonProgressDto>> _f;
   late Future<ProfileCardDto> _profileDetails;
+  late Future<List<HomeworkDTO>> _homeworkFuture;
   bool _isUploadingImage = false;
-  
+
   // Track expanded state for modules and submodules (collapsed by default)
   final Set<int> _expandedModules = <int>{};
   final Set<int> _expandedSubmodules = <int>{};
@@ -39,6 +43,41 @@ class _ProfileDetailsPageState extends State<ProfileDetailsPage> {
     super.initState();
     _f = repo.lessonProgress(widget.profile.id);
     _profileDetails = repo.getProfileDetails(widget.profile.id);
+    _homeworkFuture = homeworkApi.getHomework(widget.profile.id);
+  }
+
+  void _refreshHomework() {
+    setState(() {
+      _homeworkFuture = homeworkApi.getHomework(widget.profile.id);
+    });
+  }
+
+  Future<void> _deleteHomework(int homeworkId) async {
+    try {
+      await homeworkApi.removeHomework(homeworkId);
+      _refreshHomework();
+      if (mounted) {
+        SnackBarUtils.showSuccess(context, 'Tema a fost ștearsă');
+      }
+    } catch (e) {
+      if (mounted) {
+        SnackBarUtils.showError(context, 'Eroare la ștergerea temei: $e');
+      }
+    }
+  }
+
+  Future<void> _markHomeworkDone(int homeworkId) async {
+    try {
+      await homeworkApi.markHomeworkDone(homeworkId);
+      _refreshHomework();
+      if (mounted) {
+        SnackBarUtils.showSuccess(context, 'Tema a fost marcată ca făcută');
+      }
+    } catch (e) {
+      if (mounted) {
+        SnackBarUtils.showError(context, 'Eroare la marcarea temei: $e');
+      }
+    }
   }
 
   bool _avatarWasUpdated = false;
@@ -52,30 +91,40 @@ class _ProfileDetailsPageState extends State<ProfileDetailsPage> {
 
     try {
       final imageUploadService = ImageUploadService(GetIt.I<DioClient>());
-      final s3Key = await imageUploadService.uploadProfileAvatar(widget.profile.id, imageFile);
-      
+      final s3Key = await imageUploadService.uploadProfileAvatar(
+        widget.profile.id,
+        imageFile,
+      );
+
       debugPrint('✅ Avatar uploaded, S3 key: $s3Key');
 
       if (mounted) {
         _avatarWasUpdated = true; // Mark that avatar was updated
-        
+
         // Wait a moment for backend to process
         await Future.delayed(const Duration(milliseconds: 500));
-        
+
         // Fetch fresh profile data to get new presigned URL
         final newProfile = await repo.getProfileDetails(widget.profile.id);
-        debugPrint('✅ New profile data fetched, avatarUri: ${newProfile.avatarUri}');
-        
+        debugPrint(
+          '✅ New profile data fetched, avatarUri: ${newProfile.avatarUri}',
+        );
+
         // Clear ALL cached images for this profile
-        if (widget.profile.avatarUri != null && widget.profile.avatarUri!.isNotEmpty) {
+        if (widget.profile.avatarUri != null &&
+            widget.profile.avatarUri!.isNotEmpty) {
           await CachedNetworkImage.evictFromCache(widget.profile.avatarUri!);
-          debugPrint('🗑️ Cleared cache for old avatar: ${widget.profile.avatarUri}');
+          debugPrint(
+            '🗑️ Cleared cache for old avatar: ${widget.profile.avatarUri}',
+          );
         }
         if (newProfile.avatarUri != null && newProfile.avatarUri!.isNotEmpty) {
           await CachedNetworkImage.evictFromCache(newProfile.avatarUri!);
-          debugPrint('🗑️ Pre-cleared cache for new avatar: ${newProfile.avatarUri}');
+          debugPrint(
+            '🗑️ Pre-cleared cache for new avatar: ${newProfile.avatarUri}',
+          );
         }
-        
+
         if (mounted) {
           setState(() {
             _newAvatarUrl = newProfile.avatarUri;
@@ -83,7 +132,10 @@ class _ProfileDetailsPageState extends State<ProfileDetailsPage> {
             _avatarUpdateCounter++; // Increment to force rebuild
             _isUploadingImage = false;
           });
-          SnackBarUtils.showSuccess(context, 'Avatarul a fost încărcat cu succes');
+          SnackBarUtils.showSuccess(
+            context,
+            'Avatarul a fost încărcat cu succes',
+          );
         }
       }
     } catch (e) {
@@ -102,19 +154,18 @@ class _ProfileDetailsPageState extends State<ProfileDetailsPage> {
     await GetIt.I<SecureStore>().saveActiveProfileId(widget.profile.id);
     GetIt.I<DioClient>().setActiveProfile(widget.profile.id);
     await GetIt.I<ActiveProfileService>().set(widget.profile.id);
-    
+
     if (!mounted) return;
     SnackBarUtils.showSuccess(context, 'Profil activ: ${widget.profile.name}');
     setState(() {});
   }
-
 
   Future<void> _deleteProfile() async {
     // Check if this is the last profile
     try {
       final allProfiles = await repo.list();
       final isLastProfile = allProfiles.length == 1;
-      
+
       if (isLastProfile) {
         if (mounted) {
           SnackBarUtils.showError(
@@ -132,9 +183,7 @@ class _ProfileDetailsPageState extends State<ProfileDetailsPage> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(24),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
         title: const Text(
           'Șterge profil',
           style: TextStyle(
@@ -180,11 +229,12 @@ class _ProfileDetailsPageState extends State<ProfileDetailsPage> {
 
     if (confirmed == true && mounted) {
       try {
-        final wasActiveProfile = GetIt.I<ActiveProfileService>().id == widget.profile.id;
-        
+        final wasActiveProfile =
+            GetIt.I<ActiveProfileService>().id == widget.profile.id;
+
         await repo.delete(widget.profile.id);
         if (!mounted) return;
-        
+
         // If this was the active profile, auto-select the first remaining profile
         if (wasActiveProfile) {
           try {
@@ -210,7 +260,7 @@ class _ProfileDetailsPageState extends State<ProfileDetailsPage> {
             await GetIt.I<ActiveProfileService>().clear();
           }
         }
-        
+
         SnackBarUtils.showSuccess(context, 'Profil șters cu succes');
         Navigator.pop(context, true);
       } catch (e) {
@@ -222,28 +272,44 @@ class _ProfileDetailsPageState extends State<ProfileDetailsPage> {
 
   String _formatDate(DateTime? date) {
     if (date == null) return '—';
-    
+
     // Romanian month names
     const romanianMonths = [
-      'Ianuarie', 'Februarie', 'Martie', 'Aprilie', 'Mai', 'Iunie',
-      'Iulie', 'August', 'Septembrie', 'Octombrie', 'Noiembrie', 'Decembrie'
+      'Ianuarie',
+      'Februarie',
+      'Martie',
+      'Aprilie',
+      'Mai',
+      'Iunie',
+      'Iulie',
+      'August',
+      'Septembrie',
+      'Octombrie',
+      'Noiembrie',
+      'Decembrie',
     ];
-    
+
     final day = date.day;
     final month = romanianMonths[date.month - 1];
     final year = date.year;
-    
+
     return '$day $month $year';
   }
 
   String _getGenderLabel(String? gender) {
     if (gender == null) return '—';
     final lowerGender = gender.toLowerCase();
-    if (lowerGender == 'male' || lowerGender == 'm' || lowerGender == 'masculin') {
+    if (lowerGender == 'male' ||
+        lowerGender == 'm' ||
+        lowerGender == 'masculin') {
       return 'Băiat';
-    } else if (lowerGender == 'female' || lowerGender == 'f' || lowerGender == 'feminin') {
+    } else if (lowerGender == 'female' ||
+        lowerGender == 'f' ||
+        lowerGender == 'feminin') {
       return 'Fată';
-    } else if (lowerGender == 'other' || lowerGender == 'o' || lowerGender == 'altul') {
+    } else if (lowerGender == 'other' ||
+        lowerGender == 'o' ||
+        lowerGender == 'altul') {
       return 'Altul';
     }
     return gender;
@@ -268,298 +334,357 @@ class _ProfileDetailsPageState extends State<ProfileDetailsPage> {
           },
         ),
         title: Text(
-              widget.profile.name,
-              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.w800,
-                color: cs.onSurface,
-              ),
-            ),
+          widget.profile.name,
+          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+            fontWeight: FontWeight.w800,
+            color: cs.onSurface,
+          ),
+        ),
         actions: [
           if (!isActive)
             TextButton(
               onPressed: _selectThisProfile,
-                  child: const Text(
-                    'Setează activ',
-                    style: TextStyle(
-                      color: Color(0xFFEA2233),
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
+              child: const Text(
+                'Setează activ',
+                style: TextStyle(
+                  color: Color(0xFFEA2233),
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
             )
           else
             Padding(
               padding: const EdgeInsets.only(right: 12),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [Color(0xFFEA2233), Color(0xFFD21828)],
-                      ),
-                      borderRadius: BorderRadius.circular(20),
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFFEA2233), Color(0xFFD21828)],
+                  ),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.check_circle_rounded,
+                      color: Colors.white,
+                      size: 16,
                     ),
-                    child: const Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.check_circle_rounded, color: Colors.white, size: 16),
-                        SizedBox(width: 6),
-                        Text(
-                          'Activ',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w700,
+                    SizedBox(width: 6),
+                    Text(
+                      'Activ',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
         ],
       ),
-                  ),
-                ),
-            ],
-          ),
       body: SafeArea(
         top: true,
         bottom: true,
         child: FutureBuilder<ProfileCardDto>(
-            future: _profileDetails,
-            builder: (context, profileSnapshot) {
-              return FutureBuilder<List<LessonProgressDto>>(
-        future: _f,
-        builder: (c, s) {
-          if (!s.hasData) {
-                    return const Center(
-                      child: CircularProgressIndicator(
-                        valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFEA2233)),
+          future: _profileDetails,
+          builder: (context, profileSnapshot) {
+            return FutureBuilder<List<LessonProgressDto>>(
+              future: _f,
+              builder: (c, s) {
+                if (!s.hasData) {
+                  return const Center(
+                    child: CircularProgressIndicator(
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        Color(0xFFEA2233),
                       ),
-                    );
-                  }
-                  
-                  final profile = profileSnapshot.data ?? widget.profile;
-                  final items = s.data!;
+                    ),
+                  );
+                }
 
-          return ListView(
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-                    children: [
-                      // Profile Info Card
-                      Container(
-                        padding: const EdgeInsets.all(24),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(24),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.08),
-                              blurRadius: 16,
-                              offset: const Offset(0, 4),
-                            ),
-                          ],
-                        ),
-                        child: Column(
-                          children: [
-                            // Avatar with upload functionality
-                            _isUploadingImage
-                                ? const SizedBox(
-                                    width: 100,
-                                    height: 100,
-                                    child: Center(
-                                      child: CircularProgressIndicator(
-                                        valueColor: AlwaysStoppedAnimation<Color>(
-                                          Color(0xFFEA2233),
-                                        ),
-                                      ),
-                                    ),
-                                  )
-                                : ProfileAvatar(
-                                    key: ValueKey('profile-avatar-${profile.id}-$_avatarUpdateCounter'),
-                                    imageUrl: _newAvatarUrl ?? profile.avatarUri,
-                                    initials: _getProfileInitials(profile.name),
-                                    size: 100,
-                                    showEditButton: true,
-                                    onImageSelected: _uploadProfileAvatar,
-                                  ),
-                            const SizedBox(height: 20),
-                            Text(
-                              profile.name,
-                              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                                fontWeight: FontWeight.w800,
-                                color: const Color(0xFF17406B),
-                              ),
-                            ),
-                            if (profile.premium)
-                              Padding(
-                                padding: const EdgeInsets.only(top: 8),
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFFEA2233).withOpacity(0.1),
-                                    borderRadius: BorderRadius.circular(20),
-                                    border: Border.all(
-                                      color: const Color(0xFFEA2233).withOpacity(0.3),
-                                    ),
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(Icons.star_rounded, size: 16, color: const Color(0xFFEA2233)),
-                                      const SizedBox(width: 6),
-                                      Text(
-                                        'Premium',
-                                        style: TextStyle(
-                                          color: const Color(0xFFEA2233),
-                                          fontWeight: FontWeight.w700,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            const SizedBox(height: 24),
-                            // Details
-                            Builder(
-                              builder: (context) {
-                                // Debug logging
-                                print('🎨 Profile details page - birthDate: ${profile.birthDate}, gender: ${profile.gender}');
-                                return const SizedBox.shrink();
-                              },
-                            ),
-                            if (profile.birthDate != null || profile.gender != null || profile.age != null) ...[
-                              if (profile.birthDate != null)
-                                _DetailRow(
-                                  icon: Icons.cake_outlined,
-                                  iconColor: const Color(0xFF2D72D2),
-                                  label: 'Zi de naștere',
-                                  value: _formatDate(profile.birthDate!),
-                                ),
-                              if (profile.birthDate != null && (profile.gender != null || profile.age != null))
-                                const SizedBox(height: 16),
-                              if (profile.gender != null)
-                                _DetailRow(
-                                  icon: Icons.person_outline_rounded,
-                                  iconColor: const Color(0xFF2D72D2),
-                                  label: 'Gen',
-                                  value: _getGenderLabel(profile.gender),
-                                ),
-                              if (profile.gender != null && profile.age != null)
-                                const SizedBox(height: 16),
-                              if (profile.age != null)
-                                _DetailRow(
-                                  icon: Icons.calendar_today_outlined,
-                                  iconColor: const Color(0xFFEA2233),
-                                  label: 'Vârstă',
-                                  value: '${profile.age} ani',
-                                ),
-                              const SizedBox(height: 24),
-                            ],
-                            // Progress
-                            LinearProgressIndicator(
-                              value: (profile.totalLessons == 0)
-                                  ? 0
-                                  : (profile.completedLessons / profile.totalLessons),
-                              borderRadius: BorderRadius.circular(10),
-                              minHeight: 10,
-                              backgroundColor: const Color(0xFFEA2233).withOpacity(0.1),
-                              valueColor: const AlwaysStoppedAnimation<Color>(
-                                Color(0xFFEA2233),
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              '${profile.progressPercent}% complet (${profile.completedLessons}/${profile.totalLessons} lecții)',
-                              style: TextStyle(
-                                color: Colors.grey[600],
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
-                        ),
+                final profile = profileSnapshot.data ?? widget.profile;
+                final items = s.data!;
+
+                return ListView(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                  children: [
+                    // Profile Info Card
+                    Container(
+                      padding: const EdgeInsets.all(18),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(24),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.08),
+                            blurRadius: 16,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
                       ),
-                      const SizedBox(height: 16),
-                      // Delete Button
-                      FutureBuilder<List<ProfileCardDto>>(
-                        future: repo.list(),
-                        builder: (context, snapshot) {
-                          final allProfiles = snapshot.data ?? [];
-                          final isLastProfile = allProfiles.length == 1;
-                          
-                          return Container(
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(16),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.red.withOpacity(isLastProfile ? 0.1 : 0.2),
-                                  blurRadius: 8,
-                                  offset: const Offset(0, 2),
+                      child: Column(
+                        children: [
+                          // Avatar with upload functionality
+                          _isUploadingImage
+                              ? const SizedBox(
+                                  width: 88,
+                                  height: 88,
+                                  child: Center(
+                                    child: CircularProgressIndicator(
+                                      valueColor: AlwaysStoppedAnimation<Color>(
+                                        Color(0xFFEA2233),
+                                      ),
+                                    ),
+                                  ),
+                                )
+                              : ProfileAvatar(
+                                  key: ValueKey(
+                                    'profile-avatar-${profile.id}-$_avatarUpdateCounter',
+                                  ),
+                                  imageUrl: _newAvatarUrl ?? profile.avatarUri,
+                                  initials: _getProfileInitials(profile.name),
+                                  size: 88,
+                                  showEditButton: true,
+                                  onImageSelected: _uploadProfileAvatar,
                                 ),
-                              ],
-                            ),
-                            child: FilledButton.icon(
-                              onPressed: isLastProfile ? null : _deleteProfile,
-                              icon: const Icon(Icons.delete_outline_rounded),
-                              label: Text(isLastProfile 
-                                ? 'Nu poți șterge ultimul profil' 
-                                : 'Șterge profil'),
-                              style: FilledButton.styleFrom(
-                                backgroundColor: Colors.red,
-                                foregroundColor: Colors.white,
-                                disabledBackgroundColor: Colors.grey[400],
-                                disabledForegroundColor: Colors.white,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(16),
+                          const SizedBox(height: 14),
+                          Text(
+                            profile.name,
+                            style: Theme.of(context).textTheme.headlineSmall
+                                ?.copyWith(
+                                  fontWeight: FontWeight.w800,
+                                  color: const Color(0xFF17406B),
                                 ),
-                                padding: const EdgeInsets.symmetric(vertical: 16),
-                                textStyle: const TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w700,
+                          ),
+                          if (profile.premium)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 8),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 6,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: const Color(
+                                    0xFFEA2233,
+                                  ).withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: Border.all(
+                                    color: const Color(
+                                      0xFFEA2233,
+                                    ).withOpacity(0.3),
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      Icons.star_rounded,
+                                      size: 16,
+                                      color: const Color(0xFFEA2233),
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      'Premium',
+                                      style: TextStyle(
+                                        color: const Color(0xFFEA2233),
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
+                            ),
+                          const SizedBox(height: 16),
+                          // Details
+                          Builder(
+                            builder: (context) {
+                              // Debug logging
+                              print(
+                                '🎨 Profile details page - birthDate: ${profile.birthDate}, gender: ${profile.gender}',
+                              );
+                              return const SizedBox.shrink();
+                            },
+                          ),
+                          if (profile.birthDate != null ||
+                              profile.gender != null ||
+                              profile.age != null) ...[
+                            if (profile.birthDate != null)
+                              _DetailRow(
+                                icon: Icons.cake_outlined,
+                                iconColor: const Color(0xFF2D72D2),
+                                label: 'Zi de naștere',
+                                value: _formatDate(profile.birthDate!),
+                              ),
+                            if (profile.birthDate != null &&
+                                (profile.gender != null || profile.age != null))
+                              const SizedBox(height: 10),
+                            if (profile.gender != null)
+                              _DetailRow(
+                                icon: Icons.person_outline_rounded,
+                                iconColor: const Color(0xFF2D72D2),
+                                label: 'Gen',
+                                value: _getGenderLabel(profile.gender),
+                              ),
+                            if (profile.gender != null && profile.age != null)
+                              const SizedBox(height: 10),
+                            if (profile.age != null)
+                              _DetailRow(
+                                icon: Icons.calendar_today_outlined,
+                                iconColor: const Color(0xFFEA2233),
+                                label: 'Vârstă',
+                                value: '${profile.age} ani',
+                              ),
+                            const SizedBox(height: 16),
+                          ],
+                          // Progress
+                          LinearProgressIndicator(
+                            value: (profile.totalLessons == 0)
+                                ? 0
+                                : (profile.completedLessons /
+                                      profile.totalLessons),
+                            borderRadius: BorderRadius.circular(10),
+                            minHeight: 8,
+                            backgroundColor: const Color(
+                              0xFFEA2233,
+                            ).withOpacity(0.1),
+                            valueColor: const AlwaysStoppedAnimation<Color>(
+                              Color(0xFFEA2233),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            '${profile.progressPercent}% complet (${profile.completedLessons}/${profile.totalLessons} lecții)',
+                            style: TextStyle(
+                              color: Colors.grey[600],
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    // Assign Homework Button
+                    Container(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFF2D72D2).withOpacity(0.2),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: FilledButton.icon(
+                        onPressed: () async {
+                          final result = await showModalBottomSheet<bool>(
+                            context: context,
+                            isScrollControlled: true,
+                            backgroundColor: Colors.transparent,
+                            builder: (ctx) => AssignHomeworkSheet(
+                              profileId: widget.profile.id,
+                              profileName: widget.profile.name,
                             ),
                           );
+                          // Refresh homework list if assignment was made
+                          if (result == true) {
+                            _refreshHomework();
+                          }
                         },
-                      ),
-                      const SizedBox(height: 12),
-                      // Assign Homework Button
-                      Container(
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(16),
-                          boxShadow: [
-                            BoxShadow(
-                              color: const Color(0xFF2D72D2).withOpacity(0.2),
-                              blurRadius: 8,
-                              offset: const Offset(0, 2),
-                            ),
-                          ],
-                        ),
-                        child: FilledButton.icon(
-                          onPressed: () {
-                            showModalBottomSheet(
-                              context: context,
-                              isScrollControlled: true,
-                              backgroundColor: Colors.transparent,
-                              builder: (ctx) => AssignHomeworkSheet(
-                                profileId: widget.profile.id,
-                                profileName: widget.profile.name,
-                              ),
-                            );
-                          },
-                          icon: const Icon(Icons.assignment_add),
-                          label: const Text('Adaugă temă'),
-                          style: FilledButton.styleFrom(
-                            backgroundColor: const Color(0xFF2D72D2),
-                            foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            textStyle: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w700,
-                            ),
+                        icon: const Icon(Icons.assignment_add),
+                        label: const Text('Adaugă temă'),
+                        style: FilledButton.styleFrom(
+                          backgroundColor: const Color(0xFF2D72D2),
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          textStyle: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
                           ),
                         ),
                       ),
-                      const SizedBox(height: 16),
-                      // Lessons Progress
-                      if (items.isNotEmpty) ...[
-                        Container(
+                    ),
+                    const SizedBox(height: 16),
+                    // Homework Assignments Section
+                    FutureBuilder<List<HomeworkDTO>>(
+                      future: _homeworkFuture,
+                      builder: (context, homeworkSnapshot) {
+                        if (homeworkSnapshot.connectionState ==
+                            ConnectionState.waiting) {
+                          return const Center(
+                            child: CircularProgressIndicator(),
+                          );
+                        }
+
+                        if (homeworkSnapshot.hasError) {
+                          return Container(
+                            padding: const EdgeInsets.all(20),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(24),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.08),
+                                  blurRadius: 16,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ],
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    const Icon(
+                                      Icons.assignment,
+                                      color: Color(0xFF2D72D2),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      'Teme asignate',
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .titleLarge
+                                          ?.copyWith(
+                                            fontWeight: FontWeight.w700,
+                                            color: const Color(0xFF17406B),
+                                          ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 12),
+                                Text(
+                                  'Nu am putut încărca temele. Încearcă din nou.',
+                                  style: TextStyle(color: Colors.grey[700]),
+                                ),
+                                const SizedBox(height: 12),
+                                FilledButton.icon(
+                                  onPressed: _refreshHomework,
+                                  icon: const Icon(Icons.refresh),
+                                  label: const Text('Reîncearcă'),
+                                ),
+                              ],
+                            ),
+                          );
+                        }
+
+                        final homework = homeworkSnapshot.data ?? [];
+
+                        if (homework.isEmpty) {
+                          return const SizedBox.shrink(); // No homework, show nothing
+                        }
+
+                        return Container(
                           padding: const EdgeInsets.all(20),
                           decoration: BoxDecoration(
                             color: Colors.white,
@@ -575,67 +700,178 @@ class _ProfileDetailsPageState extends State<ProfileDetailsPage> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(
-                                'Progres lecții',
-                                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                                  fontWeight: FontWeight.w700,
-                                  color: const Color(0xFF17406B),
-                                ),
+                              Row(
+                                children: [
+                                  const Icon(
+                                    Icons.assignment,
+                                    color: Color(0xFF2D72D2),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    'Teme asignate (${homework.length})',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .titleLarge
+                                        ?.copyWith(
+                                          fontWeight: FontWeight.w700,
+                                          color: const Color(0xFF17406B),
+                                        ),
+                                  ),
+                                ],
                               ),
                               const SizedBox(height: 16),
-                              ..._buildModulesList(items),
-                            ],
-                          ),
-                        ),
-                      ] else ...[
-                        Container(
-                          padding: const EdgeInsets.all(32),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(24),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.08),
-                                blurRadius: 16,
-                                offset: const Offset(0, 4),
+                              ...homework.map(
+                                (hw) => _buildHomeworkCard(hw, items),
                               ),
                             ],
                           ),
-                          child: Center(
-                            child: Column(
-                              children: [
-                                Icon(Icons.menu_book_outlined, size: 48, color: Colors.grey[400]),
-                                const SizedBox(height: 12),
-                                Text(
-                                  'Nu există lecții',
-                                  style: TextStyle(
-                                    color: Colors.grey[600],
-                                    fontSize: 16,
-                                  ),
-                                ),
-                              ],
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    // Lessons Progress
+                    if (items.isNotEmpty) ...[
+                      Container(
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(24),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.08),
+                              blurRadius: 16,
+                              offset: const Offset(0, 4),
                             ),
+                          ],
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Progres lecții',
+                              style: Theme.of(context).textTheme.titleLarge
+                                  ?.copyWith(
+                                    fontWeight: FontWeight.w700,
+                                    color: const Color(0xFF17406B),
+                                  ),
+                            ),
+                            const SizedBox(height: 16),
+                            ..._buildModulesList(items),
+                          ],
+                        ),
+                      ),
+                    ] else ...[
+                      Container(
+                        padding: const EdgeInsets.all(32),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(24),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.08),
+                              blurRadius: 16,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: Center(
+                          child: Column(
+                            children: [
+                              Icon(
+                                Icons.menu_book_outlined,
+                                size: 48,
+                                color: Colors.grey[400],
+                              ),
+                              const SizedBox(height: 12),
+                              Text(
+                                'Nu există lecții',
+                                style: TextStyle(
+                                  color: Colors.grey[600],
+                                  fontSize: 16,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                      ],
+                      ),
                     ],
-                  );
-                },
-              );
-            },
-          ),
+                    const SizedBox(height: 16),
+                    // Delete Button (kept at the very end so homework/progress stay higher)
+                    FutureBuilder<List<ProfileCardDto>>(
+                      future: repo.list(),
+                      builder: (context, snapshot) {
+                        final allProfiles = snapshot.data ?? [];
+                        final isLastProfile = allProfiles.length == 1;
+
+                        return Container(
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(16),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.red.withOpacity(
+                                  isLastProfile ? 0.08 : 0.18,
+                                ),
+                                blurRadius: 8,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: FilledButton.icon(
+                            onPressed: isLastProfile ? null : _deleteProfile,
+                            icon: const Icon(Icons.delete_outline_rounded),
+                            label: Text(
+                              isLastProfile
+                                  ? 'Nu poți șterge ultimul profil'
+                                  : 'Șterge profil',
+                            ),
+                            style: FilledButton.styleFrom(
+                              backgroundColor: Colors.red,
+                              foregroundColor: Colors.white,
+                              disabledBackgroundColor: Colors.grey[400],
+                              disabledForegroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              textStyle: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ],
+                );
+              },
+            );
+          },
         ),
+      ),
     );
   }
 
   Widget _statusIcon(String status) {
     switch (status) {
       case 'DONE':
-        return Icon(Icons.check_circle_rounded, color: const Color(0xFFEA2233), size: 24);
+        return Icon(
+          Icons.check_circle_rounded,
+          color: const Color(0xFFEA2233),
+          size: 24,
+        );
       case 'UNLOCKED':
-        return Icon(Icons.radio_button_unchecked, color: const Color(0xFF2D72D2), size: 24);
+        return Icon(
+          Icons.radio_button_unchecked,
+          color: const Color(0xFF2D72D2),
+          size: 24,
+        );
       default:
-        return Icon(Icons.lock_outline_rounded, color: Colors.grey[400], size: 24);
+        return Icon(
+          Icons.lock_outline_rounded,
+          color: Colors.grey[400],
+          size: 24,
+        );
     }
   }
 
@@ -664,7 +900,7 @@ class _ProfileDetailsPageState extends State<ProfileDetailsPage> {
   List<Widget> _buildModulesList(List<LessonProgressDto> items) {
     // First group by module, then by submodule
     final Map<int, Map<int, List<LessonProgressDto>>> modulesMap = {};
-    
+
     for (final item in items) {
       modulesMap.putIfAbsent(item.moduleId, () => {});
       modulesMap[item.moduleId]!.putIfAbsent(item.submoduleId, () => []);
@@ -683,10 +919,7 @@ class _ProfileDetailsPageState extends State<ProfileDetailsPage> {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: const Color(0xFFF3F5F8),
-            width: 1,
-          ),
+          border: Border.all(color: const Color(0xFFF3F5F8), width: 1),
         ),
         child: Column(
           children: [
@@ -701,23 +934,28 @@ class _ProfileDetailsPageState extends State<ProfileDetailsPage> {
                   }
                 });
               },
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(16),
+              ),
               child: Padding(
                 padding: const EdgeInsets.all(16),
                 child: Row(
                   children: [
                     Icon(
-                      isModuleExpanded ? Icons.expand_more : Icons.chevron_right,
+                      isModuleExpanded
+                          ? Icons.expand_more
+                          : Icons.chevron_right,
                       color: const Color(0xFF17406B),
                     ),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         moduleTitle,
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w700,
-                          color: const Color(0xFF17406B),
-                        ),
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(
+                              fontWeight: FontWeight.w700,
+                              color: const Color(0xFF17406B),
+                            ),
                       ),
                     ),
                     Text(
@@ -742,7 +980,9 @@ class _ProfileDetailsPageState extends State<ProfileDetailsPage> {
                     final submoduleItems = submoduleEntry.value;
                     final firstSubmoduleItem = submoduleItems.first;
                     final submoduleTitle = firstSubmoduleItem.submoduleTitle;
-                    final isSubmoduleExpanded = _expandedSubmodules.contains(submoduleId);
+                    final isSubmoduleExpanded = _expandedSubmodules.contains(
+                      submoduleId,
+                    );
 
                     return Container(
                       margin: const EdgeInsets.only(top: 8),
@@ -763,13 +1003,17 @@ class _ProfileDetailsPageState extends State<ProfileDetailsPage> {
                                 }
                               });
                             },
-                            borderRadius: const BorderRadius.all(Radius.circular(12)),
+                            borderRadius: const BorderRadius.all(
+                              Radius.circular(12),
+                            ),
                             child: Padding(
                               padding: const EdgeInsets.all(12),
                               child: Row(
                                 children: [
                                   Icon(
-                                    isSubmoduleExpanded ? Icons.expand_more : Icons.chevron_right,
+                                    isSubmoduleExpanded
+                                        ? Icons.expand_more
+                                        : Icons.chevron_right,
                                     color: const Color(0xFF17406B),
                                     size: 20,
                                   ),
@@ -777,10 +1021,13 @@ class _ProfileDetailsPageState extends State<ProfileDetailsPage> {
                                   Expanded(
                                     child: Text(
                                       submoduleTitle,
-                                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                                        fontWeight: FontWeight.w700,
-                                        color: const Color(0xFF17406B),
-                                      ),
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .titleSmall
+                                          ?.copyWith(
+                                            fontWeight: FontWeight.w700,
+                                            color: const Color(0xFF17406B),
+                                          ),
                                     ),
                                   ),
                                   Text(
@@ -798,54 +1045,75 @@ class _ProfileDetailsPageState extends State<ProfileDetailsPage> {
                           // Lessons (shown when submodule is expanded)
                           if (isSubmoduleExpanded)
                             Padding(
-                              padding: const EdgeInsets.only(left: 12, right: 12, bottom: 12),
+                              padding: const EdgeInsets.only(
+                                left: 12,
+                                right: 12,
+                                bottom: 12,
+                              ),
                               child: Column(
-                                children: submoduleItems.map((l) => Padding(
-                                  padding: const EdgeInsets.only(bottom: 8),
-                                  child: Row(
-                                    children: [
-                                      _statusIcon(l.status),
-                                      const SizedBox(width: 12),
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                children: submoduleItems
+                                    .map(
+                                      (l) => Padding(
+                                        padding: const EdgeInsets.only(
+                                          bottom: 8,
+                                        ),
+                                        child: Row(
                                           children: [
-                                            Text(
-                                              l.lessonTitle,
-                                              style: const TextStyle(
-                                                fontWeight: FontWeight.w600,
-                                                color: Color(0xFF17406B),
-                                                fontSize: 14,
+                                            _statusIcon(l.status),
+                                            const SizedBox(width: 12),
+                                            Expanded(
+                                              child: Column(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.start,
+                                                children: [
+                                                  Text(
+                                                    l.lessonTitle,
+                                                    style: const TextStyle(
+                                                      fontWeight:
+                                                          FontWeight.w600,
+                                                      color: Color(0xFF17406B),
+                                                      fontSize: 14,
+                                                    ),
+                                                  ),
+                                                  Text(
+                                                    '${l.moduleTitle} • Lecția ${l.lessonId}',
+                                                    style: TextStyle(
+                                                      color: Colors.grey[600],
+                                                      fontSize: 12,
+                                                    ),
+                                                  ),
+                                                ],
                                               ),
                                             ),
-                                            Text(
-                                              '${l.moduleTitle} • Lecția ${l.lessonId}',
-                                              style: TextStyle(
-                                                color: Colors.grey[600],
-                                                fontSize: 12,
+                                            Container(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    horizontal: 8,
+                                                    vertical: 4,
+                                                  ),
+                                              decoration: BoxDecoration(
+                                                color: _getStatusColor(
+                                                  l.status,
+                                                ).withOpacity(0.1),
+                                                borderRadius:
+                                                    BorderRadius.circular(12),
+                                              ),
+                                              child: Text(
+                                                _getStatusLabel(l.status),
+                                                style: TextStyle(
+                                                  color: _getStatusColor(
+                                                    l.status,
+                                                  ),
+                                                  fontSize: 11,
+                                                  fontWeight: FontWeight.w700,
+                                                ),
                                               ),
                                             ),
                                           ],
                                         ),
                                       ),
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                        decoration: BoxDecoration(
-                                          color: _getStatusColor(l.status).withOpacity(0.1),
-                                          borderRadius: BorderRadius.circular(12),
-                                        ),
-                                        child: Text(
-                                          _getStatusLabel(l.status),
-                                          style: TextStyle(
-                                            color: _getStatusColor(l.status),
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.w700,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                )).toList(),
+                                    )
+                                    .toList(),
                               ),
                             ),
                         ],
@@ -858,6 +1126,319 @@ class _ProfileDetailsPageState extends State<ProfileDetailsPage> {
         ),
       );
     }).toList();
+  }
+
+  Widget _buildHomeworkCard(HomeworkDTO hw, List<LessonProgressDto> progress) {
+    // Use backend-calculated progress
+    final progressValue = hw.progress;
+    final kidMarkedComplete = hw.isMarkedComplete;
+    final isAllLessonsDone = hw.isAllLessonsDone;
+    final isCompleted = kidMarkedComplete || hw.isAllLessonsDone;
+    final isOverdue =
+        hw.dueDate != null &&
+        hw.dueDate!.isBefore(DateTime.now()) &&
+        !isCompleted;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isCompleted
+            ? const Color(0xFF4CAF50).withOpacity(0.05)
+            : isOverdue
+            ? Colors.red.withOpacity(0.05)
+            : const Color(0xFFF8F9FA),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isCompleted
+              ? const Color(0xFF4CAF50).withOpacity(0.3)
+              : isOverdue
+              ? Colors.red.withOpacity(0.3)
+              : const Color(0xFFE0E0E0),
+          width: 1,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              // Type badge
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF2D72D2).withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  hw.typeDescription,
+                  style: const TextStyle(
+                    color: Color(0xFF2D72D2),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              // Status badge
+              if (isCompleted)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF4CAF50).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.check_circle,
+                        size: 12,
+                        color: Color(0xFF4CAF50),
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        kidMarkedComplete && !isAllLessonsDone
+                            ? 'De confirmat'
+                            : 'Complet',
+                        style: const TextStyle(
+                          color: Color(0xFF4CAF50),
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+              else if (isOverdue)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.red.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.warning_amber_rounded,
+                        size: 12,
+                        color: Colors.red,
+                      ),
+                      SizedBox(width: 4),
+                      Text(
+                        'Întârziat',
+                        style: TextStyle(
+                          color: Colors.red,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              const Spacer(),
+              // Specialist actions: mark done (archive) + optional delete
+              IconButton(
+                onPressed: () async {
+                  final confirmed = await showDialog<bool>(
+                    context: context,
+                    builder: (ctx) => AlertDialog(
+                      title: const Text('Marchează tema ca făcută'),
+                      content: Text(
+                        'Tema "${hw.displayName}" va dispărea din lista activă.',
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.of(ctx).pop(false),
+                          child: const Text('Anulează'),
+                        ),
+                        FilledButton(
+                          onPressed: () => Navigator.of(ctx).pop(true),
+                          style: FilledButton.styleFrom(
+                            backgroundColor: const Color(0xFF4CAF50),
+                          ),
+                          child: const Text('Gata'),
+                        ),
+                      ],
+                    ),
+                  );
+                  if (confirmed == true) {
+                    _markHomeworkDone(hw.id);
+                  }
+                },
+                icon: Icon(
+                  Icons.task_alt,
+                  color: const Color(0xFF4CAF50),
+                  size: 20,
+                ),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+                tooltip: 'Marchează gata',
+              ),
+              const SizedBox(width: 10),
+              IconButton(
+                onPressed: () async {
+                  final confirmed = await showDialog<bool>(
+                    context: context,
+                    builder: (ctx) => AlertDialog(
+                      title: const Text('Șterge tema'),
+                      content: Text(
+                        'Ești sigur că vrei să ștergi tema "${hw.displayName}"?',
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.of(ctx).pop(false),
+                          child: const Text('Anulează'),
+                        ),
+                        FilledButton(
+                          onPressed: () => Navigator.of(ctx).pop(true),
+                          style: FilledButton.styleFrom(
+                            backgroundColor: Colors.red,
+                          ),
+                          child: const Text('Șterge'),
+                        ),
+                      ],
+                    ),
+                  );
+                  if (confirmed == true) {
+                    _deleteHomework(hw.id);
+                  }
+                },
+                icon: Icon(
+                  Icons.delete_outline,
+                  color: Colors.grey[600],
+                  size: 20,
+                ),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+                tooltip: 'Șterge',
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          // Title
+          Text(
+            hw.displayName,
+            style: const TextStyle(
+              fontWeight: FontWeight.w600,
+              fontSize: 16,
+              color: Color(0xFF17406B),
+            ),
+          ),
+          // Module/Submodule path
+          if (hw.partId != null && hw.submoduleName != null) ...[
+            const SizedBox(height: 4),
+            Text(
+              '${hw.moduleName ?? ''} › ${hw.submoduleName}',
+              style: TextStyle(color: Colors.grey[600], fontSize: 12),
+            ),
+          ] else if (hw.submoduleId != null && hw.moduleName != null) ...[
+            const SizedBox(height: 4),
+            Text(
+              hw.moduleName!,
+              style: TextStyle(color: Colors.grey[600], fontSize: 12),
+            ),
+          ],
+          const SizedBox(height: 12),
+          // Progress bar
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: LinearProgressIndicator(
+              value: progressValue,
+              minHeight: 8,
+              backgroundColor: Colors.grey[200],
+              valueColor: AlwaysStoppedAnimation<Color>(
+                isCompleted ? const Color(0xFF4CAF50) : const Color(0xFF2D72D2),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          // Progress text and due date
+          Row(
+            children: [
+              Text(
+                hw.totalLessons > 0
+                    ? '${(progressValue * 100).round()}% complet (${hw.completedLessons}/${hw.totalLessons})'
+                    : '0% complet',
+                style: TextStyle(
+                  color: Colors.grey[600],
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              const Spacer(),
+              if (kidMarkedComplete) ...[
+                Text(
+                  'Marcat de copil',
+                  style: TextStyle(
+                    color: const Color(0xFF4CAF50),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(width: 12),
+              ],
+              if (hw.dueDate != null)
+                Row(
+                  children: [
+                    Icon(
+                      Icons.calendar_today_outlined,
+                      size: 12,
+                      color: isOverdue ? Colors.red : Colors.grey[600],
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      'Până la: ${hw.dueDate!.day}/${hw.dueDate!.month}/${hw.dueDate!.year}',
+                      style: TextStyle(
+                        color: isOverdue ? Colors.red : Colors.grey[600],
+                        fontSize: 12,
+                        fontWeight: isOverdue
+                            ? FontWeight.w600
+                            : FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+            ],
+          ),
+          // Notes
+          if (hw.notes != null && hw.notes!.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.grey[100],
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.notes, size: 14, color: Colors.grey[600]),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      hw.notes!,
+                      style: TextStyle(
+                        color: Colors.grey[700],
+                        fontSize: 12,
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
   }
 }
 
@@ -879,14 +1460,14 @@ class _DetailRow extends StatelessWidget {
     return Row(
       children: [
         Container(
-          padding: const EdgeInsets.all(8),
+          padding: const EdgeInsets.all(6),
           decoration: BoxDecoration(
             color: iconColor.withOpacity(0.1),
             borderRadius: BorderRadius.circular(12),
           ),
-          child: Icon(icon, color: iconColor, size: 20),
+          child: Icon(icon, color: iconColor, size: 18),
         ),
-        const SizedBox(width: 12),
+        const SizedBox(width: 10),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -895,15 +1476,15 @@ class _DetailRow extends StatelessWidget {
                 label,
                 style: TextStyle(
                   color: Colors.grey[600],
-                  fontSize: 13,
+                  fontSize: 12,
                   fontWeight: FontWeight.w500,
                 ),
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: 2),
               Text(
                 value,
                 style: const TextStyle(
-                  fontSize: 15,
+                  fontSize: 14,
                   fontWeight: FontWeight.w600,
                   color: Color(0xFF17406B),
                 ),

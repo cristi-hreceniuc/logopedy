@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get_it/get_it.dart';
 import '../../../core/network/dio_client.dart';
-import '../../content/presentation/modules_page.dart';
 import '../../content/presentation/part_page.dart';
 import '../../content/presentation/submodule_page.dart';
 import '../data/kid_api.dart';
@@ -136,6 +135,7 @@ class _HomeworkTabState extends State<HomeworkTab> {
           return _HomeworkCard(
             homework: hw,
             profileId: widget.profileId,
+            onRefresh: _loadHomework,
           );
         },
       ),
@@ -146,10 +146,12 @@ class _HomeworkTabState extends State<HomeworkTab> {
 class _HomeworkCard extends StatelessWidget {
   final HomeworkDTO homework;
   final int profileId;
+  final VoidCallback onRefresh;
 
   const _HomeworkCard({
     required this.homework,
     required this.profileId,
+    required this.onRefresh,
   });
 
   @override
@@ -162,9 +164,11 @@ class _HomeworkCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 12),
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
-        onTap: () {
+        onTap: () async {
           // Navigate to the homework content
-          _navigateToHomework(context);
+          await _navigateToHomework(context);
+          // Refresh homework list when returning
+          onRefresh();
         },
         child: Padding(
           padding: const EdgeInsets.all(16),
@@ -259,12 +263,12 @@ class _HomeworkCard extends StatelessWidget {
     return '${date.day}/${date.month}/${date.year}';
   }
 
-  void _navigateToHomework(BuildContext context) {
+  Future<void> _navigateToHomework(BuildContext context) async {
     // Navigate based on the most specific homework assignment type
     // Priority: part > submodule > module
     if (homework.partId != null) {
       // Navigate to part page
-      Navigator.push(
+      await Navigator.push(
         context,
         MaterialPageRoute(
           builder: (_) => PartPage(
@@ -277,7 +281,7 @@ class _HomeworkCard extends StatelessWidget {
       );
     } else if (homework.submoduleId != null) {
       // Navigate to submodule page
-      Navigator.push(
+      await Navigator.push(
         context,
         MaterialPageRoute(
           builder: (_) => SubmodulePage(
@@ -289,27 +293,173 @@ class _HomeworkCard extends StatelessWidget {
         ),
       );
     } else if (homework.moduleId != null) {
-      // Navigate to modules page (show the specific module)
-      // For simplicity, we'll navigate to the modules page
-      // The user can then select the specific module
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => ModulesPage(
-            profileId: profileId,
-            isKid: true,
-          ),
-        ),
-      );
+      // Navigate directly to the module's submodule selection
+      try {
+        final kidApi = KidApi(GetIt.I<DioClient>());
+        final moduleData = await kidApi.getModule(homework.moduleId!);
+        final submodules = (moduleData['submodules'] as List?) ?? [];
+        
+        if (submodules.isEmpty) {
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Modulul nu are submodule disponibile.')),
+            );
+          }
+          return;
+        }
+        
+        if (context.mounted) {
+          await Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => _ModuleSubmoduleSelectionPage(
+                profileId: profileId,
+                moduleTitle: homework.moduleName ?? 'Modul',
+                submodules: submodules,
+              ),
+            ),
+          );
+        }
+      } catch (e) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Eroare la încărcarea modulului: $e')),
+          );
+        }
+      }
     } else {
-      // No specific content assigned, show a message
+      // No specific content assigned
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Această temă nu are conținut specific asociat.'),
-          duration: Duration(seconds: 2),
         ),
       );
     }
+  }
+}
+
+/// Submodule selection page for module homework
+class _ModuleSubmoduleSelectionPage extends StatelessWidget {
+  final int profileId;
+  final String moduleTitle;
+  final List<dynamic> submodules;
+
+  const _ModuleSubmoduleSelectionPage({
+    required this.profileId,
+    required this.moduleTitle,
+    required this.submodules,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(moduleTitle),
+        centerTitle: true,
+      ),
+      body: submodules.isEmpty
+          ? Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.folder_open_outlined,
+                    size: 64,
+                    color: cs.primary.withOpacity(0.3),
+                  ),
+                  const SizedBox(height: 16),
+                  const Text('Nu există submodule disponibile.'),
+                ],
+              ),
+            )
+          : ListView.separated(
+              padding: const EdgeInsets.all(16),
+              itemCount: submodules.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 12),
+              itemBuilder: (context, index) {
+                final sub = submodules[index] as Map<String, dynamic>;
+                final id = sub['id'] as int;
+                final title = sub['title'] as String? ?? 'Submodul ${index + 1}';
+                final introText = sub['introText'] as String?;
+                
+                return Card(
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(12),
+                    onTap: () async {
+                      await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => SubmodulePage(
+                            profileId: profileId,
+                            submoduleId: id,
+                            title: title,
+                            isKid: true,
+                          ),
+                        ),
+                      );
+                    },
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 48,
+                            height: 48,
+                            decoration: BoxDecoration(
+                              color: cs.primaryContainer,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Center(
+                              child: Text(
+                                '${index + 1}',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 18,
+                                  color: cs.onPrimaryContainer,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  title,
+                                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                if (introText != null && introText.isNotEmpty) ...[
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    introText,
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      color: cs.onSurface.withOpacity(0.6),
+                                    ),
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                          Icon(
+                            Icons.chevron_right,
+                            color: cs.onSurface.withOpacity(0.5),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+    );
   }
 }
 

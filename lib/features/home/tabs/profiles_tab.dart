@@ -21,7 +21,7 @@ import '../../specialist/models/license_key_dto.dart';
 
 class ProfilesTab extends StatefulWidget {
   const ProfilesTab({super.key, this.shouldOpenCreateDialog = false});
-  
+
   final bool shouldOpenCreateDialog;
 
   @override
@@ -65,19 +65,25 @@ class _ProfilesTabState extends State<ProfilesTab> {
   Future<void> _checkAndOpenCreateDialog() async {
     if (_hasCheckedForEmptyProfiles) return;
     _hasCheckedForEmptyProfiles = true;
-    
+
     try {
       final profiles = await _f;
       final activeProfileId = GetIt.I<ActiveProfileService>().id;
-      
+
       // If shouldOpenCreateDialog is true (after onboarding) or if no profiles exist, automatically open create dialog
-      final shouldOpen = widget.shouldOpenCreateDialog || (profiles.isEmpty && activeProfileId == null);
-      
-      debugPrint('ProfilesTab: shouldOpenCreateDialog=${widget.shouldOpenCreateDialog}, profiles.isEmpty=${profiles.isEmpty}, activeProfileId=$activeProfileId, shouldOpen=$shouldOpen');
-      
+      final shouldOpen =
+          widget.shouldOpenCreateDialog ||
+          (profiles.isEmpty && activeProfileId == null);
+
+      debugPrint(
+        'ProfilesTab: shouldOpenCreateDialog=${widget.shouldOpenCreateDialog}, profiles.isEmpty=${profiles.isEmpty}, activeProfileId=$activeProfileId, shouldOpen=$shouldOpen',
+      );
+
       if (shouldOpen && mounted) {
         // Wait a bit for the UI to be ready, especially after onboarding
-        await Future.delayed(Duration(milliseconds: widget.shouldOpenCreateDialog ? 1200 : 500));
+        await Future.delayed(
+          Duration(milliseconds: widget.shouldOpenCreateDialog ? 1200 : 500),
+        );
         if (mounted) {
           debugPrint('ProfilesTab: Opening create profile dialog');
           _wasAutoOpened = true; // Track that dialog was auto-opened
@@ -86,7 +92,9 @@ class _ProfilesTabState extends State<ProfilesTab> {
           debugPrint('ProfilesTab: Widget not mounted, skipping dialog');
         }
       } else {
-        debugPrint('ProfilesTab: Not opening dialog - shouldOpen=$shouldOpen, mounted=$mounted');
+        debugPrint(
+          'ProfilesTab: Not opening dialog - shouldOpen=$shouldOpen, mounted=$mounted',
+        );
       }
     } catch (e, stackTrace) {
       debugPrint('Error checking for empty profiles: $e');
@@ -95,7 +103,9 @@ class _ProfilesTabState extends State<ProfilesTab> {
   }
 
   Future<void> _refresh() async {
-    setState(() { _f = repo.list(); });
+    setState(() {
+      _f = repo.list();
+    });
     await _f;
   }
 
@@ -106,12 +116,12 @@ class _ProfilesTabState extends State<ProfilesTab> {
     File? selectedImage;
     bool isUploadingImage = false;
     final formKey = GlobalKey<FormState>();
-    
+
     // Key selection state
     List<LicenseKeyDTO>? availableKeys;
     LicenseKeyDTO? selectedKey;
     bool isLoadingKeys = true;
-    
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -121,7 +131,7 @@ class _ProfilesTabState extends State<ProfilesTab> {
         final cs = Theme.of(ctx).colorScheme;
         final isDark = Theme.of(ctx).brightness == Brightness.dark;
         final titleColor = isDark ? Colors.white : const Color(0xFF17406B);
-        
+
         // Load available keys
         void loadAvailableKeys(StateSetter setModalState) async {
           try {
@@ -138,18 +148,23 @@ class _ProfilesTabState extends State<ProfilesTab> {
             });
           }
         }
-        
+
         return StatefulBuilder(
           builder: (context, setModalState) {
+            final neutralFill =
+                Theme.of(context).inputDecorationTheme.fillColor ??
+                const Color(0xFFF2F3F6);
             // Load keys on first build
             if (isLoadingKeys && availableKeys == null) {
               loadAvailableKeys(setModalState);
             }
-            
+
             return Container(
               decoration: BoxDecoration(
-                color: cs.surfaceContainerLowest,
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+                color: Theme.of(context).scaffoldBackgroundColor,
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(20),
+                ),
               ),
               child: Padding(
                 padding: EdgeInsets.only(
@@ -179,10 +194,11 @@ class _ProfilesTabState extends State<ProfilesTab> {
                       Text(
                         'Profil nou',
                         textAlign: TextAlign.center,
-                        style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                          fontWeight: FontWeight.w700,
-                          color: titleColor,
-                        ),
+                        style: Theme.of(context).textTheme.headlineMedium
+                            ?.copyWith(
+                              fontWeight: FontWeight.w700,
+                              color: titleColor,
+                            ),
                       ),
                       const SizedBox(height: 6),
                       Text(
@@ -209,23 +225,40 @@ class _ProfilesTabState extends State<ProfilesTab> {
                               // Name field
                               TextFormField(
                                 controller: nameCtrl,
-                                style: TextStyle(fontSize: 16, color: cs.onSurface),
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  color: cs.onSurface,
+                                ),
                                 decoration: InputDecoration(
                                   labelText: 'Nume profil',
-                                  labelStyle: TextStyle(color: cs.onSurfaceVariant, fontSize: 14),
-                                  floatingLabelStyle: TextStyle(color: cs.primary, fontSize: 14),
-                                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                                  labelStyle: TextStyle(
+                                    color: cs.onSurfaceVariant,
+                                    fontSize: 14,
+                                  ),
+                                  floatingLabelStyle: TextStyle(
+                                    color: cs.primary,
+                                    fontSize: 14,
+                                  ),
+                                  contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                    vertical: 14,
+                                  ),
                                   border: OutlineInputBorder(
                                     borderRadius: BorderRadius.circular(12),
                                     borderSide: BorderSide(color: cs.outline),
                                   ),
                                   enabledBorder: OutlineInputBorder(
                                     borderRadius: BorderRadius.circular(12),
-                                    borderSide: BorderSide(color: cs.outline.withOpacity(0.5)),
+                                    borderSide: BorderSide(
+                                      color: cs.outline.withOpacity(0.5),
+                                    ),
                                   ),
                                   focusedBorder: OutlineInputBorder(
                                     borderRadius: BorderRadius.circular(12),
-                                    borderSide: BorderSide(color: cs.primary, width: 1.5),
+                                    borderSide: BorderSide(
+                                      color: cs.primary,
+                                      width: 1.5,
+                                    ),
                                   ),
                                   errorBorder: OutlineInputBorder(
                                     borderRadius: BorderRadius.circular(12),
@@ -233,52 +266,78 @@ class _ProfilesTabState extends State<ProfilesTab> {
                                   ),
                                   focusedErrorBorder: OutlineInputBorder(
                                     borderRadius: BorderRadius.circular(12),
-                                    borderSide: BorderSide(color: cs.error, width: 1.5),
+                                    borderSide: BorderSide(
+                                      color: cs.error,
+                                      width: 1.5,
+                                    ),
                                   ),
                                   filled: true,
-                                  fillColor: cs.surfaceContainerLowest,
+                                  fillColor: neutralFill,
                                 ),
-                                validator: (v) => (v == null || v.trim().isEmpty) ? 'Obligatoriu' : null,
+                                validator: (v) =>
+                                    (v == null || v.trim().isEmpty)
+                                    ? 'Obligatoriu'
+                                    : null,
                               ),
                               const SizedBox(height: 14),
                               // Birthday field
                               GestureDetector(
-                                onTap: () => _showDatePicker(ctx, selectedBirthday, (date) {
-                                  setModalState(() {
-                                    selectedBirthday = date;
-                                  });
-                                }),
+                                onTap: () => _showDatePicker(
+                                  ctx,
+                                  selectedBirthday,
+                                  (date) {
+                                    setModalState(() {
+                                      selectedBirthday = date;
+                                    });
+                                  },
+                                ),
                                 child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                    vertical: 16,
+                                  ),
                                   decoration: BoxDecoration(
-                                    color: cs.surfaceContainerLowest,
+                                    color: neutralFill,
                                     borderRadius: BorderRadius.circular(12),
-                                    border: Border.all(color: cs.outline.withOpacity(0.5)),
+                                    border: Border.all(
+                                      color: cs.outline.withOpacity(0.5),
+                                    ),
                                   ),
                                   child: Row(
                                     children: [
                                       Expanded(
                                         child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
                                           children: [
                                             Text(
                                               'Data nașterii',
-                                              style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
+                                              style: TextStyle(
+                                                fontSize: 12,
+                                                color: cs.onSurfaceVariant,
+                                              ),
                                             ),
                                             const SizedBox(height: 4),
                                             Text(
                                               selectedBirthday != null
-                                                  ? DateFormat('dd/MM/yyyy').format(selectedBirthday!)
+                                                  ? DateFormat(
+                                                      'dd/MM/yyyy',
+                                                    ).format(selectedBirthday!)
                                                   : 'Selectează',
                                               style: TextStyle(
                                                 fontSize: 16,
-                                                color: selectedBirthday != null ? cs.onSurface : cs.onSurfaceVariant,
+                                                color: selectedBirthday != null
+                                                    ? cs.onSurface
+                                                    : cs.onSurfaceVariant,
                                               ),
                                             ),
                                           ],
                                         ),
                                       ),
-                                      Icon(Icons.calendar_today_rounded, color: cs.onSurfaceVariant),
+                                      Icon(
+                                        Icons.calendar_today_rounded,
+                                        color: cs.onSurfaceVariant,
+                                      ),
                                     ],
                                   ),
                                 ),
@@ -286,42 +345,62 @@ class _ProfilesTabState extends State<ProfilesTab> {
                               const SizedBox(height: 14),
                               // Gender field
                               GestureDetector(
-                                onTap: () => _showGenderPicker(ctx, selectedGender, (value) {
-                                  setModalState(() {
-                                    selectedGender = value;
-                                  });
-                                }),
+                                onTap: () => _showGenderPicker(
+                                  ctx,
+                                  selectedGender,
+                                  (value) {
+                                    setModalState(() {
+                                      selectedGender = value;
+                                    });
+                                  },
+                                ),
                                 child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                    vertical: 16,
+                                  ),
                                   decoration: BoxDecoration(
-                                    color: cs.surfaceContainerLowest,
+                                    color: neutralFill,
                                     borderRadius: BorderRadius.circular(12),
-                                    border: Border.all(color: cs.outline.withOpacity(0.5)),
+                                    border: Border.all(
+                                      color: cs.outline.withOpacity(0.5),
+                                    ),
                                   ),
                                   child: Row(
                                     children: [
                                       Expanded(
                                         child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
                                           children: [
                                             Text(
                                               'Gen',
-                                              style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
+                                              style: TextStyle(
+                                                fontSize: 12,
+                                                color: cs.onSurfaceVariant,
+                                              ),
                                             ),
                                             const SizedBox(height: 4),
                                             Text(
                                               selectedGender != null
-                                                  ? (selectedGender == 'MALE' ? 'Masculin' : 'Feminin')
+                                                  ? (selectedGender == 'MALE'
+                                                        ? 'Masculin'
+                                                        : 'Feminin')
                                                   : 'Selectează',
                                               style: TextStyle(
                                                 fontSize: 16,
-                                                color: selectedGender != null ? cs.onSurface : cs.onSurfaceVariant,
+                                                color: selectedGender != null
+                                                    ? cs.onSurface
+                                                    : cs.onSurfaceVariant,
                                               ),
                                             ),
                                           ],
                                         ),
                                       ),
-                                      Icon(Icons.keyboard_arrow_down_rounded, color: cs.onSurfaceVariant),
+                                      Icon(
+                                        Icons.keyboard_arrow_down_rounded,
+                                        color: cs.onSurfaceVariant,
+                                      ),
                                     ],
                                   ),
                                 ),
@@ -331,20 +410,29 @@ class _ProfilesTabState extends State<ProfilesTab> {
                               Container(
                                 padding: const EdgeInsets.all(16),
                                 decoration: BoxDecoration(
-                                  color: cs.surfaceContainerLowest,
+                                  color: neutralFill,
                                   borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(color: cs.outline.withOpacity(0.5)),
+                                  border: Border.all(
+                                    color: cs.outline.withOpacity(0.5),
+                                  ),
                                 ),
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Row(
                                       children: [
-                                        Icon(Icons.photo_camera_rounded, color: cs.onSurfaceVariant, size: 18),
+                                        Icon(
+                                          Icons.photo_camera_rounded,
+                                          color: cs.onSurfaceVariant,
+                                          size: 18,
+                                        ),
                                         const SizedBox(width: 8),
                                         Text(
                                           'Avatar (opțional)',
-                                          style: TextStyle(fontSize: 14, color: cs.onSurfaceVariant),
+                                          style: TextStyle(
+                                            fontSize: 14,
+                                            color: cs.onSurfaceVariant,
+                                          ),
                                         ),
                                       ],
                                     ),
@@ -354,7 +442,8 @@ class _ProfilesTabState extends State<ProfilesTab> {
                                         child: Stack(
                                           children: [
                                             ClipRRect(
-                                              borderRadius: BorderRadius.circular(12),
+                                              borderRadius:
+                                                  BorderRadius.circular(12),
                                               child: Image.file(
                                                 selectedImage!,
                                                 height: 100,
@@ -372,12 +461,18 @@ class _ProfilesTabState extends State<ProfilesTab> {
                                                   });
                                                 },
                                                 child: Container(
-                                                  padding: const EdgeInsets.all(4),
+                                                  padding: const EdgeInsets.all(
+                                                    4,
+                                                  ),
                                                   decoration: BoxDecoration(
                                                     color: cs.error,
                                                     shape: BoxShape.circle,
                                                   ),
-                                                  child: Icon(Icons.close, color: cs.onError, size: 14),
+                                                  child: Icon(
+                                                    Icons.close,
+                                                    color: cs.onError,
+                                                    size: 14,
+                                                  ),
                                                 ),
                                               ),
                                             ),
@@ -391,29 +486,47 @@ class _ProfilesTabState extends State<ProfilesTab> {
                                         Expanded(
                                           child: TextButton(
                                             onPressed: () async {
-                                              final ImagePicker picker = ImagePicker();
-                                              final XFile? image = await picker.pickImage(
-                                                source: ImageSource.gallery,
-                                                maxWidth: 1024,
-                                                maxHeight: 1024,
-                                                imageQuality: 85,
-                                              );
+                                              final ImagePicker picker =
+                                                  ImagePicker();
+                                              final XFile? image = await picker
+                                                  .pickImage(
+                                                    source: ImageSource.gallery,
+                                                    maxWidth: 1024,
+                                                    maxHeight: 1024,
+                                                    imageQuality: 85,
+                                                  );
                                               if (image != null) {
                                                 setModalState(() {
-                                                  selectedImage = File(image.path);
+                                                  selectedImage = File(
+                                                    image.path,
+                                                  );
                                                 });
                                               }
                                             },
                                             style: TextButton.styleFrom(
                                               foregroundColor: cs.primary,
-                                              padding: const EdgeInsets.symmetric(vertical: 12),
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    vertical: 12,
+                                                  ),
                                             ),
                                             child: Row(
-                                              mainAxisAlignment: MainAxisAlignment.center,
+                                              mainAxisAlignment:
+                                                  MainAxisAlignment.center,
                                               children: [
-                                                Icon(Icons.photo_library_outlined, size: 18, color: cs.primary),
+                                                Icon(
+                                                  Icons.photo_library_outlined,
+                                                  size: 18,
+                                                  color: cs.primary,
+                                                ),
                                                 const SizedBox(width: 6),
-                                                Text('Galerie', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500)),
+                                                Text(
+                                                  'Galerie',
+                                                  style: TextStyle(
+                                                    fontSize: 15,
+                                                    fontWeight: FontWeight.w500,
+                                                  ),
+                                                ),
                                               ],
                                             ),
                                           ),
@@ -426,29 +539,47 @@ class _ProfilesTabState extends State<ProfilesTab> {
                                         Expanded(
                                           child: TextButton(
                                             onPressed: () async {
-                                              final ImagePicker picker = ImagePicker();
-                                              final XFile? image = await picker.pickImage(
-                                                source: ImageSource.camera,
-                                                maxWidth: 1024,
-                                                maxHeight: 1024,
-                                                imageQuality: 85,
-                                              );
+                                              final ImagePicker picker =
+                                                  ImagePicker();
+                                              final XFile? image = await picker
+                                                  .pickImage(
+                                                    source: ImageSource.camera,
+                                                    maxWidth: 1024,
+                                                    maxHeight: 1024,
+                                                    imageQuality: 85,
+                                                  );
                                               if (image != null) {
                                                 setModalState(() {
-                                                  selectedImage = File(image.path);
+                                                  selectedImage = File(
+                                                    image.path,
+                                                  );
                                                 });
                                               }
                                             },
                                             style: TextButton.styleFrom(
                                               foregroundColor: cs.primary,
-                                              padding: const EdgeInsets.symmetric(vertical: 12),
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    vertical: 12,
+                                                  ),
                                             ),
                                             child: Row(
-                                              mainAxisAlignment: MainAxisAlignment.center,
+                                              mainAxisAlignment:
+                                                  MainAxisAlignment.center,
                                               children: [
-                                                Icon(Icons.camera_alt_outlined, size: 18, color: cs.primary),
+                                                Icon(
+                                                  Icons.camera_alt_outlined,
+                                                  size: 18,
+                                                  color: cs.primary,
+                                                ),
                                                 const SizedBox(width: 6),
-                                                Text('Cameră', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500)),
+                                                Text(
+                                                  'Cameră',
+                                                  style: TextStyle(
+                                                    fontSize: 15,
+                                                    fontWeight: FontWeight.w500,
+                                                  ),
+                                                ),
                                               ],
                                             ),
                                           ),
@@ -463,20 +594,29 @@ class _ProfilesTabState extends State<ProfilesTab> {
                               Container(
                                 padding: const EdgeInsets.all(16),
                                 decoration: BoxDecoration(
-                                  color: cs.surfaceContainerLowest,
+                                  color: neutralFill,
                                   borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(color: cs.outline.withOpacity(0.5)),
+                                  border: Border.all(
+                                    color: cs.outline.withOpacity(0.5),
+                                  ),
                                 ),
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Row(
                                       children: [
-                                        Icon(Icons.key_rounded, color: cs.onSurfaceVariant, size: 18),
+                                        Icon(
+                                          Icons.key_rounded,
+                                          color: cs.onSurfaceVariant,
+                                          size: 18,
+                                        ),
                                         const SizedBox(width: 8),
                                         Text(
                                           'Cheie de acces (opțional)',
-                                          style: TextStyle(fontSize: 14, color: cs.onSurfaceVariant),
+                                          style: TextStyle(
+                                            fontSize: 14,
+                                            color: cs.onSurfaceVariant,
+                                          ),
                                         ),
                                       ],
                                     ),
@@ -486,48 +626,86 @@ class _ProfilesTabState extends State<ProfilesTab> {
                                         child: SizedBox(
                                           height: 20,
                                           width: 20,
-                                          child: CircularProgressIndicator(strokeWidth: 2, color: cs.primary),
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                            color: cs.primary,
+                                          ),
                                         ),
                                       )
-                                    else if (availableKeys == null || availableKeys!.isEmpty)
+                                    else if (availableKeys == null ||
+                                        availableKeys!.isEmpty)
                                       Text(
                                         'Nu ai chei disponibile',
-                                        style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant.withOpacity(0.7)),
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          color: cs.onSurfaceVariant
+                                              .withOpacity(0.7),
+                                        ),
                                       )
                                     else
                                       DropdownButtonFormField<LicenseKeyDTO>(
                                         value: selectedKey,
                                         decoration: InputDecoration(
-                                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                          contentPadding:
+                                              const EdgeInsets.symmetric(
+                                                horizontal: 12,
+                                                vertical: 10,
+                                              ),
                                           border: OutlineInputBorder(
-                                            borderRadius: BorderRadius.circular(8),
-                                            borderSide: BorderSide(color: cs.outline.withOpacity(0.5)),
+                                            borderRadius: BorderRadius.circular(
+                                              8,
+                                            ),
+                                            borderSide: BorderSide(
+                                              color: cs.outline.withOpacity(
+                                                0.5,
+                                              ),
+                                            ),
                                           ),
                                           enabledBorder: OutlineInputBorder(
-                                            borderRadius: BorderRadius.circular(8),
-                                            borderSide: BorderSide(color: cs.outline.withOpacity(0.5)),
+                                            borderRadius: BorderRadius.circular(
+                                              8,
+                                            ),
+                                            borderSide: BorderSide(
+                                              color: cs.outline.withOpacity(
+                                                0.5,
+                                              ),
+                                            ),
                                           ),
                                           filled: true,
                                           fillColor: cs.surface,
                                         ),
-                                        hint: Text('Selectează o cheie', style: TextStyle(color: cs.onSurfaceVariant)),
+                                        hint: Text(
+                                          'Selectează o cheie',
+                                          style: TextStyle(
+                                            color: cs.onSurfaceVariant,
+                                          ),
+                                        ),
                                         isExpanded: true,
                                         items: [
                                           DropdownMenuItem<LicenseKeyDTO>(
                                             value: null,
-                                            child: Text('Fără cheie', style: TextStyle(color: cs.onSurfaceVariant)),
-                                          ),
-                                          ...availableKeys!.map((key) => DropdownMenuItem<LicenseKeyDTO>(
-                                            value: key,
                                             child: Text(
-                                              '${key.keyUuid.substring(0, 8)}...',
+                                              'Fără cheie',
                                               style: TextStyle(
-                                                fontFamily: 'monospace',
-                                                fontSize: 13,
-                                                color: cs.onSurface,
+                                                color: cs.onSurfaceVariant,
                                               ),
                                             ),
-                                          )),
+                                          ),
+                                          ...availableKeys!.map(
+                                            (
+                                              key,
+                                            ) => DropdownMenuItem<LicenseKeyDTO>(
+                                              value: key,
+                                              child: Text(
+                                                '${key.keyUuid.substring(0, 8)}...',
+                                                style: TextStyle(
+                                                  fontFamily: 'monospace',
+                                                  fontSize: 13,
+                                                  color: cs.onSurface,
+                                                ),
+                                              ),
+                                            ),
+                                          ),
                                         ],
                                         onChanged: (value) {
                                           setModalState(() {
@@ -538,7 +716,12 @@ class _ProfilesTabState extends State<ProfilesTab> {
                                     const SizedBox(height: 6),
                                     Text(
                                       'Asociază o cheie pentru ca copilul să poată accesa aplicația independent.',
-                                      style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant.withOpacity(0.7)),
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        color: cs.onSurfaceVariant.withOpacity(
+                                          0.7,
+                                        ),
+                                      ),
                                     ),
                                   ],
                                 ),
@@ -546,141 +729,221 @@ class _ProfilesTabState extends State<ProfilesTab> {
                               const SizedBox(height: 20),
                               // Submit button
                               FilledButton(
-                                onPressed: isUploadingImage ? null : () async {
-                                  if (!formKey.currentState!.validate()) return;
-                                  if (selectedBirthday == null) {
-                                    ScaffoldMessenger.of(ctx).showSnackBar(
-                                      const SnackBar(
-                                        content: Text('Te rugăm să selectezi data nașterii'),
-                                        backgroundColor: Color(0xFFEA2233),
-                                      ),
-                                    );
-                                    return;
-                                  }
-                                  if (selectedGender == null) {
-                                    ScaffoldMessenger.of(ctx).showSnackBar(
-                                      const SnackBar(
-                                        content: Text('Te rugăm să selectezi genul'),
-                                        backgroundColor: Color(0xFFEA2233),
-                                      ),
-                                    );
-                                    return;
-                                  }
-                                  
-                                  // Upload image first if selected
-                                  if (selectedImage != null) {
-                                    setModalState(() {
-                                      isUploadingImage = true;
-                                    });
-                                    
-                                    try {
-                                      final name = nameCtrl.text.trim();
-                                      final tempProfile = await repo.create(
-                                        name: name,
-                                        avatarUri: null,
-                                        birthDate: selectedBirthday!,
-                                        gender: selectedGender!,
-                                      );
-                                      
-                                      final imageUploadService = ImageUploadService(GetIt.I<DioClient>());
-                                      await imageUploadService.uploadProfileAvatar(
-                                        tempProfile.id,
-                                        selectedImage!,
-                                      );
-                                      
-                                      // Activate key if selected
-                                      if (selectedKey != null) {
-                                        try {
-                                          final keysApi = KeysApi(GetIt.I<DioClient>());
-                                          await keysApi.activateKey(selectedKey!.id, tempProfile.id);
-                                        } catch (e) {
-                                          debugPrint('Failed to activate key: $e');
+                                onPressed: isUploadingImage
+                                    ? null
+                                    : () async {
+                                        if (!formKey.currentState!.validate())
+                                          return;
+                                        if (selectedBirthday == null) {
+                                          ScaffoldMessenger.of(
+                                            ctx,
+                                          ).showSnackBar(
+                                            const SnackBar(
+                                              content: Text(
+                                                'Te rugăm să selectezi data nașterii',
+                                              ),
+                                              backgroundColor: Color(
+                                                0xFFEA2233,
+                                              ),
+                                            ),
+                                          );
+                                          return;
                                         }
-                                      }
-                                      
-                                      setModalState(() {
-                                        isUploadingImage = false;
-                                      });
-                                      
-                                      if (!mounted) return;
-                                      Navigator.pop(ctx);
-                                      SnackBarUtils.showSuccess(context, selectedKey != null ? 'Profil creat cu cheie asociată' : 'Profil creat cu avatar');
-                                      
-                                      await _refresh();
-                                      
-                                      final activeProfileId = GetIt.I<ActiveProfileService>().id;
-                                      final profiles = await repo.list();
-                                      final isOnlyProfile = profiles.length == 1;
-                                      final shouldSetAsActive = activeProfileId == null || _wasAutoOpened || isOnlyProfile;
-                                      
-                                      if (shouldSetAsActive && mounted) {
-                                        context.read<SelectedProfileCubit>().set(tempProfile.id);
-                                        await GetIt.I<SecureStore>().saveActiveProfileId(tempProfile.id);
-                                        GetIt.I<DioClient>().setActiveProfile(tempProfile.id);
-                                        await GetIt.I<ActiveProfileService>().set(tempProfile.id);
-                                      }
-                                      _wasAutoOpened = false;
-                                      return;
-                                      
-                                    } catch (e) {
-                                      setModalState(() {
-                                        isUploadingImage = false;
-                                      });
-                                      if (mounted) {
-                                        ScaffoldMessenger.of(ctx).showSnackBar(
-                                          SnackBar(
-                                            content: Text('Eroare la încărcarea imaginii: $e'),
-                                            backgroundColor: Colors.red,
-                                          ),
+                                        if (selectedGender == null) {
+                                          ScaffoldMessenger.of(
+                                            ctx,
+                                          ).showSnackBar(
+                                            const SnackBar(
+                                              content: Text(
+                                                'Te rugăm să selectezi genul',
+                                              ),
+                                              backgroundColor: Color(
+                                                0xFFEA2233,
+                                              ),
+                                            ),
+                                          );
+                                          return;
+                                        }
+
+                                        // Upload image first if selected
+                                        if (selectedImage != null) {
+                                          setModalState(() {
+                                            isUploadingImage = true;
+                                          });
+
+                                          try {
+                                            final name = nameCtrl.text.trim();
+                                            final tempProfile = await repo
+                                                .create(
+                                                  name: name,
+                                                  avatarUri: null,
+                                                  birthDate: selectedBirthday!,
+                                                  gender: selectedGender!,
+                                                );
+
+                                            final imageUploadService =
+                                                ImageUploadService(
+                                                  GetIt.I<DioClient>(),
+                                                );
+                                            await imageUploadService
+                                                .uploadProfileAvatar(
+                                                  tempProfile.id,
+                                                  selectedImage!,
+                                                );
+
+                                            // Activate key if selected
+                                            if (selectedKey != null) {
+                                              try {
+                                                final keysApi = KeysApi(
+                                                  GetIt.I<DioClient>(),
+                                                );
+                                                await keysApi.activateKey(
+                                                  selectedKey!.id,
+                                                  tempProfile.id,
+                                                );
+                                              } catch (e) {
+                                                debugPrint(
+                                                  'Failed to activate key: $e',
+                                                );
+                                              }
+                                            }
+
+                                            setModalState(() {
+                                              isUploadingImage = false;
+                                            });
+
+                                            if (!mounted) return;
+                                            Navigator.pop(ctx);
+                                            SnackBarUtils.showSuccess(
+                                              context,
+                                              selectedKey != null
+                                                  ? 'Profil creat cu cheie asociată'
+                                                  : 'Profil creat cu avatar',
+                                            );
+
+                                            await _refresh();
+
+                                            final activeProfileId =
+                                                GetIt.I<ActiveProfileService>()
+                                                    .id;
+                                            final profiles = await repo.list();
+                                            final isOnlyProfile =
+                                                profiles.length == 1;
+                                            final shouldSetAsActive =
+                                                activeProfileId == null ||
+                                                _wasAutoOpened ||
+                                                isOnlyProfile;
+
+                                            if (shouldSetAsActive && mounted) {
+                                              context
+                                                  .read<SelectedProfileCubit>()
+                                                  .set(tempProfile.id);
+                                              await GetIt.I<SecureStore>()
+                                                  .saveActiveProfileId(
+                                                    tempProfile.id,
+                                                  );
+                                              GetIt.I<DioClient>()
+                                                  .setActiveProfile(
+                                                    tempProfile.id,
+                                                  );
+                                              await GetIt.I<
+                                                    ActiveProfileService
+                                                  >()
+                                                  .set(tempProfile.id);
+                                            }
+                                            _wasAutoOpened = false;
+                                            return;
+                                          } catch (e) {
+                                            setModalState(() {
+                                              isUploadingImage = false;
+                                            });
+                                            if (mounted) {
+                                              ScaffoldMessenger.of(
+                                                ctx,
+                                              ).showSnackBar(
+                                                SnackBar(
+                                                  content: Text(
+                                                    'Eroare la încărcarea imaginii: $e',
+                                                  ),
+                                                  backgroundColor: Colors.red,
+                                                ),
+                                              );
+                                            }
+                                            return;
+                                          }
+                                        }
+
+                                        // Create profile without image
+                                        final name = nameCtrl.text.trim();
+                                        final createdProfile = await repo
+                                            .create(
+                                              name: name,
+                                              avatarUri: null,
+                                              birthDate: selectedBirthday!,
+                                              gender: selectedGender!,
+                                            );
+
+                                        // Activate key if selected
+                                        if (selectedKey != null) {
+                                          try {
+                                            final keysApi = KeysApi(
+                                              GetIt.I<DioClient>(),
+                                            );
+                                            await keysApi.activateKey(
+                                              selectedKey!.id,
+                                              createdProfile.id,
+                                            );
+                                          } catch (e) {
+                                            debugPrint(
+                                              'Failed to activate key: $e',
+                                            );
+                                          }
+                                        }
+
+                                        if (!mounted) return;
+                                        Navigator.pop(ctx);
+                                        SnackBarUtils.showSuccess(
+                                          context,
+                                          selectedKey != null
+                                              ? 'Profil creat cu cheie asociată'
+                                              : 'Profil creat',
                                         );
-                                      }
-                                      return;
-                                    }
-                                  }
-                                  
-                                  // Create profile without image
-                                  final name = nameCtrl.text.trim();
-                                  final createdProfile = await repo.create(
-                                    name: name,
-                                    avatarUri: null,
-                                    birthDate: selectedBirthday!,
-                                    gender: selectedGender!,
-                                  );
-                                  
-                                  // Activate key if selected
-                                  if (selectedKey != null) {
-                                    try {
-                                      final keysApi = KeysApi(GetIt.I<DioClient>());
-                                      await keysApi.activateKey(selectedKey!.id, createdProfile.id);
-                                    } catch (e) {
-                                      debugPrint('Failed to activate key: $e');
-                                    }
-                                  }
-                                  
-                                  if (!mounted) return;
-                                  Navigator.pop(ctx);
-                                  SnackBarUtils.showSuccess(context, selectedKey != null ? 'Profil creat cu cheie asociată' : 'Profil creat');
-                                  
-                                  await _refresh();
-                                  
-                                  final activeProfileId = GetIt.I<ActiveProfileService>().id;
-                                  final profiles = await repo.list();
-                                  final isOnlyProfile = profiles.length == 1;
-                                  final shouldSetAsActive = activeProfileId == null || _wasAutoOpened || isOnlyProfile;
-                                  
-                                  if (shouldSetAsActive && mounted) {
-                                    context.read<SelectedProfileCubit>().set(createdProfile.id);
-                                    await GetIt.I<SecureStore>().saveActiveProfileId(createdProfile.id);
-                                    GetIt.I<DioClient>().setActiveProfile(createdProfile.id);
-                                    await GetIt.I<ActiveProfileService>().set(createdProfile.id);
-                                  }
-                                  _wasAutoOpened = false;
-                                },
+
+                                        await _refresh();
+
+                                        final activeProfileId =
+                                            GetIt.I<ActiveProfileService>().id;
+                                        final profiles = await repo.list();
+                                        final isOnlyProfile =
+                                            profiles.length == 1;
+                                        final shouldSetAsActive =
+                                            activeProfileId == null ||
+                                            _wasAutoOpened ||
+                                            isOnlyProfile;
+
+                                        if (shouldSetAsActive && mounted) {
+                                          context
+                                              .read<SelectedProfileCubit>()
+                                              .set(createdProfile.id);
+                                          await GetIt.I<SecureStore>()
+                                              .saveActiveProfileId(
+                                                createdProfile.id,
+                                              );
+                                          GetIt.I<DioClient>().setActiveProfile(
+                                            createdProfile.id,
+                                          );
+                                          await GetIt.I<ActiveProfileService>()
+                                              .set(createdProfile.id);
+                                        }
+                                        _wasAutoOpened = false;
+                                      },
                                 child: isUploadingImage
                                     ? const SizedBox(
                                         height: 18,
                                         width: 18,
-                                        child: CircularProgressIndicator(strokeWidth: 2),
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                        ),
                                       )
                                     : const Text('Creează'),
                               ),
@@ -699,12 +962,16 @@ class _ProfilesTabState extends State<ProfilesTab> {
     );
   }
 
-  void _showGenderPicker(BuildContext context, String? currentGender, Function(String) onSelect) {
+  void _showGenderPicker(
+    BuildContext context,
+    String? currentGender,
+    Function(String) onSelect,
+  ) {
     final cs = Theme.of(context).colorScheme;
     final genders = ['MALE', 'FEMALE'];
     final genderLabels = ['Masculin', 'Feminin'];
     int selectedIndex = currentGender == 'FEMALE' ? 1 : 0;
-    
+
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -783,20 +1050,26 @@ class _ProfilesTabState extends State<ProfilesTab> {
                     ),
                   ),
                   child: CupertinoPicker(
-                    scrollController: FixedExtentScrollController(initialItem: selectedIndex),
+                    scrollController: FixedExtentScrollController(
+                      initialItem: selectedIndex,
+                    ),
                     itemExtent: 40,
                     onSelectedItemChanged: (index) {
                       selectedIndex = index;
                     },
-                    children: genderLabels.map((label) => Center(
-                      child: Text(
-                        label,
-                        style: TextStyle(
-                          fontSize: 20,
-                          color: cs.onSurface,
-                        ),
-                      ),
-                    )).toList(),
+                    children: genderLabels
+                        .map(
+                          (label) => Center(
+                            child: Text(
+                              label,
+                              style: TextStyle(
+                                fontSize: 20,
+                                color: cs.onSurface,
+                              ),
+                            ),
+                          ),
+                        )
+                        .toList(),
                   ),
                 ),
               ),
@@ -808,10 +1081,15 @@ class _ProfilesTabState extends State<ProfilesTab> {
     );
   }
 
-  void _showDatePicker(BuildContext context, DateTime? currentDate, Function(DateTime) onSelect) {
+  void _showDatePicker(
+    BuildContext context,
+    DateTime? currentDate,
+    Function(DateTime) onSelect,
+  ) {
     final cs = Theme.of(context).colorScheme;
-    DateTime tempDate = currentDate ?? DateTime.now().subtract(const Duration(days: 365 * 5));
-    
+    DateTime tempDate =
+        currentDate ?? DateTime.now().subtract(const Duration(days: 365 * 5));
+
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -914,7 +1192,7 @@ class _ProfilesTabState extends State<ProfilesTab> {
     return SafeArea(
       child: Container(
         color: Theme.of(context).scaffoldBackgroundColor,
-      child: Scaffold(
+        child: Scaffold(
           backgroundColor: Colors.transparent,
           appBar: AppBar(
             backgroundColor: Colors.transparent,
@@ -927,22 +1205,24 @@ class _ProfilesTabState extends State<ProfilesTab> {
               ),
             ),
           ),
-        body: ListenableBuilder(
-          listenable: GetIt.I<ActiveProfileService>(),
-          builder: (context, child) {
-            return FutureBuilder<List<ProfileCardDto>>(
-              future: _f,
-              builder: (c, s) {
-                if (s.connectionState != ConnectionState.done) {
+          body: ListenableBuilder(
+            listenable: GetIt.I<ActiveProfileService>(),
+            builder: (context, child) {
+              return FutureBuilder<List<ProfileCardDto>>(
+                future: _f,
+                builder: (c, s) {
+                  if (s.connectionState != ConnectionState.done) {
                     return const Center(
                       child: CircularProgressIndicator(
-                        valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFEA2233)),
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          Color(0xFFEA2233),
+                        ),
                       ),
                     );
-                }
-                final items = s.data ?? [];
-                if (items.isEmpty) {
-                  return Center(
+                  }
+                  final items = s.data ?? [];
+                  if (items.isEmpty) {
+                    return Center(
                       child: Container(
                         margin: const EdgeInsets.all(24),
                         padding: const EdgeInsets.all(32),
@@ -975,60 +1255,65 @@ class _ProfilesTabState extends State<ProfilesTab> {
                             const SizedBox(height: 20),
                             Text(
                               'Nu ai încă profile',
-                              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                                fontWeight: FontWeight.w700,
-                                color: const Color(0xFF17406B),
-                              ),
+                              style: Theme.of(context).textTheme.titleLarge
+                                  ?.copyWith(
+                                    fontWeight: FontWeight.w700,
+                                    color: const Color(0xFF17406B),
+                                  ),
                             ),
                             const SizedBox(height: 8),
                             Text(
                               'Adaugă un profil nou folosind butonul de mai jos.',
                               textAlign: TextAlign.center,
-                              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                color: Colors.grey[600],
-                                fontWeight: FontWeight.w500,
-                              ),
+                              style: Theme.of(context).textTheme.bodyMedium
+                                  ?.copyWith(
+                                    color: Colors.grey[600],
+                                    fontWeight: FontWeight.w500,
+                                  ),
                             ),
                           ],
                         ),
                       ),
-                  );
-                }
+                    );
+                  }
 
-                return RefreshIndicator(
-                  onRefresh: _refresh,
+                  return RefreshIndicator(
+                    onRefresh: _refresh,
                     color: const Color(0xFFEA2233),
-                  child: GridView.builder(
+                    child: GridView.builder(
                       padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
-                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 2,
-                      mainAxisSpacing: 16,
-                      crossAxisSpacing: 16,
-                      childAspectRatio: 0.88,
+                      gridDelegate:
+                          const SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: 2,
+                            mainAxisSpacing: 16,
+                            crossAxisSpacing: 16,
+                            childAspectRatio: 0.88,
+                          ),
+                      itemCount: items.length,
+                      itemBuilder: (_, i) {
+                        final p = items[i];
+                        return _ProfileCard(
+                          p: p,
+                          onTap: () async {
+                            final result = await Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => ProfileDetailsPage(profile: p),
+                              ),
+                            );
+                            // If profile was deleted (result is true), refresh the list
+                            if (result == true && mounted) {
+                              await _refresh();
+                            }
+                          },
+                        );
+                      },
                     ),
-                    itemCount: items.length,
-                    itemBuilder: (_, i) {
-                      final p = items[i];
-                      return _ProfileCard(
-                        p: p,
-                        onTap: () async {
-                          final result = await Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (_) => ProfileDetailsPage(profile: p)),
-                          );
-                          // If profile was deleted (result is true), refresh the list
-                          if (result == true && mounted) {
-                            await _refresh();
-                          }
-                        },
-                      );
-                    },
-                  ),
-                );
-              },
-            );
-          },
-        ),
+                  );
+                },
+              );
+            },
+          ),
           floatingActionButton: FloatingActionButton.extended(
             onPressed: _showCreateSheet,
             backgroundColor: cs.primary,
@@ -1037,10 +1322,7 @@ class _ProfilesTabState extends State<ProfilesTab> {
             icon: const Icon(Icons.add_rounded, size: 20),
             label: const Text(
               'Profil nou',
-              style: TextStyle(
-                fontWeight: FontWeight.w600,
-                fontSize: 15,
-              ),
+              style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
             ),
           ),
         ),
@@ -1062,7 +1344,7 @@ class _ProfileCard extends StatelessWidget {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-      onTap: onTap,
+        onTap: onTap,
         borderRadius: BorderRadius.circular(24),
         child: Container(
           decoration: BoxDecoration(
@@ -1076,18 +1358,18 @@ class _ProfileCard extends StatelessWidget {
               ),
             ],
           ),
-      child: Stack(
-        children: [
+          child: Stack(
+            children: [
               Padding(
-              padding: const EdgeInsets.all(10),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
+                padding: const EdgeInsets.all(10),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   mainAxisSize: MainAxisSize.min,
-                children: [
+                  children: [
                     // Premium badge
-                  Align(
-                    alignment: Alignment.topRight,
-                    child: p.premium
+                    Align(
+                      alignment: Alignment.topRight,
+                      child: p.premium
                           ? Container(
                               padding: const EdgeInsets.all(4),
                               decoration: BoxDecoration(
@@ -1104,7 +1386,7 @@ class _ProfileCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 2),
                     // Avatar
-              Center(
+                    Center(
                       child: Stack(
                         alignment: Alignment.center,
                         children: [
@@ -1123,7 +1405,9 @@ class _ProfileCard extends StatelessWidget {
                               ),
                               boxShadow: [
                                 BoxShadow(
-                                  color: const Color(0xFFEA2233).withOpacity(0.3),
+                                  color: const Color(
+                                    0xFFEA2233,
+                                  ).withOpacity(0.3),
                                   blurRadius: 10,
                                   offset: const Offset(0, 3),
                                 ),
@@ -1138,7 +1422,8 @@ class _ProfileCard extends StatelessWidget {
                               color: Colors.white,
                             ),
                             child: ClipOval(
-                              child: p.avatarUri != null && p.avatarUri!.isNotEmpty
+                              child:
+                                  p.avatarUri != null && p.avatarUri!.isNotEmpty
                                   ? CachedNetworkImage(
                                       imageUrl: p.avatarUri!,
                                       fit: BoxFit.cover,
@@ -1146,9 +1431,10 @@ class _ProfileCard extends StatelessWidget {
                                         return Center(
                                           child: CircularProgressIndicator(
                                             strokeWidth: 2,
-                                            valueColor: AlwaysStoppedAnimation<Color>(
-                                              const Color(0xFFEA2233),
-                                            ),
+                                            valueColor:
+                                                AlwaysStoppedAnimation<Color>(
+                                                  const Color(0xFFEA2233),
+                                                ),
                                           ),
                                         );
                                       },
@@ -1179,9 +1465,9 @@ class _ProfileCard extends StatelessWidget {
                                     ),
                             ),
                           ),
-                ],
-              ),
-            ),
+                        ],
+                      ),
+                    ),
                     const SizedBox(height: 6),
                     // Name
                     Text(
@@ -1293,11 +1579,11 @@ class _ProfileCard extends StatelessWidget {
                             fontSize: 11,
                           ),
                         ),
-                  ],
+                      ],
+                    ),
+                  ),
                 ),
-              ),
-            ),
-        ],
+            ],
           ),
         ),
       ),
@@ -1316,11 +1602,17 @@ String _getProfileInitials(String name) {
 
 String _getGenderLabel(String gender) {
   final lowerGender = gender.toLowerCase();
-  if (lowerGender == 'male' || lowerGender == 'm' || lowerGender == 'masculin') {
+  if (lowerGender == 'male' ||
+      lowerGender == 'm' ||
+      lowerGender == 'masculin') {
     return 'Băiat';
-  } else if (lowerGender == 'female' || lowerGender == 'f' || lowerGender == 'feminin') {
+  } else if (lowerGender == 'female' ||
+      lowerGender == 'f' ||
+      lowerGender == 'feminin') {
     return 'Fată';
-  } else if (lowerGender == 'other' || lowerGender == 'o' || lowerGender == 'altul') {
+  } else if (lowerGender == 'other' ||
+      lowerGender == 'o' ||
+      lowerGender == 'altul') {
     return 'Altul';
   }
   return gender;
@@ -1328,7 +1620,9 @@ String _getGenderLabel(String gender) {
 
 Widget _getGenderIcon(String gender) {
   final lowerGender = gender.toLowerCase();
-  if (lowerGender == 'male' || lowerGender == 'm' || lowerGender == 'masculin') {
+  if (lowerGender == 'male' ||
+      lowerGender == 'm' ||
+      lowerGender == 'masculin') {
     // Boy icon - using child_care icon with blue styling
     return Container(
       padding: const EdgeInsets.all(3),
@@ -1336,13 +1630,11 @@ Widget _getGenderIcon(String gender) {
         color: const Color(0xFF2D72D2).withOpacity(0.1),
         shape: BoxShape.circle,
       ),
-      child: Icon(
-        Icons.child_care,
-        size: 16,
-        color: const Color(0xFF2D72D2),
-      ),
+      child: Icon(Icons.child_care, size: 16, color: const Color(0xFF2D72D2)),
     );
-  } else if (lowerGender == 'female' || lowerGender == 'f' || lowerGender == 'feminin') {
+  } else if (lowerGender == 'female' ||
+      lowerGender == 'f' ||
+      lowerGender == 'feminin') {
     // Girl icon - using face icon with pink/red styling
     return Container(
       padding: const EdgeInsets.all(3),
@@ -1350,17 +1642,9 @@ Widget _getGenderIcon(String gender) {
         color: const Color(0xFFEA2233).withOpacity(0.1),
         shape: BoxShape.circle,
       ),
-      child: Icon(
-        Icons.face,
-        size: 16,
-        color: const Color(0xFFEA2233),
-      ),
+      child: Icon(Icons.face, size: 16, color: const Color(0xFFEA2233)),
     );
   }
   // Default icon for other genders
-  return Icon(
-    Icons.person_outline,
-    size: 16,
-    color: Colors.grey[600],
-  );
+  return Icon(Icons.person_outline, size: 16, color: Colors.grey[600]);
 }

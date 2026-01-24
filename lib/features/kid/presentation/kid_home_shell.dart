@@ -30,19 +30,19 @@ class _KidHomeShellState extends State<KidHomeShell> {
     _tabs = [
       ModulesTab(profileId: widget.profileId, isKid: true),
       HomeworkTab(profileId: widget.profileId),
-      KidAccountTab(profileName: widget.profileName, isPremium: widget.isPremium),
+      KidAccountTab(
+        profileName: widget.profileName,
+        isPremium: widget.isPremium,
+      ),
     ];
   }
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    
+
     return Scaffold(
-      body: IndexedStack(
-        index: _currentIndex,
-        children: _tabs,
-      ),
+      body: IndexedStack(index: _currentIndex, children: _tabs),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _currentIndex,
         onDestinationSelected: (index) {
@@ -50,17 +50,26 @@ class _KidHomeShellState extends State<KidHomeShell> {
         },
         destinations: [
           NavigationDestination(
-            icon: Icon(Icons.grid_view_outlined, color: cs.onSurface.withOpacity(0.6)),
+            icon: Icon(
+              Icons.grid_view_outlined,
+              color: cs.onSurface.withOpacity(0.6),
+            ),
             selectedIcon: Icon(Icons.grid_view_rounded, color: cs.primary),
-            label: 'Module',
+            label: 'Exersează',
           ),
           NavigationDestination(
-            icon: Icon(Icons.assignment_outlined, color: cs.onSurface.withOpacity(0.6)),
+            icon: Icon(
+              Icons.assignment_outlined,
+              color: cs.onSurface.withOpacity(0.6),
+            ),
             selectedIcon: Icon(Icons.assignment_rounded, color: cs.primary),
             label: 'Teme',
           ),
           NavigationDestination(
-            icon: Icon(Icons.person_outline, color: cs.onSurface.withOpacity(0.6)),
+            icon: Icon(
+              Icons.person_outline,
+              color: cs.onSurface.withOpacity(0.6),
+            ),
             selectedIcon: Icon(Icons.person_rounded, color: cs.primary),
             label: 'Cont',
           ),
@@ -69,4 +78,3 @@ class _KidHomeShellState extends State<KidHomeShell> {
     );
   }
 }
-

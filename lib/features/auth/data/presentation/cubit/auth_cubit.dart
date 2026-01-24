@@ -75,6 +75,20 @@ class AuthCubit extends Cubit<AuthState> {
     }
   }
 
+  /// Set authenticated state for kid login (with access key)
+  /// This should be called after the kid session is stored in SecureStore
+  void setKidAuthenticated({
+    required int profileId,
+    required String profileName,
+    required bool isPremium,
+  }) {
+    emit(AuthState.kidAuthenticated(
+      profileId: profileId,
+      profileName: profileName,
+      isPremium: isPremium,
+    ));
+  }
+
   Future<void> signup(SignupRequest req) async {
     emit(const AuthState.loading());
     try {

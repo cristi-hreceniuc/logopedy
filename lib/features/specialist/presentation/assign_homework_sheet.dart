@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:get_it/get_it.dart';
 import '../../../core/network/dio_client.dart';
@@ -84,7 +85,10 @@ class _AssignHomeworkSheetState extends State<AssignHomeworkSheet> {
     });
 
     try {
-      final details = await _contentRepo.moduleDetails(widget.profileId, module.id);
+      final details = await _contentRepo.moduleDetails(
+        widget.profileId,
+        module.id,
+      );
       if (mounted) {
         setState(() {
           _selectedModule = details;
@@ -110,7 +114,10 @@ class _AssignHomeworkSheetState extends State<AssignHomeworkSheet> {
     });
 
     try {
-      final details = await _contentRepo.submoduleWithParts(widget.profileId, submodule.id);
+      final details = await _contentRepo.submoduleWithParts(
+        widget.profileId,
+        submodule.id,
+      );
       if (mounted) {
         setState(() {
           _submoduleDetails = details;
@@ -127,23 +134,115 @@ class _AssignHomeworkSheetState extends State<AssignHomeworkSheet> {
     }
   }
 
-  Future<void> _selectDueDate() async {
-    final date = await showDatePicker(
+  void _selectDueDate() {
+    final cs = Theme.of(context).colorScheme;
+    DateTime tempDate = _dueDate ?? DateTime.now().add(const Duration(days: 7));
+
+    showModalBottomSheet(
       context: context,
-      initialDate: _dueDate ?? DateTime.now().add(const Duration(days: 7)),
-      firstDate: DateTime.now(),
-      lastDate: DateTime.now().add(const Duration(days: 365)),
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        decoration: BoxDecoration(
+          color: cs.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Handle bar
+              Container(
+                margin: const EdgeInsets.only(top: 12),
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: cs.outline.withOpacity(0.3),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 16),
+              // Header with title and buttons
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(ctx),
+                      child: Text(
+                        'Anulează',
+                        style: TextStyle(
+                          fontSize: 16,
+                          color: cs.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                    Text(
+                      'Termen limită',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                        color: cs.onSurface,
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: () {
+                        setState(() => _dueDate = tempDate);
+                        Navigator.pop(ctx);
+                      },
+                      child: Text(
+                        'Gata',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: cs.primary,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 8),
+              // Date picker
+              SizedBox(
+                height: 200,
+                child: CupertinoTheme(
+                  data: CupertinoThemeData(
+                    textTheme: CupertinoTextThemeData(
+                      dateTimePickerTextStyle: TextStyle(
+                        fontSize: 20,
+                        color: cs.onSurface,
+                      ),
+                    ),
+                  ),
+                  child: CupertinoDatePicker(
+                    mode: CupertinoDatePickerMode.date,
+                    initialDateTime: tempDate,
+                    minimumDate: DateTime.now(),
+                    maximumDate: DateTime.now().add(const Duration(days: 365)),
+                    onDateTimeChanged: (DateTime newDate) {
+                      tempDate = newDate;
+                    },
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+            ],
+          ),
+        ),
+      ),
     );
-    if (date != null) {
-      setState(() => _dueDate = date);
-    }
   }
 
   Future<void> _assignHomework() async {
     // Validate selection
-    if (_selectedModule == null && _selectedSubmodule == null && _selectedPartIds.isEmpty) {
+    if (_selectedModule == null &&
+        _selectedSubmodule == null &&
+        _selectedPartIds.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Selectează un modul, submodul sau cel puțin o parte')),
+        const SnackBar(
+          content: Text('Selectează un modul, submodul sau cel puțin o parte'),
+        ),
       );
       return;
     }
@@ -151,8 +250,10 @@ class _AssignHomeworkSheetState extends State<AssignHomeworkSheet> {
     setState(() => _isSaving = true);
 
     try {
-      final notes = _notesController.text.isEmpty ? null : _notesController.text;
-      
+      final notes = _notesController.text.isEmpty
+          ? null
+          : _notesController.text;
+
       // If parts are selected, create one homework per part
       if (_selectedPartIds.isNotEmpty) {
         int successCount = 0;
@@ -165,11 +266,15 @@ class _AssignHomeworkSheetState extends State<AssignHomeworkSheet> {
           );
           successCount++;
         }
-        
+
         if (mounted) {
           Navigator.of(context).pop(true);
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('$successCount ${successCount == 1 ? 'temă a fost adăugată' : 'teme au fost adăugate'} cu succes')),
+            SnackBar(
+              content: Text(
+                '$successCount ${successCount == 1 ? 'temă a fost adăugată' : 'teme au fost adăugate'} cu succes',
+              ),
+            ),
           );
         }
       } else {
@@ -191,9 +296,9 @@ class _AssignHomeworkSheetState extends State<AssignHomeworkSheet> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Eroare: ${e.toString()}')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Eroare: ${e.toString()}')));
         setState(() => _isSaving = false);
       }
     }
@@ -225,7 +330,7 @@ class _AssignHomeworkSheetState extends State<AssignHomeworkSheet> {
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
-              
+
               // Header
               Padding(
                 padding: const EdgeInsets.all(16),
@@ -237,13 +342,14 @@ class _AssignHomeworkSheetState extends State<AssignHomeworkSheet> {
                         children: [
                           Text(
                             'Adaugă temă',
-                            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                              fontWeight: FontWeight.bold,
-                            ),
+                            style: Theme.of(context).textTheme.titleLarge
+                                ?.copyWith(fontWeight: FontWeight.bold),
                           ),
                           Text(
                             'Pentru: ${widget.profileName}',
-                            style: TextStyle(color: cs.onSurface.withOpacity(0.6)),
+                            style: TextStyle(
+                              color: cs.onSurface.withOpacity(0.6),
+                            ),
                           ),
                         ],
                       ),
@@ -263,21 +369,21 @@ class _AssignHomeworkSheetState extends State<AssignHomeworkSheet> {
                 child: _isLoadingModules
                     ? const Center(child: CircularProgressIndicator())
                     : _error != null
-                        ? Center(child: Text(_error!))
-                        : SingleChildScrollView(
-                            controller: scrollController,
-                            padding: const EdgeInsets.all(16),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                _buildSelectionSection(cs),
-                                const SizedBox(height: 24),
-                                _buildDueDateSection(cs),
-                                const SizedBox(height: 16),
-                                _buildNotesSection(cs),
-                              ],
-                            ),
-                          ),
+                    ? Center(child: Text(_error!))
+                    : SingleChildScrollView(
+                        controller: scrollController,
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _buildSelectionSection(cs),
+                            const SizedBox(height: 24),
+                            _buildDueDateSection(cs),
+                            const SizedBox(height: 16),
+                            _buildNotesSection(cs),
+                          ],
+                        ),
+                      ),
               ),
 
               // Actions
@@ -295,9 +401,11 @@ class _AssignHomeworkSheetState extends State<AssignHomeworkSheet> {
                             height: 20,
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
-                        : Text(_selectedPartIds.length > 1 
-                            ? 'Adaugă ${_selectedPartIds.length} teme'
-                            : 'Adaugă temă'),
+                        : Text(
+                            _selectedPartIds.length > 1
+                                ? 'Adaugă ${_selectedPartIds.length} teme'
+                                : 'Adaugă temă',
+                          ),
                   ),
                 ),
               ),
@@ -314,16 +422,16 @@ class _AssignHomeworkSheetState extends State<AssignHomeworkSheet> {
       children: [
         Text(
           'Selectează conținut',
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.w600,
-          ),
+          style: Theme.of(
+            context,
+          ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
         ),
         const SizedBox(height: 12),
 
         // Module selection
         _buildDropdown<ModuleDto>(
           label: 'Modul',
-          value: _selectedModule != null 
+          value: _selectedModule != null
               ? _modules?.firstWhere((m) => m.id == _selectedModule!.id)
               : null,
           items: _modules ?? [],
@@ -342,11 +450,13 @@ class _AssignHomeworkSheetState extends State<AssignHomeworkSheet> {
               value: _selectedSubmodule,
               items: _selectedModule!.submodules,
               itemLabel: (s) => s.title,
-              onChanged: (s) => s != null ? _selectSubmodule(s) : setState(() {
-                _selectedSubmodule = null;
-                _submoduleDetails = null;
-                _selectedPartIds.clear();
-              }),
+              onChanged: (s) => s != null
+                  ? _selectSubmodule(s)
+                  : setState(() {
+                      _selectedSubmodule = null;
+                      _submoduleDetails = null;
+                      _selectedPartIds.clear();
+                    }),
             ),
         ],
         const SizedBox(height: 12),
@@ -355,15 +465,16 @@ class _AssignHomeworkSheetState extends State<AssignHomeworkSheet> {
         if (_selectedSubmodule != null) ...[
           if (_isLoadingParts)
             const Center(child: CircularProgressIndicator())
-          else if (_submoduleDetails != null && _submoduleDetails!.parts.isNotEmpty) ...[
+          else if (_submoduleDetails != null &&
+              _submoduleDetails!.parts.isNotEmpty) ...[
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
                   'Părți (opțional)',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: cs.onSurfaceVariant,
-                  ),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
                 ),
                 // Select all / Deselect all buttons
                 Row(
@@ -376,7 +487,10 @@ class _AssignHomeworkSheetState extends State<AssignHomeworkSheet> {
                           );
                         });
                       },
-                      child: const Text('Toate', style: TextStyle(fontSize: 12)),
+                      child: const Text(
+                        'Toate',
+                        style: TextStyle(fontSize: 12),
+                      ),
                     ),
                     TextButton(
                       onPressed: () {
@@ -384,7 +498,10 @@ class _AssignHomeworkSheetState extends State<AssignHomeworkSheet> {
                           _selectedPartIds.clear();
                         });
                       },
-                      child: const Text('Niciunul', style: TextStyle(fontSize: 12)),
+                      child: const Text(
+                        'Niciunul',
+                        style: TextStyle(fontSize: 12),
+                      ),
                     ),
                   ],
                 ),
@@ -402,7 +519,7 @@ class _AssignHomeworkSheetState extends State<AssignHomeworkSheet> {
                   final part = entry.value;
                   final isSelected = _selectedPartIds.contains(part.id);
                   final isLast = index == _submoduleDetails!.parts.length - 1;
-                  
+
                   return Column(
                     children: [
                       CheckboxListTile(
@@ -419,7 +536,9 @@ class _AssignHomeworkSheetState extends State<AssignHomeworkSheet> {
                         title: Text(
                           part.name,
                           style: TextStyle(
-                            fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                            fontWeight: isSelected
+                                ? FontWeight.w600
+                                : FontWeight.normal,
                             color: isSelected ? cs.primary : cs.onSurface,
                           ),
                         ),
@@ -431,12 +550,17 @@ class _AssignHomeworkSheetState extends State<AssignHomeworkSheet> {
                         activeColor: cs.primary,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.vertical(
-                            top: index == 0 ? const Radius.circular(12) : Radius.zero,
-                            bottom: isLast ? const Radius.circular(12) : Radius.zero,
+                            top: index == 0
+                                ? const Radius.circular(12)
+                                : Radius.zero,
+                            bottom: isLast
+                                ? const Radius.circular(12)
+                                : Radius.zero,
                           ),
                         ),
                       ),
-                      if (!isLast) Divider(height: 1, color: cs.outline.withOpacity(0.2)),
+                      if (!isLast)
+                        Divider(height: 1, color: cs.outline.withOpacity(0.2)),
                     ],
                   );
                 }).toList(),
@@ -450,7 +574,7 @@ class _AssignHomeworkSheetState extends State<AssignHomeworkSheet> {
         Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: cs.primaryContainer.withOpacity(0.3),
+            color: const Color(0xFFF2F3F6),
             borderRadius: BorderRadius.circular(8),
           ),
           child: Row(
@@ -478,65 +602,239 @@ class _AssignHomeworkSheetState extends State<AssignHomeworkSheet> {
     required String Function(T) itemLabel,
     required void Function(T?) onChanged,
   }) {
-    return DropdownButtonFormField<T>(
-      value: value,
-      decoration: InputDecoration(
-        labelText: label,
-        border: OutlineInputBorder(
+    final cs = Theme.of(context).colorScheme;
+    final hasValue = value != null;
+    
+    return GestureDetector(
+      onTap: () => _showSelectionSheet<T>(
+        title: label,
+        items: items,
+        itemLabel: itemLabel,
+        selectedValue: value,
+        onSelected: onChanged,
+      ),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: cs.surfaceContainerHighest.withOpacity(0.5),
           borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: hasValue ? cs.primary.withOpacity(0.3) : cs.outline.withOpacity(0.2),
+          ),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: cs.onSurface.withOpacity(0.6),
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    hasValue ? itemLabel(value as T) : 'Selectează...',
+                    style: TextStyle(
+                      fontSize: 15,
+                      color: hasValue ? cs.onSurface : cs.onSurface.withOpacity(0.4),
+                      fontWeight: hasValue ? FontWeight.w500 : FontWeight.normal,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(
+              Icons.keyboard_arrow_down_rounded,
+              color: cs.onSurface.withOpacity(0.5),
+            ),
+          ],
         ),
       ),
-      items: [
-        DropdownMenuItem<T>(
-          value: null,
-          child: Text('Selectează...', style: TextStyle(color: Colors.grey[500])),
+    );
+  }
+
+  void _showSelectionSheet<T>({
+    required String title,
+    required List<T> items,
+    required String Function(T) itemLabel,
+    required T? selectedValue,
+    required void Function(T?) onSelected,
+  }) {
+    final cs = Theme.of(context).colorScheme;
+    
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) => Container(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.6,
         ),
-        ...items.map((item) => DropdownMenuItem<T>(
-          value: item,
-          child: Text(itemLabel(item)),
-        )),
-      ],
-      onChanged: onChanged,
+        decoration: BoxDecoration(
+          color: cs.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Handle
+            Container(
+              margin: const EdgeInsets.only(top: 12),
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: cs.outline.withOpacity(0.3),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            // Title
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  Text(
+                    title,
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const Spacer(),
+                  IconButton(
+                    icon: const Icon(Icons.close, size: 20),
+                    onPressed: () => Navigator.pop(ctx),
+                  ),
+                ],
+              ),
+            ),
+            const Divider(height: 1),
+            // Items
+            Flexible(
+              child: ListView.builder(
+                shrinkWrap: true,
+                itemCount: items.length,
+                itemBuilder: (context, index) {
+                  final item = items[index];
+                  final isSelected = item == selectedValue;
+                  
+                  return InkWell(
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      onSelected(item);
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                      decoration: BoxDecoration(
+                        color: isSelected ? cs.primary.withOpacity(0.1) : null,
+                        border: Border(
+                          bottom: BorderSide(
+                            color: cs.outline.withOpacity(0.1),
+                          ),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              itemLabel(item),
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                                color: isSelected ? cs.primary : cs.onSurface,
+                              ),
+                            ),
+                          ),
+                          if (isSelected)
+                            Icon(Icons.check_rounded, color: cs.primary, size: 22),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+            SizedBox(height: MediaQuery.of(ctx).padding.bottom + 8),
+          ],
+        ),
+      ),
     );
   }
 
   Widget _buildDueDateSection(ColorScheme cs) {
+    final hasDate = _dueDate != null;
+    
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           'Termen limită (opțional)',
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.w600,
-          ),
+          style: Theme.of(
+            context,
+          ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
         ),
         const SizedBox(height: 12),
-        InkWell(
+        GestureDetector(
           onTap: _selectDueDate,
-          borderRadius: BorderRadius.circular(12),
           child: Container(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             decoration: BoxDecoration(
-              border: Border.all(color: cs.outline.withOpacity(0.3)),
+              color: cs.surfaceContainerHighest.withOpacity(0.5),
               borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: hasDate ? cs.primary.withOpacity(0.3) : cs.outline.withOpacity(0.2),
+              ),
             ),
             child: Row(
               children: [
-                Icon(Icons.calendar_today, color: cs.primary),
+                Icon(
+                  Icons.calendar_today_rounded,
+                  color: hasDate ? cs.primary : cs.onSurface.withOpacity(0.4),
+                  size: 20,
+                ),
                 const SizedBox(width: 12),
-                Text(
-                  _dueDate != null
-                      ? '${_dueDate!.day}/${_dueDate!.month}/${_dueDate!.year}'
-                      : 'Selectează data...',
-                  style: TextStyle(
-                    color: _dueDate != null ? cs.onSurface : cs.onSurface.withOpacity(0.5),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Data limită',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: cs.onSurface.withOpacity(0.6),
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        hasDate
+                            ? '${_dueDate!.day.toString().padLeft(2, '0')}/${_dueDate!.month.toString().padLeft(2, '0')}/${_dueDate!.year}'
+                            : 'Selectează...',
+                        style: TextStyle(
+                          fontSize: 15,
+                          color: hasDate ? cs.onSurface : cs.onSurface.withOpacity(0.4),
+                          fontWeight: hasDate ? FontWeight.w500 : FontWeight.normal,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                const Spacer(),
-                if (_dueDate != null)
-                  IconButton(
-                    icon: const Icon(Icons.clear),
-                    onPressed: () => setState(() => _dueDate = null),
+                if (hasDate)
+                  GestureDetector(
+                    onTap: () => setState(() => _dueDate = null),
+                    child: Icon(
+                      Icons.close_rounded,
+                      color: cs.onSurface.withOpacity(0.4),
+                      size: 20,
+                    ),
+                  )
+                else
+                  Icon(
+                    Icons.keyboard_arrow_down_rounded,
+                    color: cs.onSurface.withOpacity(0.5),
                   ),
               ],
             ),
@@ -552,9 +850,9 @@ class _AssignHomeworkSheetState extends State<AssignHomeworkSheet> {
       children: [
         Text(
           'Note (opțional)',
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.w600,
-          ),
+          style: Theme.of(
+            context,
+          ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
         ),
         const SizedBox(height: 12),
         TextField(
@@ -562,9 +860,7 @@ class _AssignHomeworkSheetState extends State<AssignHomeworkSheet> {
           maxLines: 3,
           decoration: InputDecoration(
             hintText: 'Adaugă instrucțiuni sau note pentru copil...',
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
           ),
         ),
       ],
@@ -591,4 +887,3 @@ class _AssignHomeworkSheetState extends State<AssignHomeworkSheet> {
     return 'Selectează un modul pentru a continua';
   }
 }
-

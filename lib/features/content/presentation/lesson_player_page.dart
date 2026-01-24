@@ -110,23 +110,23 @@ Widget _gap([double h = 12]) => SizedBox(height: h);
 /// MySQL uses the format: base64:type##:actualBase64Content
 String _decodeBase64String(String input) {
   if (!input.startsWith('base64:')) return input;
-  
+
   try {
     final parts = input.split(':');
     if (parts.length < 3) return input;
-    
+
     // Join all parts after the type (in case the content contains colons)
     var base64Content = parts.sublist(2).join(':');
-    
+
     // Normalize the base64 string - remove any whitespace/newlines
     base64Content = base64Content.replaceAll(RegExp(r'\s'), '');
-    
+
     // Convert URL-safe base64 to standard base64 if needed
     base64Content = base64Content.replaceAll('-', '+').replaceAll('_', '/');
-    
+
     // Normalize using Dart's base64Url codec (handles padding automatically)
     final normalized = base64Url.normalize(base64Content);
-    
+
     // Decode the base64 string to UTF-8
     final decoded = utf8.decode(base64Url.decode(normalized));
     return decoded;
@@ -184,10 +184,7 @@ List<String> _sxList(Map m, List<String> keys) {
 
 /// Hint overlay widget that shows hint text and fades out
 class _HintOverlay extends StatefulWidget {
-  const _HintOverlay({
-    required this.hint,
-    required this.onDismiss,
-  });
+  const _HintOverlay({required this.hint, required this.onDismiss});
 
   final String hint;
   final VoidCallback onDismiss;
@@ -196,7 +193,8 @@ class _HintOverlay extends StatefulWidget {
   State<_HintOverlay> createState() => _HintOverlayState();
 }
 
-class _HintOverlayState extends State<_HintOverlay> with SingleTickerProviderStateMixin {
+class _HintOverlayState extends State<_HintOverlay>
+    with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _fadeAnimation;
 
@@ -212,12 +210,12 @@ class _HintOverlayState extends State<_HintOverlay> with SingleTickerProviderSta
       curve: Curves.easeInOut,
     );
     _controller.forward();
-    
+
     // Calculate fade out duration based on text length
     final baseDuration = widget.hint.length * 50; // 50ms per character
     final seconds = (baseDuration / 1000).clamp(2.0, 8.0);
     final fadeOutDuration = Duration(milliseconds: (seconds * 1000).round());
-    
+
     // Start fade out after showing
     Future.delayed(fadeOutDuration, () {
       if (mounted) {
@@ -239,7 +237,7 @@ class _HintOverlayState extends State<_HintOverlay> with SingleTickerProviderSta
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    
+
     return FadeTransition(
       opacity: _fadeAnimation,
       child: Material(
@@ -275,10 +273,11 @@ class _HintOverlayState extends State<_HintOverlay> with SingleTickerProviderSta
                       Expanded(
                         child: Text(
                           'Indiciu',
-                          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                            fontWeight: FontWeight.w700,
-                            color: cs.onSurface,
-                          ),
+                          style: Theme.of(context).textTheme.titleLarge
+                              ?.copyWith(
+                                fontWeight: FontWeight.w700,
+                                color: cs.onSurface,
+                              ),
                         ),
                       ),
                       IconButton(
@@ -319,15 +318,15 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
   LessonDto? _data;
   String? _error;
   bool _loading = true;
-  
+
   // Timer for minimum screen duration (per screen, not per lesson)
   Timer? _screenTimer;
   int _elapsedSeconds = 0;
   int _minimumSeconds = 10; // Default, will be overridden by screen payload
-  
+
   // Hint overlay state
   bool _showHint = false;
-  
+
   // Track if any progress was made during this session (for back navigation)
   bool _progressMade = false;
 
@@ -337,10 +336,10 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
 
     // 1) Set player mode FIRST - use mediaPlayer for BytesSource support
     _player.setPlayerMode(PlayerMode.mediaPlayer);
-    
+
     // 2) Set release mode
     _player.setReleaseMode(ReleaseMode.stop);
-    
+
     // 3) Set audio context - keep it simple for iOS
     _player.setAudioContext(
       AudioContext(
@@ -360,22 +359,26 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
     // (opțional) log pentru debugging
     _player.onPlayerStateChanged.listen((s) => debugPrint('AUDIO state: $s'));
     _player.onPlayerComplete.listen((_) => debugPrint('AUDIO complete'));
-    
+
     // Listen for errors
-    _player.eventStream.listen((event) {
-      if (event.eventType == AudioEventType.log) {
-        debugPrint('🎵 Audio log: ${event.logMessage}');
-      }
-    }, onError: (error) {
-      debugPrint('\x1B[31mAudioPlayers Exception: $error\x1B[0m');
-    });
+    _player.eventStream.listen(
+      (event) {
+        if (event.eventType == AudioEventType.log) {
+          debugPrint('🎵 Audio log: ${event.logMessage}');
+        }
+      },
+      onError: (error) {
+        debugPrint('\x1B[31mAudioPlayers Exception: $error\x1B[0m');
+      },
+    );
 
     _load();
   }
 
   void _startTimer({int? minSeconds}) {
     _elapsedSeconds = 0;
-    _minimumSeconds = minSeconds ?? 10; // Use provided minSeconds or default to 10
+    _minimumSeconds =
+        minSeconds ?? 10; // Use provided minSeconds or default to 10
     _screenTimer?.cancel();
     _screenTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (mounted) {
@@ -387,7 +390,7 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
       }
     });
   }
-  
+
   void _completeTimer() {
     if (mounted) {
       setState(() {
@@ -397,7 +400,7 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
   }
 
   bool get _canFinishLesson => _elapsedSeconds >= _minimumSeconds;
-  
+
   int _getMinSecondsFromPayload(Map<String, dynamic> payload) {
     final minSec = payload['minSeconds'];
     if (minSec is int) return minSec;
@@ -411,13 +414,13 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
     _player.dispose();
     super.dispose();
   }
-  
+
   void _showHintOverlay() {
     if (_data?.hint == null || _data!.hint!.isEmpty) return;
-    
+
     // Play hint feedback
     _feedback.hint();
-    
+
     // Hide previous hint if showing, then show new one
     if (_showHint) {
       setState(() {
@@ -457,7 +460,7 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
   String _asset(String folder, String filename) {
     final folderPath = folder == 'img' ? 'images' : folder;
     final extension = folder == 'img' ? 'png' : 'mp3';
-    
+
     // Dacă filename-ul are deja extensie, o folosim
     if (filename.contains('.')) {
       return 'assets/$folderPath/$filename';
@@ -535,28 +538,33 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
   /// Handles S3 keys, full URLs, and legacy asset paths
   String _getMediaUrl(String uriOrKey) {
     if (uriOrKey.isEmpty) return '';
-    
+
     // Already a full URL
     if (uriOrKey.startsWith('http://') || uriOrKey.startsWith('https://')) {
       return uriOrKey;
     }
-    
+
     // S3 key - construct full URL
     if (uriOrKey.startsWith('modules/')) {
       return _s3.getFullUrl(uriOrKey);
     }
-    
+
     // Legacy assets path - return as-is
     if (uriOrKey.startsWith('assets/')) {
       return uriOrKey;
     }
-    
+
     // Assume it's an S3 key without the full path
     return _s3.getFullUrl(uriOrKey);
   }
-  
+
   /// Load image from S3, URL, or assets
-  Widget _buildImage(String uriOrKey, {double? width, double? height, BoxFit fit = BoxFit.cover}) {
+  Widget _buildImage(
+    String uriOrKey, {
+    double? width,
+    double? height,
+    BoxFit fit = BoxFit.cover,
+  }) {
     final url = _getMediaUrl(uriOrKey);
     if (url.isEmpty) {
       return Container(
@@ -566,7 +574,7 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
         child: Icon(Icons.broken_image, size: 64, color: Colors.grey[400]),
       );
     }
-    
+
     if (url.startsWith('http://') || url.startsWith('https://')) {
       // Load from network (S3) with caching
       return CachedNetworkImage(
@@ -623,17 +631,18 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
   String _extractErrorMessage(Object e) {
     if (e is DioException) {
       final data = e.response?.data;
-      
+
       // Try multiple possible error message formats from backend
       String? errorMessage;
-      
+
       if (data is Map<String, dynamic>) {
         // Try common error message fields
-        errorMessage = data['message'] as String? ??
-                      data['error'] as String? ??
-                      data['errorMessage'] as String? ??
-                      data['msg'] as String?;
-        
+        errorMessage =
+            data['message'] as String? ??
+            data['error'] as String? ??
+            data['errorMessage'] as String? ??
+            data['msg'] as String?;
+
         // If still no message, try errors array/object
         if (errorMessage == null && data['errors'] != null) {
           if (data['errors'] is List && (data['errors'] as List).isNotEmpty) {
@@ -652,12 +661,12 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
           }
         }
       }
-      
+
       // If we have a specific error message, return it
       if (errorMessage != null && errorMessage.isNotEmpty) {
         return errorMessage;
       }
-      
+
       // Handle specific HTTP status codes with user-friendly messages
       final statusCode = e.response?.statusCode;
       if (statusCode != null) {
@@ -677,10 +686,11 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
           case 503:
             return 'Eroare de server. Te rog încearcă mai târziu.';
           default:
-            return e.message ?? 'Eroare la încărcarea lecției. Te rog încearcă din nou.';
+            return e.message ??
+                'Eroare la încărcarea lecției. Te rog încearcă din nou.';
         }
       }
-      
+
       return e.message ?? 'Eroare de rețea. Te rog încearcă din nou.';
     }
     return e.toString();
@@ -727,7 +737,7 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
       });
     }
   }
-  
+
   @override
   void didUpdateWidget(LessonPlayerPage oldWidget) {
     super.didUpdateWidget(oldWidget);
@@ -737,20 +747,23 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
     }
   }
 
-  Future<void> _playAudio(String uriOrKey, {bool waitForCompletion = false}) async {
+  Future<void> _playAudio(
+    String uriOrKey, {
+    bool waitForCompletion = false,
+  }) async {
     if (uriOrKey.isEmpty) return;
-    
+
     // Play audio start feedback
     _feedback.audioPlay();
-    
+
     try {
       // Stop any currently playing audio
       await _player.stop();
-      
+
       // Create completer if we need to wait for completion
       Completer<void>? completer;
       StreamSubscription<void>? subscription;
-      
+
       if (waitForCompletion) {
         completer = Completer<void>();
         subscription = _player.onPlayerComplete.listen((_) {
@@ -759,13 +772,13 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
           }
         });
       }
-      
+
       // Check if it's an S3 key or full URL
       if (uriOrKey.startsWith('http://') || uriOrKey.startsWith('https://')) {
         // Full URL - download and cache, then play from file URL
         debugPrint('🎵 Caching and playing audio from URL: $uriOrKey');
         final localPath = await _audioCache.getLocalPath(uriOrKey);
-        
+
         if (localPath != null) {
           // Verify file exists and has content
           final file = File(localPath);
@@ -774,10 +787,10 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
             subscription?.cancel();
             return;
           }
-          
+
           final fileSize = await file.length();
           debugPrint('🎵 Playing cached file: $localPath ($fileSize bytes)');
-          
+
           // Use file:// URL for iOS compatibility
           final fileUrl = Uri.file(localPath).toString();
           debugPrint('🎵 File URL: $fileUrl');
@@ -787,12 +800,13 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
           subscription?.cancel();
           return;
         }
-      } else if (uriOrKey.startsWith('modules/') || !uriOrKey.startsWith('assets/')) {
+      } else if (uriOrKey.startsWith('modules/') ||
+          !uriOrKey.startsWith('assets/')) {
         // S3 key - construct full URL, download and cache, then play from file URL
         final url = _s3.getFullUrl(uriOrKey);
         debugPrint('🎵 Caching and playing audio from S3 key: $uriOrKey');
         final localPath = await _audioCache.getLocalPath(url);
-        
+
         if (localPath != null) {
           // Verify file exists and has content
           final file = File(localPath);
@@ -801,21 +815,23 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
             subscription?.cancel();
             return;
           }
-          
+
           final fileSize = await file.length();
           debugPrint('🎵 Playing cached file: $localPath ($fileSize bytes)');
-          
+
           // Verify we can read the file
           try {
             final testBytes = await file.readAsBytes();
             debugPrint('🎵 File is readable: ${testBytes.length} bytes');
-            debugPrint('🎵 First bytes: ${testBytes.take(10).map((b) => b.toRadixString(16).padLeft(2, '0')).join(' ')}');
+            debugPrint(
+              '🎵 First bytes: ${testBytes.take(10).map((b) => b.toRadixString(16).padLeft(2, '0')).join(' ')}',
+            );
           } catch (e) {
             debugPrint('❌ Cannot read file: $e');
             subscription?.cancel();
             return;
           }
-          
+
           // Try playing with DeviceFileSource
           debugPrint('🎵 Playing with DeviceFileSource');
           await _player.play(DeviceFileSource(localPath), volume: 1.0);
@@ -826,11 +842,13 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
         }
       } else {
         // Legacy assets/ path - convert to asset source
-        final path = uriOrKey.startsWith('assets/') ? uriOrKey.substring(7) : uriOrKey;
+        final path = uriOrKey.startsWith('assets/')
+            ? uriOrKey.substring(7)
+            : uriOrKey;
         debugPrint('🎵 Playing audio from assets: $path');
         await _player.play(AssetSource(path), volume: 1.0);
       }
-      
+
       // Wait for audio to complete if requested
       if (waitForCompletion && completer != null) {
         await completer.future;
@@ -858,9 +876,15 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
     }
   }
 
-  Future<void> _showCompletionDialog(bool endOfLesson, bool endOfSubmodule, bool endOfModule) async {
-    debugPrint('🎉 _showCompletionDialog() called - endOfLesson: $endOfLesson, endOfSubmodule: $endOfSubmodule, endOfModule: $endOfModule');
-    
+  Future<void> _showCompletionDialog(
+    bool endOfLesson,
+    bool endOfSubmodule,
+    bool endOfModule,
+  ) async {
+    debugPrint(
+      '🎉 _showCompletionDialog() called - endOfLesson: $endOfLesson, endOfSubmodule: $endOfSubmodule, endOfModule: $endOfModule',
+    );
+
     // Play celebration feedback based on achievement level
     if (endOfModule) {
       _feedback.moduleComplete();
@@ -869,13 +893,13 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
     } else if (endOfLesson) {
       _feedback.lessonComplete();
     }
-    
+
     // Determine which image and message to show
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final suffix = isDark ? '_dark' : '';
     String imagePath;
     String message;
-    
+
     if (endOfModule) {
       imagePath = 'assets/images/finish_module$suffix.png';
       message = 'Excelent! Ai terminat modulul!';
@@ -890,16 +914,16 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
       imagePath = 'assets/images/finish_lesson$suffix.png';
       message = 'Bravo! Ai terminat lecția!';
     }
-    
+
     // Use a timer for auto-dismiss after 4 seconds
     Timer? autoCloseTimer;
-    
+
     await showDialog(
       context: context,
       barrierDismissible: false, // Prevent dismissing by tapping outside
       builder: (dialogContext) {
         debugPrint('🎉 Building completion dialog with image: $imagePath');
-        
+
         // Start the 4-second auto-close timer
         autoCloseTimer = Timer(const Duration(seconds: 4), () {
           if (Navigator.of(dialogContext).canPop()) {
@@ -907,16 +931,22 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
             Navigator.of(dialogContext).pop();
           }
         });
-        
+
         return Dialog(
           elevation: 8,
           backgroundColor: Colors.transparent,
-          insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+          insetPadding: const EdgeInsets.symmetric(
+            horizontal: 24,
+            vertical: 24,
+          ),
           child: Container(
             decoration: BoxDecoration(
               color: Theme.of(context).colorScheme.surface,
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: Theme.of(context).colorScheme.outlineVariant, width: 2),
+              border: Border.all(
+                color: Theme.of(context).colorScheme.outlineVariant,
+                width: 2,
+              ),
               boxShadow: [
                 BoxShadow(
                   color: Colors.black.withOpacity(0.1),
@@ -929,7 +959,9 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
               color: Colors.transparent,
               child: InkWell(
                 onTap: () {
-                  debugPrint('🎉 User tapped on dialog to continue immediately');
+                  debugPrint(
+                    '🎉 User tapped on dialog to continue immediately',
+                  );
                   // Cancel the auto-close timer since user tapped
                   autoCloseTimer?.cancel();
                   Navigator.of(dialogContext).pop();
@@ -943,7 +975,9 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
                       // Completion image based on level - wrapped to ensure taps work
                       GestureDetector(
                         onTap: () {
-                          debugPrint('🎉 User tapped on image to continue immediately');
+                          debugPrint(
+                            '🎉 User tapped on image to continue immediately',
+                          );
                           autoCloseTimer?.cancel();
                           Navigator.of(dialogContext).pop();
                         },
@@ -958,7 +992,10 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
                               height: 300,
                               color: Colors.red.withOpacity(0.3),
                               child: const Center(
-                                child: Text('Image Error', style: TextStyle(color: Colors.white)),
+                                child: Text(
+                                  'Image Error',
+                                  style: TextStyle(color: Colors.white),
+                                ),
                               ),
                             );
                           },
@@ -967,32 +1004,40 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
                       const SizedBox(height: 16),
                       GestureDetector(
                         onTap: () {
-                          debugPrint('🎉 User tapped on message text to continue immediately');
+                          debugPrint(
+                            '🎉 User tapped on message text to continue immediately',
+                          );
                           autoCloseTimer?.cancel();
                           Navigator.of(dialogContext).pop();
                         },
                         child: Text(
                           message,
                           textAlign: TextAlign.center,
-                          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                            fontWeight: FontWeight.w700,
-                            color: Theme.of(context).colorScheme.onSurface,
-                          ),
+                          style: Theme.of(context).textTheme.headlineSmall
+                              ?.copyWith(
+                                fontWeight: FontWeight.w700,
+                                color: Theme.of(context).colorScheme.onSurface,
+                              ),
                         ),
                       ),
                       const SizedBox(height: 12),
                       GestureDetector(
                         onTap: () {
-                          debugPrint('🎉 User tapped on instruction text to continue immediately');
+                          debugPrint(
+                            '🎉 User tapped on instruction text to continue immediately',
+                          );
                           autoCloseTimer?.cancel();
                           Navigator.of(dialogContext).pop();
                         },
                         child: Text(
                           'Apasă oriunde pentru a continua',
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
-                            fontStyle: FontStyle.italic,
-                          ),
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onSurface.withOpacity(0.6),
+                                fontStyle: FontStyle.italic,
+                              ),
                         ),
                       ),
                     ],
@@ -1009,7 +1054,6 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
     autoCloseTimer?.cancel();
     debugPrint('🎉 Completion dialog dismissed, proceeding to next lesson');
   }
-
 
   /// Lecțiile actuale au 1 singur ecran -> marcăm DONE și ieșim
   Future<void> _finishLesson({bool skipCompletionDialog = false}) async {
@@ -1031,23 +1075,34 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
         );
       }
       if (!mounted) return;
-      
+
       // Mark that progress was made (lesson completed)
       _progressMade = true;
 
       // Debug: Log the response to see what flags are set
-      debugPrint('🎉 API Response: endOfLesson=${resp.endOfLesson}, endOfSubmodule=${resp.endOfSubmodule}, endOfModule=${resp.endOfModule}');
-      debugPrint('🎉 Current lesson data: moduleId=${resp.moduleId}, submoduleId=${resp.submoduleId}, lessonId=${resp.lessonId}, screenIndex=${resp.screenIndex}');
-      debugPrint('🎉 Next lesson data: nextModuleId=${resp.nextModuleId}, nextSubmoduleId=${resp.nextSubmoduleId}, nextLessonId=${resp.nextLessonId}');
-      
+      debugPrint(
+        '🎉 API Response: endOfLesson=${resp.endOfLesson}, endOfSubmodule=${resp.endOfSubmodule}, endOfModule=${resp.endOfModule}',
+      );
+      debugPrint(
+        '🎉 Current lesson data: moduleId=${resp.moduleId}, submoduleId=${resp.submoduleId}, lessonId=${resp.lessonId}, screenIndex=${resp.screenIndex}',
+      );
+      debugPrint(
+        '🎉 Next lesson data: nextModuleId=${resp.nextModuleId}, nextSubmoduleId=${resp.nextSubmoduleId}, nextLessonId=${resp.nextLessonId}',
+      );
+
       // arată GIF la final de lecție / submodul / modul (alege condiția dorită)
-      final shouldCelebrate = resp.endOfLesson || resp.endOfSubmodule || resp.endOfModule;
+      final shouldCelebrate =
+          resp.endOfLesson || resp.endOfSubmodule || resp.endOfModule;
       debugPrint('🎉 Should celebrate: $shouldCelebrate');
-      
+
       // Show completion dialog unless skipped
       if (!skipCompletionDialog) {
         debugPrint('🎉 Showing completion dialog!');
-        await _showCompletionDialog(resp.endOfLesson, resp.endOfSubmodule, resp.endOfModule);
+        await _showCompletionDialog(
+          resp.endOfLesson,
+          resp.endOfSubmodule,
+          resp.endOfModule,
+        );
       }
 
       // Navigate to next lesson if available, otherwise go back to submodule
@@ -1056,23 +1111,33 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
         // Priority 1: Use explicit nextLessonId from backend
         // Priority 2: If lessonId in response is different and we're not at an end, use that
         int? targetLessonId;
-        
-        if (resp.nextLessonId != null && resp.nextLessonId! > 0 && resp.nextLessonId! != widget.lessonId) {
+
+        if (resp.nextLessonId != null &&
+            resp.nextLessonId! > 0 &&
+            resp.nextLessonId! != widget.lessonId) {
           // Backend explicitly provided next lesson ID
           targetLessonId = resp.nextLessonId;
-          debugPrint('🎉 Using explicit nextLessonId from backend: $targetLessonId');
-        } else if (!resp.endOfSubmodule && 
-                   !resp.endOfModule && 
-                   resp.lessonId != widget.lessonId && 
-                   resp.lessonId > widget.lessonId) {
+          debugPrint(
+            '🎉 Using explicit nextLessonId from backend: $targetLessonId',
+          );
+        } else if (!resp.endOfSubmodule &&
+            !resp.endOfModule &&
+            resp.lessonId != widget.lessonId &&
+            resp.lessonId > widget.lessonId) {
           // Backend returned a different lessonId that's greater than current - likely the next lesson
           targetLessonId = resp.lessonId;
-          debugPrint('🎉 Using updated lessonId from backend as next lesson: $targetLessonId');
+          debugPrint(
+            '🎉 Using updated lessonId from backend as next lesson: $targetLessonId',
+          );
         }
-        
-        debugPrint('🎉 Navigation check - targetLessonId: $targetLessonId, widget.lessonId: ${widget.lessonId}, resp.lessonId: ${resp.lessonId}, resp.nextLessonId: ${resp.nextLessonId}');
-        debugPrint('🎉 End flags - endOfSubmodule: ${resp.endOfSubmodule}, endOfModule: ${resp.endOfModule}');
-        
+
+        debugPrint(
+          '🎉 Navigation check - targetLessonId: $targetLessonId, widget.lessonId: ${widget.lessonId}, resp.lessonId: ${resp.lessonId}, resp.nextLessonId: ${resp.nextLessonId}',
+        );
+        debugPrint(
+          '🎉 End flags - endOfSubmodule: ${resp.endOfSubmodule}, endOfModule: ${resp.endOfModule}',
+        );
+
         if (targetLessonId != null) {
           final nextLessonId = targetLessonId; // Non-null variable for clarity
           debugPrint('🎉 Attempting to navigate to next lesson: $nextLessonId');
@@ -1080,27 +1145,35 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
           try {
             final lessonExists = await _lessonExists(nextLessonId);
             if (!lessonExists) {
-              debugPrint('🎉 Lesson $nextLessonId does not exist, going back to submodule');
+              debugPrint(
+                '🎉 Lesson $nextLessonId does not exist, going back to submodule',
+              );
               // Add a longer delay to ensure backend has processed the lesson completion
               // This ensures the current lesson is marked as DONE before we navigate back
-              debugPrint('🎉 Waiting for backend to process lesson completion before navigating back...');
+              debugPrint(
+                '🎉 Waiting for backend to process lesson completion before navigating back...',
+              );
               await Future.delayed(const Duration(milliseconds: 1000));
               if (mounted) {
                 Navigator.of(context).maybePop(true);
               }
               return;
             }
-            
+
             Navigator.of(context).pushReplacement(
               MaterialPageRoute(
                 builder: (_) => LessonPlayerPage(
                   profileId: widget.profileId,
                   lessonId: nextLessonId,
-                  title: 'Lecția $nextLessonId', // You might want to get the actual title
+                  title:
+                      'Lecția $nextLessonId', // You might want to get the actual title
+                  isKid: widget.isKid,
                 ),
               ),
             );
-            debugPrint('🎉 Successfully navigated to next lesson: $nextLessonId');
+            debugPrint(
+              '🎉 Successfully navigated to next lesson: $nextLessonId',
+            );
           } catch (e) {
             debugPrint('🎉 Error navigating to next lesson $nextLessonId: $e');
             debugPrint('🎉 Going back to submodule due to navigation error');
@@ -1112,7 +1185,9 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
           }
         } else {
           debugPrint('🎉 No valid next lesson data, going back to submodule');
-          debugPrint('🎉 Next lesson ID: ${resp.nextLessonId}, Response lesson ID: ${resp.lessonId}, Widget lesson ID: ${widget.lessonId}');
+          debugPrint(
+            '🎉 Next lesson ID: ${resp.nextLessonId}, Response lesson ID: ${resp.lessonId}, Widget lesson ID: ${widget.lessonId}',
+          );
           // No fallback navigation - just go back to submodule
           // Add a longer delay to ensure backend has processed the lesson completion
           // This is especially important for the last lesson in a submodule
@@ -1121,31 +1196,37 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
           await Future.delayed(const Duration(milliseconds: 1000));
           if (mounted) {
             // Always return true to signal that data changed and submodule should refresh
-            debugPrint('🎉 Navigating back to submodule after lesson completion');
+            debugPrint(
+              '🎉 Navigating back to submodule after lesson completion',
+            );
             Navigator.of(context).maybePop(true);
           }
         }
       }
     } catch (e) {
       if (!mounted) return;
-      
+
       // Handle server errors (500) when trying to advance past final lesson
       if (e is DioException) {
         final statusCode = e.response?.statusCode;
         if (statusCode != null && statusCode >= 500 && statusCode < 600) {
           // Server error - likely no next lesson available
-          debugPrint('🎉 Server error when advancing (status $statusCode) - treating as end of lessons');
-          
+          debugPrint(
+            '🎉 Server error when advancing (status $statusCode) - treating as end of lessons',
+          );
+
           // Show completion dialog for finishing the lesson
           if (!skipCompletionDialog) {
             await _showCompletionDialog(true, false, false);
           }
-          
+
           // Navigate back to submodule and signal refresh
           // Add a longer delay to ensure backend has processed the lesson completion
           // Even if we got a server error, we still want to give the backend time
           // to process the lesson completion before navigating back
-          debugPrint('🎉 Server error occurred, but waiting for backend to process lesson completion...');
+          debugPrint(
+            '🎉 Server error occurred, but waiting for backend to process lesson completion...',
+          );
           await Future.delayed(const Duration(milliseconds: 1000));
           if (mounted) {
             Navigator.of(context).maybePop(true);
@@ -1153,13 +1234,13 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
           return;
         }
       }
-      
+
       // For other errors, still return true to allow refresh if the lesson was completed
       // This ensures the submodule page refreshes even if there was a minor error
       if (mounted) {
         Navigator.of(context).maybePop(true);
       }
-      
+
       // Show error message
       final errorMsg = _extractErrorMessage(e);
       SnackBarUtils.showError(context, errorMsg);
@@ -1171,7 +1252,7 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
     if (_canFinishLesson) {
       return const SizedBox.shrink();
     }
-    
+
     final remainingSeconds = _minimumSeconds - _elapsedSeconds;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -1186,11 +1267,7 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            Icons.hourglass_empty,
-            size: 18,
-            color: const Color(0xFFEA2233),
-          ),
+          Icon(Icons.hourglass_empty, size: 18, color: const Color(0xFFEA2233)),
           const SizedBox(width: 6),
           Text(
             '$remainingSeconds',
@@ -1240,34 +1317,36 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
           ],
         ),
         body: Stack(
-        children: [
-          SafeArea(
-            top: true,
-            bottom: true,
-            child: _loading
-                ? const Center(
-                    child: CircularProgressIndicator(
-                      valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFEA2233)),
-                    ),
-                  )
-                : _error != null
-                    ? _ErrorView(message: _error!, onRetry: _load)
-                    : _data == null || _data!.screens.isEmpty
-                        ? const _EmptyView()
-                        : _renderScreen(_data!.screens.first, cs),
-          ),
-          // Hint overlay
-          if (_showHint && _data?.hint != null && _data!.hint!.isNotEmpty)
-            _HintOverlay(
-              hint: _data!.hint!,
-              onDismiss: () {
-                setState(() {
-                  _showHint = false;
-                });
-              },
+          children: [
+            SafeArea(
+              top: true,
+              bottom: true,
+              child: _loading
+                  ? const Center(
+                      child: CircularProgressIndicator(
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          Color(0xFFEA2233),
+                        ),
+                      ),
+                    )
+                  : _error != null
+                  ? _ErrorView(message: _error!, onRetry: _load)
+                  : _data == null || _data!.screens.isEmpty
+                  ? const _EmptyView()
+                  : _renderScreen(_data!.screens.first, cs),
             ),
-        ],
-      ),
+            // Hint overlay
+            if (_showHint && _data?.hint != null && _data!.hint!.isNotEmpty)
+              _HintOverlay(
+                hint: _data!.hint!,
+                onDismiss: () {
+                  setState(() {
+                    _showHint = false;
+                  });
+                },
+              ),
+          ],
+        ),
       ),
     );
   }
@@ -1318,23 +1397,27 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
                                   Text(
                                     title,
                                     textAlign: TextAlign.center,
-                                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                                      fontSize: 28,
-                                      fontWeight: FontWeight.w800,
-                                      color: cs.onSurface,
-                                    ),
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .titleLarge
+                                        ?.copyWith(
+                                          fontSize: 28,
+                                          fontWeight: FontWeight.w800,
+                                          color: cs.onSurface,
+                                        ),
                                   ),
                                   const SizedBox(height: 20),
                                 ],
                                 Text(
                                   text,
                                   textAlign: TextAlign.center,
-                                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                                    fontSize: 20,
-                                    height: 1.5,
-                                    color: cs.onSurface,
-                                    fontWeight: FontWeight.w500,
-                                  ),
+                                  style: Theme.of(context).textTheme.bodyLarge
+                                      ?.copyWith(
+                                        fontSize: 20,
+                                        height: 1.5,
+                                        color: cs.onSurface,
+                                        fontWeight: FontWeight.w500,
+                                      ),
                                 ),
                               ],
                             ),
@@ -1361,7 +1444,9 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
                   child: FilledButton(
                     onPressed: _canFinishLesson ? _finishLesson : null,
                     style: FilledButton.styleFrom(
-                      backgroundColor: _canFinishLesson ? const Color(0xFFEA2233) : Colors.grey[400],
+                      backgroundColor: _canFinishLesson
+                          ? const Color(0xFFEA2233)
+                          : Colors.grey[400],
                       foregroundColor: Colors.white,
                       minimumSize: const Size.fromHeight(56),
                       shape: RoundedRectangleBorder(
@@ -1458,11 +1543,12 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
                             Text(
                               title,
                               textAlign: TextAlign.center,
-                              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                                fontSize: 26,
-                                fontWeight: FontWeight.w800,
-                                color: cs.onSurface,
-                              ),
+                              style: Theme.of(context).textTheme.titleLarge
+                                  ?.copyWith(
+                                    fontSize: 26,
+                                    fontWeight: FontWeight.w800,
+                                    color: cs.onSurface,
+                                  ),
                             ),
                             const SizedBox(height: 20),
                           ],
@@ -1470,12 +1556,13 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
                           if (text.isNotEmpty) ...[
                             Text(
                               text,
-                              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                                fontSize: 18,
-                                height: 1.5,
-                                color: cs.onSurface,
-                                fontWeight: FontWeight.w500,
-                              ),
+                              style: Theme.of(context).textTheme.bodyLarge
+                                  ?.copyWith(
+                                    fontSize: 18,
+                                    height: 1.5,
+                                    color: cs.onSurface,
+                                    fontWeight: FontWeight.w500,
+                                  ),
                             ),
                             const SizedBox(height: 20),
                           ],
@@ -1484,10 +1571,11 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
                             if (subtitle.isNotEmpty) ...[
                               Text(
                                 subtitle,
-                                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                  fontWeight: FontWeight.w700,
-                                  color: cs.onSurface,
-                                ),
+                                style: Theme.of(context).textTheme.titleMedium
+                                    ?.copyWith(
+                                      fontWeight: FontWeight.w700,
+                                      color: cs.onSurface,
+                                    ),
                               ),
                               const SizedBox(height: 16),
                             ],
@@ -1496,10 +1584,14 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
                                 (e) => Padding(
                                   padding: const EdgeInsets.only(bottom: 12),
                                   child: Row(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Container(
-                                        margin: const EdgeInsets.only(top: 6, right: 12),
+                                        margin: const EdgeInsets.only(
+                                          top: 6,
+                                          right: 12,
+                                        ),
                                         width: 6,
                                         height: 6,
                                         decoration: const BoxDecoration(
@@ -1510,12 +1602,15 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
                                       Expanded(
                                         child: Text(
                                           e,
-                                          style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                                            fontSize: 16,
-                                            height: 1.5,
-                                            color: cs.onSurface,
-                                            fontWeight: FontWeight.w500,
-                                          ),
+                                          style: Theme.of(context)
+                                              .textTheme
+                                              .bodyLarge
+                                              ?.copyWith(
+                                                fontSize: 16,
+                                                height: 1.5,
+                                                color: cs.onSurface,
+                                                fontWeight: FontWeight.w500,
+                                              ),
                                         ),
                                       ),
                                     ],
@@ -1545,7 +1640,9 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
                   child: FilledButton(
                     onPressed: _canFinishLesson ? _finishLesson : null,
                     style: FilledButton.styleFrom(
-                      backgroundColor: _canFinishLesson ? const Color(0xFFEA2233) : Colors.grey[400],
+                      backgroundColor: _canFinishLesson
+                          ? const Color(0xFFEA2233)
+                          : Colors.grey[400],
                       foregroundColor: Colors.white,
                       minimumSize: const Size.fromHeight(56),
                       shape: RoundedRectangleBorder(
@@ -1609,10 +1706,11 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
                           if (title.isNotEmpty) ...[
                             Text(
                               title,
-                              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                                fontWeight: FontWeight.w700,
-                                color: cs.onSurface,
-                              ),
+                              style: Theme.of(context).textTheme.titleLarge
+                                  ?.copyWith(
+                                    fontWeight: FontWeight.w700,
+                                    color: cs.onSurface,
+                                  ),
                             ),
                             const SizedBox(height: 20),
                           ],
@@ -1622,24 +1720,26 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
                                 padding: const EdgeInsets.only(bottom: 16),
                                 child: Text(
                                   '$e',
-                                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                                    fontSize: 18,
-                                    height: 1.6,
-                                    color: cs.onSurface,
-                                    fontWeight: FontWeight.w500,
-                                  ),
+                                  style: Theme.of(context).textTheme.bodyLarge
+                                      ?.copyWith(
+                                        fontSize: 18,
+                                        height: 1.6,
+                                        color: cs.onSurface,
+                                        fontWeight: FontWeight.w500,
+                                      ),
                                 ),
                               ),
                             )
                           else
                             Text(
                               text,
-                              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                                fontSize: 18,
-                                height: 1.6,
-                                color: cs.onSurface,
-                                fontWeight: FontWeight.w500,
-                              ),
+                              style: Theme.of(context).textTheme.bodyLarge
+                                  ?.copyWith(
+                                    fontSize: 18,
+                                    height: 1.6,
+                                    color: cs.onSurface,
+                                    fontWeight: FontWeight.w500,
+                                  ),
                             ),
                         ],
                       ),
@@ -1661,7 +1761,9 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
                   child: FilledButton(
                     onPressed: _canFinishLesson ? _finishLesson : null,
                     style: FilledButton.styleFrom(
-                      backgroundColor: _canFinishLesson ? const Color(0xFFEA2233) : Colors.grey[400],
+                      backgroundColor: _canFinishLesson
+                          ? const Color(0xFFEA2233)
+                          : Colors.grey[400],
                       foregroundColor: Colors.white,
                       minimumSize: const Size.fromHeight(56),
                       shape: RoundedRectangleBorder(
@@ -1733,22 +1835,26 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
                             Text(
                               title,
                               textAlign: TextAlign.center,
-                              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                                fontWeight: FontWeight.w800,
-                                color: cs.onSurface,
-                              ),
+                              style: Theme.of(context).textTheme.titleLarge
+                                  ?.copyWith(
+                                    fontWeight: FontWeight.w800,
+                                    color: cs.onSurface,
+                                  ),
                             ),
                             const SizedBox(height: 20),
                           ],
                           if (imgUri.isNotEmpty) ...[
                             LayoutBuilder(
                               builder: (context, constraints) {
-                                final orientation = MediaQuery.of(context).orientation;
+                                final orientation = MediaQuery.of(
+                                  context,
+                                ).orientation;
                                 // Responsive image size based on orientation
-                                final imageSize = orientation == Orientation.landscape
+                                final imageSize =
+                                    orientation == Orientation.landscape
                                     ? 160.0 // Smaller in landscape
                                     : 240.0; // Normal in portrait
-                                
+
                                 return Container(
                                   decoration: BoxDecoration(
                                     borderRadius: BorderRadius.circular(20),
@@ -1762,7 +1868,11 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
                                   ),
                                   child: ClipRRect(
                                     borderRadius: BorderRadius.circular(20),
-                                    child: _buildImage(imgUri, width: imageSize, height: imageSize),
+                                    child: _buildImage(
+                                      imgUri,
+                                      width: imageSize,
+                                      height: imageSize,
+                                    ),
                                   ),
                                 );
                               },
@@ -1771,7 +1881,10 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
                           ],
                           if (word.isNotEmpty) ...[
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 20,
+                                vertical: 16,
+                              ),
                               decoration: BoxDecoration(
                                 color: const Color(0xFF2D72D2).withOpacity(0.1),
                                 borderRadius: BorderRadius.circular(16),
@@ -1783,10 +1896,13 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
                                     child: Text(
                                       word,
                                       textAlign: TextAlign.center,
-                                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                                        fontWeight: FontWeight.w700,
-                                        color: cs.onSurface,
-                                      ),
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .headlineSmall
+                                          ?.copyWith(
+                                            fontWeight: FontWeight.w700,
+                                            color: cs.onSurface,
+                                          ),
                                     ),
                                   ),
                                   const SizedBox(width: 12),
@@ -1796,7 +1912,10 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
                                       shape: BoxShape.circle,
                                     ),
                                     child: IconButton(
-                                      icon: const Icon(Icons.volume_up, color: Colors.white),
+                                      icon: const Icon(
+                                        Icons.volume_up,
+                                        color: Colors.white,
+                                      ),
                                       onPressed: () => _playAudio(wordAudioUri),
                                     ),
                                   ),
@@ -1808,10 +1927,11 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
                           if (syllables.isNotEmpty) ...[
                             Text(
                               'Silabe',
-                              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                fontWeight: FontWeight.w700,
-                                color: cs.onSurface,
-                              ),
+                              style: Theme.of(context).textTheme.titleMedium
+                                  ?.copyWith(
+                                    fontWeight: FontWeight.w700,
+                                    color: cs.onSurface,
+                                  ),
                             ),
                             const SizedBox(height: 12),
                             Wrap(
@@ -1822,10 +1942,14 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
                                 final uri = _assetUri(e['audio']);
                                 return Container(
                                   decoration: BoxDecoration(
-                                    color: const Color(0xFFEA2233).withOpacity(0.1),
+                                    color: const Color(
+                                      0xFFEA2233,
+                                    ).withOpacity(0.1),
                                     borderRadius: BorderRadius.circular(12),
                                     border: Border.all(
-                                      color: const Color(0xFFEA2233).withOpacity(0.3),
+                                      color: const Color(
+                                        0xFFEA2233,
+                                      ).withOpacity(0.3),
                                     ),
                                   ),
                                   child: Material(
@@ -1834,7 +1958,10 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
                                       onTap: () => _playAudio(uri),
                                       borderRadius: BorderRadius.circular(12),
                                       child: Padding(
-                                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 16,
+                                          vertical: 12,
+                                        ),
                                         child: Row(
                                           mainAxisSize: MainAxisSize.min,
                                           children: [
@@ -1847,7 +1974,11 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
                                               ),
                                             ),
                                             const SizedBox(width: 8),
-                                            Icon(Icons.volume_up, size: 18, color: const Color(0xFFEA2233)),
+                                            Icon(
+                                              Icons.volume_up,
+                                              size: 18,
+                                              color: const Color(0xFFEA2233),
+                                            ),
                                           ],
                                         ),
                                       ),
@@ -1877,7 +2008,9 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
                   child: FilledButton(
                     onPressed: _canFinishLesson ? _finishLesson : null,
                     style: FilledButton.styleFrom(
-                      backgroundColor: _canFinishLesson ? const Color(0xFFEA2233) : Colors.grey[400],
+                      backgroundColor: _canFinishLesson
+                          ? const Color(0xFFEA2233)
+                          : Colors.grey[400],
                       foregroundColor: Colors.white,
                       minimumSize: const Size.fromHeight(56),
                       shape: RoundedRectangleBorder(
@@ -1955,19 +2088,22 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
                       children: [
                         Text(
                           title,
-                          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                            fontSize: 28,
-                            fontWeight: FontWeight.w700,
-                            color: cs.onSurface,
-                          ),
+                          style: Theme.of(context).textTheme.titleLarge
+                              ?.copyWith(
+                                fontSize: 28,
+                                fontWeight: FontWeight.w700,
+                                color: cs.onSurface,
+                              ),
                         ),
                         const SizedBox(height: 24),
                         Expanded(
                           child: ListView.separated(
                             itemCount: pairs.length,
-                            separatorBuilder: (_, __) => const SizedBox(height: 20),
+                            separatorBuilder: (_, __) =>
+                                const SizedBox(height: 20),
                             itemBuilder: (_, i) {
-                              final it = (pairs[i] as Map).cast<String, dynamic>();
+                              final it = (pairs[i] as Map)
+                                  .cast<String, dynamic>();
                               final masked = _s(
                                 it,
                                 'masked',
@@ -1978,12 +2114,17 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
                                 'solution',
                                 _s(it, 'answer'),
                               ).toUpperCase(); // "s" -> "S"
-                              final revealed = (it['revealed'] as bool?) ?? false;
+                              final revealed =
+                                  (it['revealed'] as bool?) ?? false;
 
                               return Container(
                                 padding: const EdgeInsets.all(16),
                                 decoration: BoxDecoration(
-                                  color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                                  color:
+                                      Theme.of(
+                                        context,
+                                      ).inputDecorationTheme.fillColor ??
+                                      const Color(0xFFF2F3F6),
                                   borderRadius: BorderRadius.circular(16),
                                 ),
                                 child: Row(
@@ -2001,7 +2142,10 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
                                                   wordStyle,
                                                   highlightStyle,
                                                 )
-                                              : TextSpan(text: masked, style: wordStyle),
+                                              : TextSpan(
+                                                  text: masked,
+                                                  style: wordStyle,
+                                                ),
                                         ),
                                       ),
                                     ),
@@ -2013,7 +2157,9 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
                                             ? []
                                             : [
                                                 BoxShadow(
-                                                  color: const Color(0xFFEA2233).withOpacity(0.2),
+                                                  color: const Color(
+                                                    0xFFEA2233,
+                                                  ).withOpacity(0.2),
                                                   blurRadius: 8,
                                                   offset: const Offset(0, 2),
                                                 ),
@@ -2022,7 +2168,9 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
                                       child: TextButton(
                                         onPressed: revealed
                                             ? null
-                                            : () => setState(() => it['revealed'] = true),
+                                            : () => setState(
+                                                () => it['revealed'] = true,
+                                              ),
                                         style: TextButton.styleFrom(
                                           backgroundColor: revealed
                                               ? Colors.grey[200]
@@ -2034,12 +2182,19 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
                                             fontSize: 16,
                                             fontWeight: FontWeight.w700,
                                           ),
-                                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 20,
+                                            vertical: 12,
+                                          ),
                                           shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(12),
+                                            borderRadius: BorderRadius.circular(
+                                              12,
+                                            ),
                                           ),
                                         ),
-                                        child: Text(revealed ? 'Arătat' : 'Arată'),
+                                        child: Text(
+                                          revealed ? 'Arătat' : 'Arată',
+                                        ),
                                       ),
                                     ),
                                   ],
@@ -2067,7 +2222,9 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
                   child: FilledButton(
                     onPressed: _canFinishLesson ? _finishLesson : null,
                     style: FilledButton.styleFrom(
-                      backgroundColor: _canFinishLesson ? const Color(0xFFEA2233) : Colors.grey[400],
+                      backgroundColor: _canFinishLesson
+                          ? const Color(0xFFEA2233)
+                          : Colors.grey[400],
                       foregroundColor: Colors.white,
                       minimumSize: const Size.fromHeight(56),
                       shape: RoundedRectangleBorder(
@@ -2148,7 +2305,11 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
           final imgUrl = imgUrl0(p);
 
           // masca poate veni ca 'masked', 'word' sau chiar 'subtitle'
-          final masked = _s(p, 'masked', _s(p, 'word', _s(p, 'subtitle'))).toUpperCase();
+          final masked = _s(
+            p,
+            'masked',
+            _s(p, 'word', _s(p, 'subtitle')),
+          ).toUpperCase();
           // soluția poate fi 'solution' sau 'answer'
           final solution = _s(p, 'solution', _s(p, 'answer')).toUpperCase();
           final next = _s(
@@ -2193,23 +2354,27 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
                           Text(
                             title,
                             textAlign: TextAlign.center,
-                            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                              fontSize: 28,
-                              fontWeight: FontWeight.w700,
-                              color: cs.onSurface,
-                            ),
+                            style: Theme.of(context).textTheme.titleLarge
+                                ?.copyWith(
+                                  fontSize: 28,
+                                  fontWeight: FontWeight.w700,
+                                  color: cs.onSurface,
+                                ),
                           ),
                           const SizedBox(height: 24),
 
                           if (imgUrl.isNotEmpty) ...[
                             LayoutBuilder(
                               builder: (context, constraints) {
-                                final orientation = MediaQuery.of(context).orientation;
+                                final orientation = MediaQuery.of(
+                                  context,
+                                ).orientation;
                                 // Responsive image size based on orientation
-                                final imageSize = orientation == Orientation.landscape
+                                final imageSize =
+                                    orientation == Orientation.landscape
                                     ? 160.0 // Smaller in landscape
                                     : 240.0; // Normal in portrait
-                                
+
                                 return Container(
                                   decoration: BoxDecoration(
                                     borderRadius: BorderRadius.circular(20),
@@ -2223,7 +2388,11 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
                                   ),
                                   child: ClipRRect(
                                     borderRadius: BorderRadius.circular(20),
-                                    child: _buildImage(imgUrl, width: imageSize, height: imageSize),
+                                    child: _buildImage(
+                                      imgUrl,
+                                      width: imageSize,
+                                      height: imageSize,
+                                    ),
                                   ),
                                 );
                               },
@@ -2235,12 +2404,17 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
                           Container(
                             padding: const EdgeInsets.all(20),
                             decoration: BoxDecoration(
-                              color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                              color:
+                                  Theme.of(
+                                    context,
+                                  ).inputDecorationTheme.fillColor ??
+                                  const Color(0xFFF2F3F6),
                               borderRadius: BorderRadius.circular(16),
                             ),
                             child: StatefulBuilder(
                               builder: (ctx, setSB) {
-                                final revealed = (p['revealed'] as bool?) ?? false;
+                                final revealed =
+                                    (p['revealed'] as bool?) ?? false;
                                 return Row(
                                   crossAxisAlignment: CrossAxisAlignment.center,
                                   children: [
@@ -2255,7 +2429,10 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
                                                   wordStyle,
                                                   hiStyle,
                                                 )
-                                              : TextSpan(text: masked, style: wordStyle),
+                                              : TextSpan(
+                                                  text: masked,
+                                                  style: wordStyle,
+                                                ),
                                         ),
                                       ),
                                     ),
@@ -2267,7 +2444,9 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
                                             ? []
                                             : [
                                                 BoxShadow(
-                                                  color: const Color(0xFFEA2233).withOpacity(0.2),
+                                                  color: const Color(
+                                                    0xFFEA2233,
+                                                  ).withOpacity(0.2),
                                                   blurRadius: 8,
                                                   offset: const Offset(0, 2),
                                                 ),
@@ -2276,7 +2455,9 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
                                       child: TextButton(
                                         onPressed: revealed
                                             ? null
-                                            : () => setSB(() => p['revealed'] = true),
+                                            : () => setSB(
+                                                () => p['revealed'] = true,
+                                              ),
                                         style: TextButton.styleFrom(
                                           backgroundColor: revealed
                                               ? Colors.grey[200]
@@ -2288,12 +2469,19 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
                                             fontSize: 16,
                                             fontWeight: FontWeight.w700,
                                           ),
-                                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 20,
+                                            vertical: 12,
+                                          ),
                                           shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(12),
+                                            borderRadius: BorderRadius.circular(
+                                              12,
+                                            ),
                                           ),
                                         ),
-                                        child: Text(revealed ? 'Arătat' : 'Arată'),
+                                        child: Text(
+                                          revealed ? 'Arătat' : 'Arată',
+                                        ),
                                       ),
                                     ),
                                   ],
@@ -2321,7 +2509,9 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
                   child: FilledButton(
                     onPressed: _canFinishLesson ? _finishLesson : null,
                     style: FilledButton.styleFrom(
-                      backgroundColor: _canFinishLesson ? const Color(0xFFEA2233) : Colors.grey[400],
+                      backgroundColor: _canFinishLesson
+                          ? const Color(0xFFEA2233)
+                          : Colors.grey[400],
                       foregroundColor: Colors.white,
                       minimumSize: const Size.fromHeight(56),
                       shape: RoundedRectangleBorder(
@@ -2418,7 +2608,9 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
       case ScreenType.imageSelection:
         {
           final question = _s(p, 'question', 'Selectează imaginea corectă');
-          final images = _asListOfMap(p['images']); // [{s3Key: string, correct: boolean}]
+          final images = _asListOfMap(
+            p['images'],
+          ); // [{s3Key: string, correct: boolean}]
           final next = _s(_buttons(p), 'nextLabel', 'Următorul');
 
           return _ImageSelectionWidget(
@@ -2440,7 +2632,9 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
           final question = _s(p, 'question', 'Găsește sunetul');
           final word = _s(p, 'word', '');
           final wordAudioKey = _s(p, 's3WordAudioKey', '');
-          final syllables = _asListOfMap(p['syllables']); // [{text, s3AudioKey, correct}]
+          final syllables = _asListOfMap(
+            p['syllables'],
+          ); // [{text, s3AudioKey, correct}]
           final next = _s(_buttons(p), 'nextLabel', 'Următorul');
 
           return _FindSoundWidget(
@@ -2485,7 +2679,11 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
       // 11) Find Non-Intruder - select 2 matching images from 3
       case ScreenType.findNonIntruder:
         {
-          final question = _s(p, 'question', 'Selectează cele două imagini care se potrivesc');
+          final question = _s(
+            p,
+            'question',
+            'Selectează cele două imagini care se potrivesc',
+          );
           final images = _asListOfMap(p['images']); // [{s3Key, isMatch}]
           final next = _s(_buttons(p), 'nextLabel', 'Următorul');
 
@@ -2589,7 +2787,8 @@ class _ImageRevealWordWidget extends StatefulWidget {
   final Future<void> Function({bool skipCompletionDialog}) onFinish;
   final Future<void> Function(bool, bool, bool) onShowCompletionDialog;
   final bool canFinishLesson;
-  final Widget Function(String, {double? width, double? height, BoxFit fit}) buildImage;
+  final Widget Function(String, {double? width, double? height, BoxFit fit})
+  buildImage;
   final VoidCallback onCorrectAnswer;
 
   @override
@@ -2608,16 +2807,16 @@ class _ImageRevealWordWidgetState extends State<_ImageRevealWordWidget> {
     _controller = TextEditingController();
     _focusNode = FocusNode();
     _revealed = (widget.payload['revealed'] as bool?) ?? false;
-    
+
     // Listen to text changes to detect when user types correct answer
     _controller.addListener(_onTextChanged);
-    
+
     // Auto-focus the text field when the widget is built
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _focusNode.requestFocus();
     });
   }
-  
+
   void _onTextChanged() {
     if (_isCorrect && !_hasCalledCorrectAnswer) {
       _hasCalledCorrectAnswer = true;
@@ -2647,7 +2846,8 @@ class _ImageRevealWordWidgetState extends State<_ImageRevealWordWidget> {
         .replaceAll('ţ', 't');
   }
 
-  bool get _isCorrect => _normalize(_controller.text) == _normalize(widget.correctWord);
+  bool get _isCorrect =>
+      _normalize(_controller.text) == _normalize(widget.correctWord);
   bool get _hasError => !_isCorrect && _controller.text.trim().isNotEmpty;
   bool get _canProceed => _isCorrect || _revealed;
 
@@ -2673,7 +2873,7 @@ class _ImageRevealWordWidgetState extends State<_ImageRevealWordWidget> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
       child: Column(
@@ -2710,10 +2910,11 @@ class _ImageRevealWordWidgetState extends State<_ImageRevealWordWidget> {
                       Text(
                         widget.subtitle,
                         textAlign: TextAlign.center,
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          color: Colors.grey[600],
-                          fontWeight: FontWeight.w500,
-                        ),
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(
+                              color: Colors.grey[600],
+                              fontWeight: FontWeight.w500,
+                            ),
                       ),
                     ],
                     const SizedBox(height: 24),
@@ -2721,12 +2922,14 @@ class _ImageRevealWordWidgetState extends State<_ImageRevealWordWidget> {
                     if (widget.imgUrl.isNotEmpty) ...[
                       LayoutBuilder(
                         builder: (context, constraints) {
-                          final orientation = MediaQuery.of(context).orientation;
+                          final orientation = MediaQuery.of(
+                            context,
+                          ).orientation;
                           // Responsive image size based on orientation
                           final imageSize = orientation == Orientation.landscape
                               ? 180.0 // Smaller in landscape
                               : 260.0; // Normal in portrait
-                          
+
                           return Container(
                             decoration: BoxDecoration(
                               borderRadius: BorderRadius.circular(20),
@@ -2740,7 +2943,11 @@ class _ImageRevealWordWidgetState extends State<_ImageRevealWordWidget> {
                             ),
                             child: ClipRRect(
                               borderRadius: BorderRadius.circular(20),
-                              child: widget.buildImage(widget.imgUrl, width: imageSize, height: imageSize),
+                              child: widget.buildImage(
+                                widget.imgUrl,
+                                width: imageSize,
+                                height: imageSize,
+                              ),
                             ),
                           );
                         },
@@ -2751,7 +2958,8 @@ class _ImageRevealWordWidgetState extends State<_ImageRevealWordWidget> {
                     TextField(
                       controller: _controller,
                       focusNode: _focusNode,
-                      onChanged: (_) => setState(() {}), // Rebuild for feedback icons
+                      onChanged: (_) =>
+                          setState(() {}), // Rebuild for feedback icons
                       textInputAction: TextInputAction.done,
                       onSubmitted: (_) => _handleNext(),
                       decoration: InputDecoration(
@@ -2784,10 +2992,23 @@ class _ImageRevealWordWidgetState extends State<_ImageRevealWordWidget> {
                             width: 2,
                           ),
                         ),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 20,
+                          vertical: 18,
+                        ),
                         suffixIcon: _isCorrect
-                            ? const Icon(Icons.check_circle, size: 24, color: Colors.green)
-                            : (_hasError ? const Icon(Icons.cancel, size: 24, color: Colors.red) : null),
+                            ? const Icon(
+                                Icons.check_circle,
+                                size: 24,
+                                color: Colors.green,
+                              )
+                            : (_hasError
+                                  ? const Icon(
+                                      Icons.cancel,
+                                      size: 24,
+                                      color: Colors.red,
+                                    )
+                                  : null),
                       ),
                       style: const TextStyle(
                         fontSize: 18,
@@ -2807,7 +3028,9 @@ class _ImageRevealWordWidgetState extends State<_ImageRevealWordWidget> {
                               ? []
                               : [
                                   BoxShadow(
-                                    color: const Color(0xFF2D72D2).withOpacity(0.2),
+                                    color: const Color(
+                                      0xFF2D72D2,
+                                    ).withOpacity(0.2),
                                     blurRadius: 8,
                                     offset: const Offset(0, 2),
                                   ),
@@ -2826,7 +3049,10 @@ class _ImageRevealWordWidgetState extends State<_ImageRevealWordWidget> {
                               fontSize: 16,
                               fontWeight: FontWeight.w700,
                             ),
-                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 20,
+                              vertical: 12,
+                            ),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12),
                             ),
@@ -2856,9 +3082,13 @@ class _ImageRevealWordWidgetState extends State<_ImageRevealWordWidget> {
                   : [],
             ),
             child: FilledButton(
-              onPressed: (_canProceed && widget.canFinishLesson) ? _handleNext : null,
+              onPressed: (_canProceed && widget.canFinishLesson)
+                  ? _handleNext
+                  : null,
               style: FilledButton.styleFrom(
-                backgroundColor: (_canProceed && widget.canFinishLesson) ? const Color(0xFFEA2233) : Colors.grey[400],
+                backgroundColor: (_canProceed && widget.canFinishLesson)
+                    ? const Color(0xFFEA2233)
+                    : Colors.grey[400],
                 foregroundColor: Colors.white,
                 minimumSize: const Size.fromHeight(56),
                 shape: RoundedRectangleBorder(
@@ -2908,14 +3138,16 @@ class _ImageSelectionWidget extends StatefulWidget {
   final Future<void> Function({bool skipCompletionDialog}) onFinish;
   final Future<void> Function(bool, bool, bool) onShowCompletionDialog;
   final bool canFinishLesson;
-  final Widget Function(String, {double? width, double? height, BoxFit fit}) buildImage;
+  final Widget Function(String, {double? width, double? height, BoxFit fit})
+  buildImage;
   final VoidCallback onCorrectAnswer;
 
   @override
   State<_ImageSelectionWidget> createState() => _ImageSelectionWidgetState();
 }
 
-class _ImageSelectionWidgetState extends State<_ImageSelectionWidget> with SingleTickerProviderStateMixin {
+class _ImageSelectionWidgetState extends State<_ImageSelectionWidget>
+    with SingleTickerProviderStateMixin {
   late List<Map<String, dynamic>> _shuffledImages;
   int? _selectedIndex;
   bool _isCorrect = false;
@@ -2929,13 +3161,13 @@ class _ImageSelectionWidgetState extends State<_ImageSelectionWidget> with Singl
     super.initState();
     // Shuffle images on init
     _shuffledImages = List.from(widget.images)..shuffle();
-    
+
     // Initialize animation controller for error message fade
     _errorAnimationController = AnimationController(
       duration: const Duration(milliseconds: 300),
       vsync: this,
     );
-    
+
     _errorOpacity = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(parent: _errorAnimationController, curve: Curves.easeIn),
     );
@@ -2952,10 +3184,10 @@ class _ImageSelectionWidgetState extends State<_ImageSelectionWidget> with Singl
     if (_hasSelectedCorrectAnswer) {
       return;
     }
-    
+
     final image = _shuffledImages[index];
     final correct = image['correct'] == true;
-    
+
     // Play selection feedback
     final feedback = GetIt.I<FeedbackService>();
     feedback.imageSelect();
@@ -3002,7 +3234,10 @@ class _ImageSelectionWidgetState extends State<_ImageSelectionWidget> with Singl
       await widget.onShowCompletionDialog(true, false, false);
       await widget.onFinish(skipCompletionDialog: true);
     } else {
-      SnackBarUtils.showInfo(context, 'Selectează imaginea corectă pentru a continua!');
+      SnackBarUtils.showInfo(
+        context,
+        'Selectează imaginea corectă pentru a continua!',
+      );
     }
   }
 
@@ -3039,11 +3274,12 @@ class _ImageSelectionWidgetState extends State<_ImageSelectionWidget> with Singl
                           Text(
                             widget.question,
                             textAlign: TextAlign.center,
-                            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                              fontSize: 22,
-                              fontWeight: FontWeight.w700,
-                              color: cs.onSurface,
-                            ),
+                            style: Theme.of(context).textTheme.titleLarge
+                                ?.copyWith(
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.w700,
+                                  color: cs.onSurface,
+                                ),
                           ),
                           const SizedBox(height: 20),
                           // Display images in a grid layout
@@ -3052,34 +3288,59 @@ class _ImageSelectionWidgetState extends State<_ImageSelectionWidget> with Singl
                               spacing: 12,
                               runSpacing: 12,
                               alignment: WrapAlignment.center,
-                              children: List.generate(_shuffledImages.length, (index) {
+                              children: List.generate(_shuffledImages.length, (
+                                index,
+                              ) {
                                 final image = _shuffledImages[index];
-                                final s3Key = image['s3Key']?.toString() ?? image['uri']?.toString() ?? '';
+                                final s3Key =
+                                    image['s3Key']?.toString() ??
+                                    image['uri']?.toString() ??
+                                    '';
                                 final isSelected = _selectedIndex == index;
                                 final showCorrect = isSelected && _isCorrect;
                                 final showWrong = isSelected && !_isCorrect;
 
                                 // Calculate square size based on available space, considering orientation
-                                final availableWidth = constraints.maxWidth - 48; // container padding
-                                final availableHeight = constraints.maxHeight - 150; // space for question and padding
-                                final orientation = MediaQuery.of(context).orientation;
+                                final availableWidth =
+                                    constraints.maxWidth -
+                                    48; // container padding
+                                final availableHeight =
+                                    constraints.maxHeight -
+                                    150; // space for question and padding
+                                final orientation = MediaQuery.of(
+                                  context,
+                                ).orientation;
 
                                 // Determine optimal size based on orientation and available space
                                 double imageSize;
                                 if (orientation == Orientation.landscape) {
                                   // In landscape: make images smaller to fit better, use height constraint
-                                  final maxByHeight = (availableHeight - 24) / 2; // 2 rows max
-                                  final maxByWidth = (availableWidth - 12) / 3; // 3 columns
-                                  imageSize = (maxByHeight < maxByWidth ? maxByHeight : maxByWidth).clamp(80.0, 140.0);
+                                  final maxByHeight =
+                                      (availableHeight - 24) / 2; // 2 rows max
+                                  final maxByWidth =
+                                      (availableWidth - 12) / 3; // 3 columns
+                                  imageSize =
+                                      (maxByHeight < maxByWidth
+                                              ? maxByHeight
+                                              : maxByWidth)
+                                          .clamp(80.0, 140.0);
                                 } else {
                                   // In portrait: use width-based calculation
-                                  imageSize = ((availableWidth - 24) / 2).clamp(100.0, 160.0); // 2 columns
+                                  imageSize = ((availableWidth - 24) / 2).clamp(
+                                    100.0,
+                                    160.0,
+                                  ); // 2 columns
                                 }
 
                                 return GestureDetector(
-                                  onTap: _hasSelectedCorrectAnswer ? null : () => _handleImageTap(index),
+                                  onTap: _hasSelectedCorrectAnswer
+                                      ? null
+                                      : () => _handleImageTap(index),
                                   child: Opacity(
-                                    opacity: _hasSelectedCorrectAnswer && !isSelected ? 0.4 : 1.0,
+                                    opacity:
+                                        _hasSelectedCorrectAnswer && !isSelected
+                                        ? 0.4
+                                        : 1.0,
                                     child: Container(
                                       width: imageSize,
                                       height: imageSize,
@@ -3090,21 +3351,26 @@ class _ImageSelectionWidgetState extends State<_ImageSelectionWidget> with Singl
                                           color: showCorrect
                                               ? Colors.green
                                               : showWrong
-                                                  ? Colors.red
-                                                  : isSelected
-                                                      ? const Color(0xFFEA2233)
-                                                      : Colors.grey[300]!,
-                                          width: showCorrect || showWrong ? 3 : 2,
+                                              ? Colors.red
+                                              : isSelected
+                                              ? const Color(0xFFEA2233)
+                                              : Colors.grey[300]!,
+                                          width: showCorrect || showWrong
+                                              ? 3
+                                              : 2,
                                         ),
                                         boxShadow: [
                                           if (isSelected)
                                             BoxShadow(
-                                              color: (showCorrect
-                                                      ? Colors.green
-                                                      : showWrong
+                                              color:
+                                                  (showCorrect
+                                                          ? Colors.green
+                                                          : showWrong
                                                           ? Colors.red
-                                                          : const Color(0xFFEA2233))
-                                                  .withOpacity(0.3),
+                                                          : const Color(
+                                                              0xFFEA2233,
+                                                            ))
+                                                      .withOpacity(0.3),
                                               blurRadius: 12,
                                               offset: const Offset(0, 4),
                                             ),
@@ -3115,18 +3381,30 @@ class _ImageSelectionWidgetState extends State<_ImageSelectionWidget> with Singl
                                         child: Stack(
                                           fit: StackFit.expand,
                                           children: [
-                                            widget.buildImage(s3Key, width: imageSize, height: imageSize, fit: BoxFit.contain),
+                                            widget.buildImage(
+                                              s3Key,
+                                              width: imageSize,
+                                              height: imageSize,
+                                              fit: BoxFit.contain,
+                                            ),
                                             if (showCorrect)
                                               Positioned(
                                                 top: 8,
                                                 right: 8,
                                                 child: Container(
-                                                  padding: const EdgeInsets.all(8),
-                                                  decoration: const BoxDecoration(
-                                                    color: Colors.green,
-                                                    shape: BoxShape.circle,
+                                                  padding: const EdgeInsets.all(
+                                                    8,
                                                   ),
-                                                  child: const Icon(Icons.check, color: Colors.white, size: 24),
+                                                  decoration:
+                                                      const BoxDecoration(
+                                                        color: Colors.green,
+                                                        shape: BoxShape.circle,
+                                                      ),
+                                                  child: const Icon(
+                                                    Icons.check,
+                                                    color: Colors.white,
+                                                    size: 24,
+                                                  ),
                                                 ),
                                               ),
                                             if (showWrong)
@@ -3134,12 +3412,19 @@ class _ImageSelectionWidgetState extends State<_ImageSelectionWidget> with Singl
                                                 top: 8,
                                                 right: 8,
                                                 child: Container(
-                                                  padding: const EdgeInsets.all(8),
-                                                  decoration: const BoxDecoration(
-                                                    color: Colors.red,
-                                                    shape: BoxShape.circle,
+                                                  padding: const EdgeInsets.all(
+                                                    8,
                                                   ),
-                                                  child: const Icon(Icons.close, color: Colors.white, size: 24),
+                                                  decoration:
+                                                      const BoxDecoration(
+                                                        color: Colors.red,
+                                                        shape: BoxShape.circle,
+                                                      ),
+                                                  child: const Icon(
+                                                    Icons.close,
+                                                    color: Colors.white,
+                                                    size: 24,
+                                                  ),
                                                 ),
                                               ),
                                           ],
@@ -3162,7 +3447,10 @@ class _ImageSelectionWidgetState extends State<_ImageSelectionWidget> with Singl
                           child: FadeTransition(
                             opacity: _errorOpacity,
                             child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 20,
+                                vertical: 14,
+                              ),
                               decoration: BoxDecoration(
                                 color: Colors.red,
                                 borderRadius: BorderRadius.circular(16),
@@ -3177,7 +3465,11 @@ class _ImageSelectionWidgetState extends State<_ImageSelectionWidget> with Singl
                               child: Row(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  const Icon(Icons.close_rounded, color: Colors.white, size: 22),
+                                  const Icon(
+                                    Icons.close_rounded,
+                                    color: Colors.white,
+                                    size: 22,
+                                  ),
                                   const SizedBox(width: 10),
                                   const Text(
                                     'Încercă din nou!',
@@ -3213,9 +3505,13 @@ class _ImageSelectionWidgetState extends State<_ImageSelectionWidget> with Singl
                   : [],
             ),
             child: FilledButton(
-              onPressed: (_isCorrect && widget.canFinishLesson) ? _handleNext : null,
+              onPressed: (_isCorrect && widget.canFinishLesson)
+                  ? _handleNext
+                  : null,
               style: FilledButton.styleFrom(
-                backgroundColor: (_isCorrect && widget.canFinishLesson) ? const Color(0xFFEA2233) : Colors.grey[400],
+                backgroundColor: (_isCorrect && widget.canFinishLesson)
+                    ? const Color(0xFFEA2233)
+                    : Colors.grey[400],
                 foregroundColor: Colors.white,
                 minimumSize: const Size.fromHeight(56),
                 shape: RoundedRectangleBorder(
@@ -3276,7 +3572,8 @@ class _FindSoundWidget extends StatefulWidget {
   State<_FindSoundWidget> createState() => _FindSoundWidgetState();
 }
 
-class _FindSoundWidgetState extends State<_FindSoundWidget> with SingleTickerProviderStateMixin {
+class _FindSoundWidgetState extends State<_FindSoundWidget>
+    with SingleTickerProviderStateMixin {
   int? _selectedIndex;
   bool _isCorrect = false;
   final Set<int> _wrongAnswers = {}; // Track wrong answers for fade out
@@ -3289,21 +3586,21 @@ class _FindSoundWidgetState extends State<_FindSoundWidget> with SingleTickerPro
   @override
   void initState() {
     super.initState();
-    
+
     // Initialize animation controller for error message fade
     _errorAnimationController = AnimationController(
       duration: const Duration(milliseconds: 300),
       vsync: this,
     );
-    
+
     _errorOpacity = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(parent: _errorAnimationController, curve: Curves.easeIn),
     );
-    
+
     // Auto-play sequence when entering the question
     _autoPlaySequence();
   }
-  
+
   @override
   void dispose() {
     _errorAnimationController.dispose();
@@ -3314,7 +3611,7 @@ class _FindSoundWidgetState extends State<_FindSoundWidget> with SingleTickerPro
     // Wait 0.5 seconds before starting
     await Future.delayed(const Duration(milliseconds: 500));
     if (!mounted) return;
-    
+
     // Play the whole word first (wait for completion)
     if (widget.wordAudioKey.isNotEmpty) {
       setState(() => _playingIndex = -1); // -1 means all playing
@@ -3324,12 +3621,14 @@ class _FindSoundWidgetState extends State<_FindSoundWidget> with SingleTickerPro
       await Future.delayed(const Duration(milliseconds: 200));
       if (mounted) setState(() => _playingIndex = null);
     }
-    
+
     // Then play each syllable - wait 0.2s after each one finishes
     for (int i = 0; i < widget.syllables.length; i++) {
       if (!mounted) return;
-      final audioKey = widget.syllables[i]['s3AudioKey']?.toString() ?? 
-                       widget.syllables[i]['audioUri']?.toString() ?? '';
+      final audioKey =
+          widget.syllables[i]['s3AudioKey']?.toString() ??
+          widget.syllables[i]['audioUri']?.toString() ??
+          '';
       if (audioKey.isNotEmpty) {
         setState(() => _playingIndex = i);
         await widget.playAudio(audioKey, waitForCompletion: true);
@@ -3345,14 +3644,14 @@ class _FindSoundWidgetState extends State<_FindSoundWidget> with SingleTickerPro
     final syllable = widget.syllables[index];
     final correct = syllable['correct'] == true;
     final feedback = GetIt.I<FeedbackService>();
-    
+
     // If this syllable was already marked wrong, show error feedback
     if (_wrongAnswers.contains(index)) {
       feedback.wrongAnswer();
       _showWrongAnswerFeedback(index);
       return;
     }
-    
+
     // If correct answer already found
     if (_isCorrect) {
       // Only allow tapping wrong syllables to show error
@@ -3362,7 +3661,7 @@ class _FindSoundWidgetState extends State<_FindSoundWidget> with SingleTickerPro
       }
       return;
     }
-    
+
     // Play selection feedback
     feedback.selection();
 
@@ -3399,18 +3698,18 @@ class _FindSoundWidgetState extends State<_FindSoundWidget> with SingleTickerPro
       });
     }
   }
-  
+
   void _showWrongAnswerFeedback(int index) {
     // Reset animation if already running
     if (_errorAnimationController.isAnimating) {
       _errorAnimationController.reset();
     }
-    
+
     setState(() {
       _flashingWrongIndex = index;
       _showErrorMessage = true;
     });
-    
+
     // Show error message with fade animation
     _errorAnimationController.forward().then((_) {
       // Auto-hide error after 1.2 seconds with fade out
@@ -3434,13 +3733,18 @@ class _FindSoundWidgetState extends State<_FindSoundWidget> with SingleTickerPro
       await widget.onShowCompletionDialog(true, false, false);
       await widget.onFinish(skipCompletionDialog: true);
     } else {
-      SnackBarUtils.showInfo(context, 'Selectează silaba corectă pentru a continua!');
+      SnackBarUtils.showInfo(
+        context,
+        'Selectează silaba corectă pentru a continua!',
+      );
     }
   }
 
   Future<void> _playSyllable(int index) async {
-    final audioKey = widget.syllables[index]['s3AudioKey']?.toString() ?? 
-                     widget.syllables[index]['audioUri']?.toString() ?? '';
+    final audioKey =
+        widget.syllables[index]['s3AudioKey']?.toString() ??
+        widget.syllables[index]['audioUri']?.toString() ??
+        '';
     if (audioKey.isNotEmpty) {
       setState(() => _playingIndex = index);
       await widget.playAudio(audioKey, waitForCompletion: true);
@@ -3493,166 +3797,226 @@ class _FindSoundWidgetState extends State<_FindSoundWidget> with SingleTickerPro
                         Text(
                           widget.question,
                           textAlign: TextAlign.center,
-                          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                            fontSize: 24,
-                            fontWeight: FontWeight.w700,
-                            color: cs.onSurface,
-                          ),
+                          style: Theme.of(context).textTheme.titleLarge
+                              ?.copyWith(
+                                fontSize: 24,
+                                fontWeight: FontWeight.w700,
+                                color: cs.onSurface,
+                              ),
                         ),
                         const SizedBox(height: 16),
                         if (widget.word.isNotEmpty) ...[
                           // Syllables display as split word with play buttons underneath
                           Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 16),
-                        child: Column(
-                          children: [
-                            // Single row with syllable columns and dashes between
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              mainAxisSize: MainAxisSize.min,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 16,
+                            ),
+                            child: Column(
                               children: [
-                                for (int i = 0; i < widget.syllables.length; i++) ...[
-                                  if (i > 0)
-                                    // Dash column - same height structure as syllable
-                                    Column(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Text(
-                                          ' - ',
-                                          style: TextStyle(
-                                            fontSize: 32,
-                                            fontWeight: FontWeight.bold,
-                                            color: Colors.grey[400],
-                                            height: 1.0,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 8),
-                                        const SizedBox(height: 36), // Same height as play button
-                                      ],
-                                    ),
-                                  // Each syllable in a column: text + button centered
-                                  Builder(
-                                    builder: (context) {
-                                      final isWrong = _wrongAnswers.contains(i);
-                                      final isCorrectAnswer = _selectedIndex == i && _isCorrect;
-                                      final isPlaying = _playingIndex == i || _playingIndex == -1;
-                                      final isFlashingWrong = _flashingWrongIndex == i;
-                                      final syllable = widget.syllables[i];
-                                      final isWrongSyllable = syllable['correct'] != true;
-                                      
-                                      return AnimatedOpacity(
-                                        duration: const Duration(milliseconds: 300),
-                                        opacity: isWrong && !isFlashingWrong ? 0.35 : 1.0,
-                                        child: Column(
+                                // Single row with syllable columns and dashes between
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    for (
+                                      int i = 0;
+                                      i < widget.syllables.length;
+                                      i++
+                                    ) ...[
+                                      if (i > 0)
+                                        // Dash column - same height structure as syllable
+                                        Column(
                                           mainAxisSize: MainAxisSize.min,
                                           children: [
-                                            // Syllable text
-                                            GestureDetector(
-                                              onTap: () => _handleSyllableTap(i),
-                                              child: AnimatedDefaultTextStyle(
-                                                duration: const Duration(milliseconds: 200),
-                                                style: TextStyle(
-                                                  fontSize: 32,
-                                                  fontWeight: FontWeight.bold,
-                                                  letterSpacing: 1,
-                                                  height: 1.0,
-                                                  color: isFlashingWrong
-                                                      ? Colors.red[600]
-                                                      : isCorrectAnswer
-                                                          ? Colors.green[600]
-                                                          : isWrong
-                                                              ? Colors.grey[400]
-                                                              : isPlaying
-                                                                  ? const Color(0xFF2D72D2)
-                                                                  : (_isCorrect && isWrongSyllable)
-                                                                      ? const Color(0xFF1A1A2E) // Allow tapping after correct
-                                                                      : const Color(0xFF1A1A2E),
-                                                ),
-                                                child: Text(
-                                                  (widget.syllables[i]['text']?.toString() ?? '').toUpperCase(),
-                                                ),
+                                            Text(
+                                              ' - ',
+                                              style: TextStyle(
+                                                fontSize: 32,
+                                                fontWeight: FontWeight.bold,
+                                                color: Colors.grey[400],
+                                                height: 1.0,
                                               ),
                                             ),
                                             const SizedBox(height: 8),
-                                            // Play button centered under text
-                                            GestureDetector(
-                                              onTap: (isWrong && !isFlashingWrong) ? null : () => _playSyllable(i),
-                                              child: AnimatedContainer(
-                                                duration: const Duration(milliseconds: 200),
-                                                padding: const EdgeInsets.all(8),
-                                                decoration: BoxDecoration(
-                                                  color: isFlashingWrong
-                                                      ? Colors.red[400]
-                                                      : (isWrong && !isFlashingWrong)
-                                                          ? Colors.grey[300]
-                                                          : isPlaying
-                                                              ? const Color(0xFF2D72D2)
-                                                              : const Color(0xFF2D72D2).withOpacity(0.15),
-                                                  shape: BoxShape.circle,
-                                                ),
-                                                child: Icon(
-                                                  isFlashingWrong ? Icons.close : Icons.volume_up,
-                                                  color: isFlashingWrong
-                                                      ? Colors.white
-                                                      : (isWrong && !isFlashingWrong)
-                                                          ? Colors.grey[500]
-                                                          : isPlaying
-                                                              ? Colors.white
-                                                              : const Color(0xFF2D72D2),
-                                                  size: 20,
-                                                ),
-                                              ),
-                                            ),
+                                            const SizedBox(
+                                              height: 36,
+                                            ), // Same height as play button
                                           ],
                                         ),
-                                      );
-                                    },
+                                      // Each syllable in a column: text + button centered
+                                      Builder(
+                                        builder: (context) {
+                                          final isWrong = _wrongAnswers
+                                              .contains(i);
+                                          final isCorrectAnswer =
+                                              _selectedIndex == i && _isCorrect;
+                                          final isPlaying =
+                                              _playingIndex == i ||
+                                              _playingIndex == -1;
+                                          final isFlashingWrong =
+                                              _flashingWrongIndex == i;
+                                          final syllable = widget.syllables[i];
+                                          final isWrongSyllable =
+                                              syllable['correct'] != true;
+
+                                          return AnimatedOpacity(
+                                            duration: const Duration(
+                                              milliseconds: 300,
+                                            ),
+                                            opacity: isWrong && !isFlashingWrong
+                                                ? 0.35
+                                                : 1.0,
+                                            child: Column(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                // Syllable text
+                                                GestureDetector(
+                                                  onTap: () =>
+                                                      _handleSyllableTap(i),
+                                                  child: AnimatedDefaultTextStyle(
+                                                    duration: const Duration(
+                                                      milliseconds: 200,
+                                                    ),
+                                                    style: TextStyle(
+                                                      fontSize: 32,
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                      letterSpacing: 1,
+                                                      height: 1.0,
+                                                      color: isFlashingWrong
+                                                          ? Colors.red[600]
+                                                          : isCorrectAnswer
+                                                          ? Colors.green[600]
+                                                          : isWrong
+                                                          ? Colors.grey[400]
+                                                          : isPlaying
+                                                          ? const Color(
+                                                              0xFF2D72D2,
+                                                            )
+                                                          : (_isCorrect &&
+                                                                isWrongSyllable)
+                                                          ? const Color(
+                                                              0xFF1A1A2E,
+                                                            ) // Allow tapping after correct
+                                                          : const Color(
+                                                              0xFF1A1A2E,
+                                                            ),
+                                                    ),
+                                                    child: Text(
+                                                      (widget.syllables[i]['text']
+                                                                  ?.toString() ??
+                                                              '')
+                                                          .toUpperCase(),
+                                                    ),
+                                                  ),
+                                                ),
+                                                const SizedBox(height: 8),
+                                                // Play button centered under text
+                                                GestureDetector(
+                                                  onTap:
+                                                      (isWrong &&
+                                                          !isFlashingWrong)
+                                                      ? null
+                                                      : () => _playSyllable(i),
+                                                  child: AnimatedContainer(
+                                                    duration: const Duration(
+                                                      milliseconds: 200,
+                                                    ),
+                                                    padding:
+                                                        const EdgeInsets.all(8),
+                                                    decoration: BoxDecoration(
+                                                      color: isFlashingWrong
+                                                          ? Colors.red[400]
+                                                          : (isWrong &&
+                                                                !isFlashingWrong)
+                                                          ? Colors.grey[300]
+                                                          : isPlaying
+                                                          ? const Color(
+                                                              0xFF2D72D2,
+                                                            )
+                                                          : const Color(
+                                                              0xFF2D72D2,
+                                                            ).withOpacity(0.15),
+                                                      shape: BoxShape.circle,
+                                                    ),
+                                                    child: Icon(
+                                                      isFlashingWrong
+                                                          ? Icons.close
+                                                          : Icons.volume_up,
+                                                      color: isFlashingWrong
+                                                          ? Colors.white
+                                                          : (isWrong &&
+                                                                !isFlashingWrong)
+                                                          ? Colors.grey[500]
+                                                          : isPlaying
+                                                          ? Colors.white
+                                                          : const Color(
+                                                              0xFF2D72D2,
+                                                            ),
+                                                      size: 20,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          );
+                                        },
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                                const SizedBox(height: 16),
+                                // Play word button
+                                GestureDetector(
+                                  onTap: () => _playWord(),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 20,
+                                      vertical: 12,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF2D72D2),
+                                      borderRadius: BorderRadius.circular(30),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: const Color(
+                                            0xFF2D72D2,
+                                          ).withOpacity(0.4),
+                                          blurRadius: 8,
+                                          offset: const Offset(0, 3),
+                                        ),
+                                      ],
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: const [
+                                        Icon(
+                                          Icons.play_circle_filled,
+                                          color: Colors.white,
+                                          size: 24,
+                                        ),
+                                        SizedBox(width: 8),
+                                        Text(
+                                          'Ascultă cuvântul',
+                                          style: TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                                   ),
-                                ],
+                                ),
                               ],
                             ),
-                            const SizedBox(height: 16),
-                            // Play word button
-                            GestureDetector(
-                              onTap: () => _playWord(),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFF2D72D2),
-                                  borderRadius: BorderRadius.circular(30),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: const Color(0xFF2D72D2).withOpacity(0.4),
-                                      blurRadius: 8,
-                                      offset: const Offset(0, 3),
-                                    ),
-                                  ],
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: const [
-                                    Icon(Icons.play_circle_filled, color: Colors.white, size: 24),
-                                    SizedBox(width: 8),
-                                    Text(
-                                      'Ascultă cuvântul',
-                                      style: TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-                    ],
-                  ],
-                ),
+                          ),
+                          const SizedBox(height: 24),
+                        ],
+                      ],
+                    ),
                   ),
                   // Error message overlay - positioned at bottom
                   if (_showErrorMessage)
@@ -3663,7 +4027,10 @@ class _FindSoundWidgetState extends State<_FindSoundWidget> with SingleTickerPro
                       child: FadeTransition(
                         opacity: _errorOpacity,
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 20,
+                            vertical: 14,
+                          ),
                           decoration: BoxDecoration(
                             color: Colors.red,
                             borderRadius: BorderRadius.circular(16),
@@ -3678,7 +4045,11 @@ class _FindSoundWidgetState extends State<_FindSoundWidget> with SingleTickerPro
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              const Icon(Icons.close_rounded, color: Colors.white, size: 22),
+                              const Icon(
+                                Icons.close_rounded,
+                                color: Colors.white,
+                                size: 22,
+                              ),
                               const SizedBox(width: 10),
                               const Text(
                                 'Încercă din nou!',
@@ -3712,9 +4083,13 @@ class _FindSoundWidgetState extends State<_FindSoundWidget> with SingleTickerPro
                   : [],
             ),
             child: FilledButton(
-              onPressed: (_isCorrect && widget.canFinishLesson) ? _handleNext : null,
+              onPressed: (_isCorrect && widget.canFinishLesson)
+                  ? _handleNext
+                  : null,
               style: FilledButton.styleFrom(
-                backgroundColor: (_isCorrect && widget.canFinishLesson) ? const Color(0xFFEA2233) : Colors.grey[400],
+                backgroundColor: (_isCorrect && widget.canFinishLesson)
+                    ? const Color(0xFFEA2233)
+                    : Colors.grey[400],
                 foregroundColor: Colors.white,
                 minimumSize: const Size.fromHeight(56),
                 shape: RoundedRectangleBorder(
@@ -3768,11 +4143,13 @@ class _FindMissingLetterWidget extends StatefulWidget {
   final Future<void> Function({bool skipCompletionDialog}) onFinish;
   final Future<void> Function(bool, bool, bool) onShowCompletionDialog;
   final bool canFinishLesson;
-  final Widget Function(String, {double? width, double? height, BoxFit fit}) buildImage;
+  final Widget Function(String, {double? width, double? height, BoxFit fit})
+  buildImage;
   final VoidCallback onCorrectAnswer;
 
   @override
-  State<_FindMissingLetterWidget> createState() => _FindMissingLetterWidgetState();
+  State<_FindMissingLetterWidget> createState() =>
+      _FindMissingLetterWidgetState();
 }
 
 class _FindMissingLetterWidgetState extends State<_FindMissingLetterWidget> {
@@ -3794,13 +4171,15 @@ class _FindMissingLetterWidgetState extends State<_FindMissingLetterWidget> {
   void _generateLetterOptions() {
     final correctLetter = widget.correctLetter.toUpperCase();
     final distractors = <String>[];
-    
+
     // Generate 4 unique distractor letters
-    final availableLetters = _alphabet.split('').where((l) => l != correctLetter).toList()..shuffle();
+    final availableLetters =
+        _alphabet.split('').where((l) => l != correctLetter).toList()
+          ..shuffle();
     for (var i = 0; i < 4 && i < availableLetters.length; i++) {
       distractors.add(availableLetters[i]);
     }
-    
+
     // Combine correct letter + distractors and shuffle
     _letterOptions = [correctLetter, ...distractors]..shuffle();
   }
@@ -3812,7 +4191,10 @@ class _FindMissingLetterWidgetState extends State<_FindMissingLetterWidget> {
     }
     final selectedLetter = _letterOptions[_selectedIndex!];
     // Replace underscore(s) with the selected letter
-    return widget.maskedWord.toUpperCase().replaceAll(RegExp(r'_+'), selectedLetter);
+    return widget.maskedWord.toUpperCase().replaceAll(
+      RegExp(r'_+'),
+      selectedLetter,
+    );
   }
 
   void _handleLetterTap(int index) {
@@ -3820,8 +4202,9 @@ class _FindMissingLetterWidgetState extends State<_FindMissingLetterWidget> {
 
     final selectedLetter = _letterOptions[index];
     // Compare case-insensitive but keep diacritics distinct (Ș ≠ S, Ț ≠ T, etc.)
-    final correct = selectedLetter.toLowerCase() == widget.correctLetter.toLowerCase();
-    
+    final correct =
+        selectedLetter.toLowerCase() == widget.correctLetter.toLowerCase();
+
     // Play feedback based on correctness
     final feedback = GetIt.I<FeedbackService>();
     feedback.letterSelect();
@@ -3860,7 +4243,10 @@ class _FindMissingLetterWidgetState extends State<_FindMissingLetterWidget> {
       await widget.onShowCompletionDialog(true, false, false);
       await widget.onFinish(skipCompletionDialog: true);
     } else {
-      SnackBarUtils.showInfo(context, 'Selectează litera corectă pentru a continua!');
+      SnackBarUtils.showInfo(
+        context,
+        'Selectează litera corectă pentru a continua!',
+      );
     }
   }
 
@@ -3879,8 +4265,9 @@ class _FindMissingLetterWidgetState extends State<_FindMissingLetterWidget> {
                 // Calculate available space for image to fit everything on one screen
                 final orientation = MediaQuery.of(context).orientation;
                 final availableWidth = constraints.maxWidth - 40; // padding
-                final availableHeight = constraints.maxHeight - 250; // space for text and buttons
-                
+                final availableHeight =
+                    constraints.maxHeight - 250; // space for text and buttons
+
                 // Determine optimal image size based on orientation
                 double imageSize;
                 if (orientation == Orientation.landscape) {
@@ -3933,7 +4320,10 @@ class _FindMissingLetterWidgetState extends State<_FindMissingLetterWidget> {
                             padding: const EdgeInsets.all(12),
                             child: ClipRRect(
                               borderRadius: BorderRadius.circular(12),
-                              child: widget.buildImage(widget.imageKey, fit: BoxFit.contain),
+                              child: widget.buildImage(
+                                widget.imageKey,
+                                fit: BoxFit.contain,
+                              ),
                             ),
                           ),
                         ),
@@ -3952,16 +4342,17 @@ class _FindMissingLetterWidgetState extends State<_FindMissingLetterWidget> {
                       Text(
                         _getDisplayWord(),
                         textAlign: TextAlign.center,
-                        style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                          fontSize: 36,
-                          fontWeight: FontWeight.w700,
-                          color: _isCorrect
-                              ? Colors.green
-                              : _showError
+                        style: Theme.of(context).textTheme.headlineMedium
+                            ?.copyWith(
+                              fontSize: 36,
+                              fontWeight: FontWeight.w700,
+                              color: _isCorrect
+                                  ? Colors.green
+                                  : _showError
                                   ? Colors.red
                                   : const Color(0xFF2D72D2),
-                          letterSpacing: 6,
-                        ),
+                              letterSpacing: 6,
+                            ),
                       ),
                       const SizedBox(height: 20),
                       // Letter options - 5 buttons to choose from
@@ -3975,41 +4366,58 @@ class _FindMissingLetterWidgetState extends State<_FindMissingLetterWidget> {
                           final isSelected = _selectedIndex == index;
                           final showCorrect = isSelected && _isCorrect;
                           final showWrong = isSelected && _showError;
-                          final isDark = Theme.of(context).brightness == Brightness.dark;
+                          final isDark =
+                              Theme.of(context).brightness == Brightness.dark;
 
                           return GestureDetector(
-                            onTap: (isDisabled || _isCorrect) ? null : () => _handleLetterTap(index),
+                            onTap: (isDisabled || _isCorrect)
+                                ? null
+                                : () => _handleLetterTap(index),
                             child: Container(
                               width: 70,
                               height: 70,
                               decoration: BoxDecoration(
                                 color: isDisabled
-                                    ? (isDark ? Colors.grey[800] : Colors.grey[300])
+                                    ? (isDark
+                                          ? Colors.grey[800]
+                                          : Colors.grey[300])
                                     : showCorrect
-                                        ? Colors.green
-                                        : showWrong
-                                            ? Colors.red
-                                            : (isDark ? const Color(0xFF2D72D2) : const Color(0xFF2D72D2).withOpacity(0.1)),
+                                    ? Colors.green
+                                    : showWrong
+                                    ? Colors.red
+                                    : (isDark
+                                          ? const Color(0xFF2D72D2)
+                                          : const Color(
+                                              0xFF2D72D2,
+                                            ).withOpacity(0.1)),
                                 borderRadius: BorderRadius.circular(14),
                                 border: Border.all(
                                   color: isDisabled
-                                      ? (isDark ? Colors.grey[700]! : Colors.grey[400]!)
+                                      ? (isDark
+                                            ? Colors.grey[700]!
+                                            : Colors.grey[400]!)
                                       : showCorrect
-                                          ? Colors.green
-                                          : showWrong
-                                              ? Colors.red
-                                              : const Color(0xFF2D72D2),
+                                      ? Colors.green
+                                      : showWrong
+                                      ? Colors.red
+                                      : const Color(0xFF2D72D2),
                                   width: 2,
                                 ),
-                                boxShadow: (isDisabled || showWrong) ? null : [
-                                  BoxShadow(
-                                    color: showCorrect 
-                                        ? Colors.green.withOpacity(0.3)
-                                        : const Color(0xFF2D72D2).withOpacity(isDark ? 0.3 : 0.1),
-                                    blurRadius: 8,
-                                    offset: const Offset(0, 2),
-                                  ),
-                                ],
+                                boxShadow: (isDisabled || showWrong)
+                                    ? null
+                                    : [
+                                        BoxShadow(
+                                          color: showCorrect
+                                              ? Colors.green.withOpacity(0.3)
+                                              : const Color(
+                                                  0xFF2D72D2,
+                                                ).withOpacity(
+                                                  isDark ? 0.3 : 0.1,
+                                                ),
+                                          blurRadius: 8,
+                                          offset: const Offset(0, 2),
+                                        ),
+                                      ],
                               ),
                               child: Center(
                                 child: Text(
@@ -4018,10 +4426,12 @@ class _FindMissingLetterWidgetState extends State<_FindMissingLetterWidget> {
                                     fontSize: 28,
                                     fontWeight: FontWeight.w700,
                                     color: isDisabled
-                                        ? (isDark ? Colors.grey[600] : Colors.grey[500])
+                                        ? (isDark
+                                              ? Colors.grey[600]
+                                              : Colors.grey[500])
                                         : (showCorrect || showWrong || isDark)
-                                            ? Colors.white
-                                            : const Color(0xFF17406B),
+                                        ? Colors.white
+                                        : const Color(0xFF17406B),
                                   ),
                                 ),
                               ),
@@ -4032,17 +4442,26 @@ class _FindMissingLetterWidgetState extends State<_FindMissingLetterWidget> {
                       if (_showError) ...[
                         const SizedBox(height: 16),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 10,
+                          ),
                           decoration: BoxDecoration(
                             color: Colors.red.withOpacity(0.1),
                             borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: Colors.red.withOpacity(0.3)),
+                            border: Border.all(
+                              color: Colors.red.withOpacity(0.3),
+                            ),
                           ),
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Icon(Icons.close, color: Colors.red[700], size: 20),
+                              Icon(
+                                Icons.close,
+                                color: Colors.red[700],
+                                size: 20,
+                              ),
                               const SizedBox(width: 8),
                               Text(
                                 'Încercă din nou!',
@@ -4059,17 +4478,26 @@ class _FindMissingLetterWidgetState extends State<_FindMissingLetterWidget> {
                       if (_isCorrect) ...[
                         const SizedBox(height: 16),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 10,
+                          ),
                           decoration: BoxDecoration(
                             color: Colors.green.withOpacity(0.1),
                             borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: Colors.green.withOpacity(0.3)),
+                            border: Border.all(
+                              color: Colors.green.withOpacity(0.3),
+                            ),
                           ),
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Icon(Icons.check, color: Colors.green[700], size: 20),
+                              Icon(
+                                Icons.check,
+                                color: Colors.green[700],
+                                size: 20,
+                              ),
                               const SizedBox(width: 8),
                               Text(
                                 'Corect!',
@@ -4104,9 +4532,13 @@ class _FindMissingLetterWidgetState extends State<_FindMissingLetterWidget> {
                   : [],
             ),
             child: FilledButton(
-              onPressed: (_isCorrect && widget.canFinishLesson) ? _handleNext : null,
+              onPressed: (_isCorrect && widget.canFinishLesson)
+                  ? _handleNext
+                  : null,
               style: FilledButton.styleFrom(
-                backgroundColor: (_isCorrect && widget.canFinishLesson) ? const Color(0xFFEA2233) : Colors.grey[400],
+                backgroundColor: (_isCorrect && widget.canFinishLesson)
+                    ? const Color(0xFFEA2233)
+                    : Colors.grey[400],
                 foregroundColor: Colors.white,
                 minimumSize: const Size.fromHeight(56),
                 shape: RoundedRectangleBorder(
@@ -4156,7 +4588,8 @@ class _FindNonIntruderWidget extends StatefulWidget {
   final Future<void> Function({bool skipCompletionDialog}) onFinish;
   final Future<void> Function(bool, bool, bool) onShowCompletionDialog;
   final bool canFinishLesson;
-  final Widget Function(String, {double? width, double? height, BoxFit fit}) buildImage;
+  final Widget Function(String, {double? width, double? height, BoxFit fit})
+  buildImage;
   final VoidCallback onCorrectAnswer;
 
   @override
@@ -4178,7 +4611,7 @@ class _FindNonIntruderWidgetState extends State<_FindNonIntruderWidget> {
   void _handleImageTap(int index) {
     final feedback = GetIt.I<FeedbackService>();
     feedback.imageSelect();
-    
+
     setState(() {
       if (_selectedIndices.contains(index)) {
         _selectedIndices.remove(index);
@@ -4222,7 +4655,10 @@ class _FindNonIntruderWidgetState extends State<_FindNonIntruderWidget> {
       await widget.onShowCompletionDialog(true, false, false);
       await widget.onFinish(skipCompletionDialog: true);
     } else {
-      SnackBarUtils.showInfo(context, 'Selectează cele două imagini corecte pentru a continua!');
+      SnackBarUtils.showInfo(
+        context,
+        'Selectează cele două imagini corecte pentru a continua!',
+      );
     }
   }
 
@@ -4280,12 +4716,18 @@ class _FindNonIntruderWidgetState extends State<_FindNonIntruderWidget> {
                           decoration: BoxDecoration(
                             color: Colors.red.withOpacity(0.1),
                             borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: Colors.red.withOpacity(0.3)),
+                            border: Border.all(
+                              color: Colors.red.withOpacity(0.3),
+                            ),
                           ),
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Icon(Icons.close, color: Colors.red[700], size: 20),
+                              Icon(
+                                Icons.close,
+                                color: Colors.red[700],
+                                size: 20,
+                              ),
                               const SizedBox(width: 8),
                               Text(
                                 'Încercă din nou!',
@@ -4306,28 +4748,53 @@ class _FindNonIntruderWidgetState extends State<_FindNonIntruderWidget> {
                           spacing: 12,
                           runSpacing: 12,
                           alignment: WrapAlignment.center,
-                          children: List.generate(_shuffledImages.length, (index) {
+                          children: List.generate(_shuffledImages.length, (
+                            index,
+                          ) {
                             final image = _shuffledImages[index];
-                            final s3Key = image['s3Key']?.toString() ?? image['uri']?.toString() ?? '';
+                            final s3Key =
+                                image['s3Key']?.toString() ??
+                                image['uri']?.toString() ??
+                                '';
                             final isSelected = _selectedIndices.contains(index);
-                            final showCorrect = isSelected && _isCorrect && _selectedIndices.length == 2;
-                            final showWrong = isSelected && _showError && _selectedIndices.length == 2;
+                            final showCorrect =
+                                isSelected &&
+                                _isCorrect &&
+                                _selectedIndices.length == 2;
+                            final showWrong =
+                                isSelected &&
+                                _showError &&
+                                _selectedIndices.length == 2;
 
                             // Calculate square size based on available space, considering orientation
-                            final availableWidth = constraints.maxWidth - 48; // container padding
-                            final availableHeight = constraints.maxHeight - 200; // space for question, text, and padding
-                            final orientation = MediaQuery.of(context).orientation;
-                            
+                            final availableWidth =
+                                constraints.maxWidth - 48; // container padding
+                            final availableHeight =
+                                constraints.maxHeight -
+                                200; // space for question, text, and padding
+                            final orientation = MediaQuery.of(
+                              context,
+                            ).orientation;
+
                             // Determine optimal size based on orientation and available space
                             double imageSize;
                             if (orientation == Orientation.landscape) {
                               // In landscape: make images smaller to fit better
-                              final maxByHeight = (availableHeight - 24) / 2; // 2 rows max
-                              final maxByWidth = (availableWidth - 12) / 3; // 3 columns
-                              imageSize = (maxByHeight < maxByWidth ? maxByHeight : maxByWidth).clamp(80.0, 140.0);
+                              final maxByHeight =
+                                  (availableHeight - 24) / 2; // 2 rows max
+                              final maxByWidth =
+                                  (availableWidth - 12) / 3; // 3 columns
+                              imageSize =
+                                  (maxByHeight < maxByWidth
+                                          ? maxByHeight
+                                          : maxByWidth)
+                                      .clamp(80.0, 140.0);
                             } else {
                               // In portrait: use width-based calculation
-                              imageSize = ((availableWidth - 12) / 2).clamp(120.0, 200.0); // 2 columns
+                              imageSize = ((availableWidth - 12) / 2).clamp(
+                                120.0,
+                                200.0,
+                              ); // 2 columns
                             }
 
                             return GestureDetector(
@@ -4341,21 +4808,22 @@ class _FindNonIntruderWidgetState extends State<_FindNonIntruderWidget> {
                                     color: showCorrect
                                         ? Colors.green
                                         : showWrong
-                                            ? Colors.red
-                                            : isSelected
-                                                ? const Color(0xFFEA2233)
-                                                : Colors.grey[300]!,
+                                        ? Colors.red
+                                        : isSelected
+                                        ? const Color(0xFFEA2233)
+                                        : Colors.grey[300]!,
                                     width: showCorrect || showWrong ? 3 : 2,
                                   ),
                                   boxShadow: [
                                     if (isSelected)
                                       BoxShadow(
-                                        color: (showCorrect
-                                                ? Colors.green
-                                                : showWrong
+                                        color:
+                                            (showCorrect
+                                                    ? Colors.green
+                                                    : showWrong
                                                     ? Colors.red
                                                     : const Color(0xFFEA2233))
-                                            .withOpacity(0.3),
+                                                .withOpacity(0.3),
                                         blurRadius: 12,
                                         offset: const Offset(0, 4),
                                       ),
@@ -4366,7 +4834,12 @@ class _FindNonIntruderWidgetState extends State<_FindNonIntruderWidget> {
                                   child: Stack(
                                     fit: StackFit.expand,
                                     children: [
-                                      widget.buildImage(s3Key, width: imageSize, height: imageSize, fit: BoxFit.contain),
+                                      widget.buildImage(
+                                        s3Key,
+                                        width: imageSize,
+                                        height: imageSize,
+                                        fit: BoxFit.contain,
+                                      ),
                                       if (showCorrect)
                                         Positioned(
                                           top: 8,
@@ -4377,7 +4850,11 @@ class _FindNonIntruderWidgetState extends State<_FindNonIntruderWidget> {
                                               color: Colors.green,
                                               shape: BoxShape.circle,
                                             ),
-                                            child: const Icon(Icons.check, color: Colors.white, size: 24),
+                                            child: const Icon(
+                                              Icons.check,
+                                              color: Colors.white,
+                                              size: 24,
+                                            ),
                                           ),
                                         ),
                                       if (showWrong)
@@ -4390,10 +4867,16 @@ class _FindNonIntruderWidgetState extends State<_FindNonIntruderWidget> {
                                               color: Colors.red,
                                               shape: BoxShape.circle,
                                             ),
-                                            child: const Icon(Icons.close, color: Colors.white, size: 24),
+                                            child: const Icon(
+                                              Icons.close,
+                                              color: Colors.white,
+                                              size: 24,
+                                            ),
                                           ),
                                         ),
-                                      if (isSelected && !showCorrect && !showWrong)
+                                      if (isSelected &&
+                                          !showCorrect &&
+                                          !showWrong)
                                         Positioned(
                                           top: 8,
                                           right: 8,
@@ -4442,9 +4925,13 @@ class _FindNonIntruderWidgetState extends State<_FindNonIntruderWidget> {
                   : [],
             ),
             child: FilledButton(
-              onPressed: (_isCorrect && widget.canFinishLesson) ? _handleNext : null,
+              onPressed: (_isCorrect && widget.canFinishLesson)
+                  ? _handleNext
+                  : null,
               style: FilledButton.styleFrom(
-                backgroundColor: (_isCorrect && widget.canFinishLesson) ? const Color(0xFFEA2233) : Colors.grey[400],
+                backgroundColor: (_isCorrect && widget.canFinishLesson)
+                    ? const Color(0xFFEA2233)
+                    : Colors.grey[400],
                 foregroundColor: Colors.white,
                 minimumSize: const Size.fromHeight(56),
                 shape: RoundedRectangleBorder(
@@ -4500,7 +4987,8 @@ class _FormatWordWidget extends StatefulWidget {
   final Future<void> Function(bool, bool, bool) onShowCompletionDialog;
   final bool canFinishLesson;
   final Future<void> Function(String) playAudio;
-  final Widget Function(String, {double? width, double? height, BoxFit fit}) buildImage;
+  final Widget Function(String, {double? width, double? height, BoxFit fit})
+  buildImage;
   final VoidCallback onCorrectAnswer;
 
   /// Returns true if this is image mode (has image key but no audio)
@@ -4511,7 +4999,8 @@ class _FormatWordWidget extends StatefulWidget {
 }
 
 class _FormatWordWidgetState extends State<_FormatWordWidget> {
-  late List<String> _allLetters; // All letters (shuffled), never modified after init
+  late List<String>
+  _allLetters; // All letters (shuffled), never modified after init
   final List<int> _selectedIndices = []; // Indices of selected letters in order
   late Set<int> _usedIndices; // Track which indices are used
   bool _isCorrect = false;
@@ -4523,10 +5012,12 @@ class _FormatWordWidgetState extends State<_FormatWordWidget> {
     super.initState();
     _allLetters = widget.correctWord.split('')..shuffle();
     _usedIndices = {};
-    
+
     // Audio mode: play audio on init
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!widget.isImageMode && !_hasPlayedAudio && widget.audioQuestionKey.isNotEmpty) {
+      if (!widget.isImageMode &&
+          !_hasPlayedAudio &&
+          widget.audioQuestionKey.isNotEmpty) {
         _hasPlayedAudio = true;
         widget.playAudio(widget.audioQuestionKey);
       }
@@ -4534,11 +5025,12 @@ class _FormatWordWidgetState extends State<_FormatWordWidget> {
   }
 
   void _handleLetterTap(int index) {
-    if (_usedIndices.contains(index)) return; // Already used, don't allow re-use
-    
+    if (_usedIndices.contains(index))
+      return; // Already used, don't allow re-use
+
     // Play letter selection feedback
     GetIt.I<FeedbackService>().letterSelect();
-    
+
     setState(() {
       _selectedIndices.add(index);
       _usedIndices.add(index);
@@ -4554,7 +5046,7 @@ class _FormatWordWidgetState extends State<_FormatWordWidget> {
   void _handleSelectedTap(int tapIndex) {
     // Play light feedback for removing letters
     GetIt.I<FeedbackService>().lightTap();
-    
+
     // Remove this letter and all letters after it from selection
     setState(() {
       // Get indices to remove (from tapIndex to end)
@@ -4570,7 +5062,8 @@ class _FormatWordWidgetState extends State<_FormatWordWidget> {
 
   void _checkAnswer() {
     final formedWord = _selectedIndices.map((i) => _allLetters[i]).join('');
-    final correct = formedWord.toLowerCase() == widget.correctWord.toLowerCase();
+    final correct =
+        formedWord.toLowerCase() == widget.correctWord.toLowerCase();
     final feedback = GetIt.I<FeedbackService>();
 
     setState(() {
@@ -4612,7 +5105,10 @@ class _FormatWordWidgetState extends State<_FormatWordWidget> {
       await widget.onShowCompletionDialog(true, false, false);
       await widget.onFinish(skipCompletionDialog: true);
     } else {
-      SnackBarUtils.showInfo(context, 'Formează cuvântul corect pentru a continua!');
+      SnackBarUtils.showInfo(
+        context,
+        'Formează cuvântul corect pentru a continua!',
+      );
     }
   }
 
@@ -4621,9 +5117,15 @@ class _FormatWordWidgetState extends State<_FormatWordWidget> {
     final cs = Theme.of(context).colorScheme;
     // Calculate letter box size based on word length to fit all on screen
     final letterCount = _allLetters.length;
-    final letterBoxSize = letterCount > 8 ? 50.0 : (letterCount > 6 ? 60.0 : 70.0);
-    final letterFontSize = letterCount > 8 ? 24.0 : (letterCount > 6 ? 28.0 : 32.0);
-    final selectedFontSize = letterCount > 8 ? 20.0 : (letterCount > 6 ? 24.0 : 28.0);
+    final letterBoxSize = letterCount > 8
+        ? 50.0
+        : (letterCount > 6 ? 60.0 : 70.0);
+    final letterFontSize = letterCount > 8
+        ? 24.0
+        : (letterCount > 6 ? 28.0 : 32.0);
+    final selectedFontSize = letterCount > 8
+        ? 20.0
+        : (letterCount > 6 ? 24.0 : 28.0);
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
@@ -4649,8 +5151,8 @@ class _FormatWordWidgetState extends State<_FormatWordWidget> {
                   // Image mode: show question text + image
                   if (widget.isImageMode) ...[
                     Text(
-                      widget.question.isNotEmpty 
-                          ? widget.question 
+                      widget.question.isNotEmpty
+                          ? widget.question
                           : 'Formează cuvântul din imagine',
                       textAlign: TextAlign.center,
                       style: Theme.of(context).textTheme.titleLarge?.copyWith(
@@ -4675,7 +5177,10 @@ class _FormatWordWidgetState extends State<_FormatWordWidget> {
                         padding: const EdgeInsets.all(8),
                         child: ClipRRect(
                           borderRadius: BorderRadius.circular(12),
-                          child: widget.buildImage(widget.imageKey, fit: BoxFit.contain),
+                          child: widget.buildImage(
+                            widget.imageKey,
+                            fit: BoxFit.contain,
+                          ),
                         ),
                       ),
                     ),
@@ -4688,23 +5193,29 @@ class _FormatWordWidgetState extends State<_FormatWordWidget> {
                           child: Text(
                             'Ascultă și formează cuvântul',
                             textAlign: TextAlign.center,
-                            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w700,
-                              color: cs.onSurface,
-                            ),
+                            style: Theme.of(context).textTheme.titleLarge
+                                ?.copyWith(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w700,
+                                  color: cs.onSurface,
+                                ),
                           ),
                         ),
                         const SizedBox(width: 12),
                         GestureDetector(
-                          onTap: () => widget.playAudio(widget.audioQuestionKey),
+                          onTap: () =>
+                              widget.playAudio(widget.audioQuestionKey),
                           child: Container(
                             padding: const EdgeInsets.all(10),
                             decoration: const BoxDecoration(
                               color: Color(0xFF2D72D2),
                               shape: BoxShape.circle,
                             ),
-                            child: const Icon(Icons.volume_up, color: Colors.white, size: 24),
+                            child: const Icon(
+                              Icons.volume_up,
+                              color: Colors.white,
+                              size: 24,
+                            ),
                           ),
                         ),
                       ],
@@ -4714,21 +5225,25 @@ class _FormatWordWidgetState extends State<_FormatWordWidget> {
                   const SizedBox(height: 12),
                   // Selected letters area
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 10,
+                    ),
                     constraints: const BoxConstraints(minHeight: 60),
                     decoration: BoxDecoration(
                       color: _isCorrect
                           ? Colors.green.withOpacity(0.1)
                           : _showError
-                              ? Colors.red.withOpacity(0.1)
-                              : cs.surfaceContainerHighest,
+                          ? Colors.red.withOpacity(0.1)
+                          : Theme.of(context).inputDecorationTheme.fillColor ??
+                                const Color(0xFFF2F3F6),
                       borderRadius: BorderRadius.circular(16),
                       border: Border.all(
                         color: _isCorrect
                             ? Colors.green
                             : _showError
-                                ? Colors.red
-                                : cs.outline.withOpacity(0.5),
+                            ? Colors.red
+                            : cs.outline.withOpacity(0.5),
                         width: 2,
                       ),
                     ),
@@ -4748,7 +5263,9 @@ class _FormatWordWidgetState extends State<_FormatWordWidget> {
                             spacing: 6,
                             runSpacing: 6,
                             alignment: WrapAlignment.center,
-                            children: List.generate(_selectedIndices.length, (index) {
+                            children: List.generate(_selectedIndices.length, (
+                              index,
+                            ) {
                               final letterIndex = _selectedIndices[index];
                               return GestureDetector(
                                 onTap: () => _handleSelectedTap(index),
@@ -4758,8 +5275,8 @@ class _FormatWordWidgetState extends State<_FormatWordWidget> {
                                     color: _isCorrect
                                         ? Colors.green
                                         : _showError
-                                            ? Colors.red
-                                            : const Color(0xFFEA2233),
+                                        ? Colors.red
+                                        : const Color(0xFFEA2233),
                                     borderRadius: BorderRadius.circular(10),
                                   ),
                                   child: Text(
@@ -4779,7 +5296,10 @@ class _FormatWordWidgetState extends State<_FormatWordWidget> {
                   if (_showError) ...[
                     const SizedBox(height: 8),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
+                      ),
                       decoration: BoxDecoration(
                         color: Colors.red.withOpacity(0.1),
                         borderRadius: BorderRadius.circular(12),
@@ -4808,17 +5328,30 @@ class _FormatWordWidgetState extends State<_FormatWordWidget> {
                     GestureDetector(
                       onTap: _reset,
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 8,
+                        ),
                         decoration: BoxDecoration(
-                          color: cs.surfaceContainerHighest,
+                          color:
+                              Theme.of(
+                                context,
+                              ).inputDecorationTheme.fillColor ??
+                              const Color(0xFFF2F3F6),
                           borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: cs.outline.withOpacity(0.5)),
+                          border: Border.all(
+                            color: cs.outline.withOpacity(0.5),
+                          ),
                         ),
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(Icons.refresh, color: cs.onSurface.withOpacity(0.6), size: 18),
+                            Icon(
+                              Icons.refresh,
+                              color: cs.onSurface.withOpacity(0.6),
+                              size: 18,
+                            ),
                             const SizedBox(width: 6),
                             Text(
                               'Resetează',
@@ -4841,30 +5374,41 @@ class _FormatWordWidgetState extends State<_FormatWordWidget> {
                     alignment: WrapAlignment.center,
                     children: List.generate(_allLetters.length, (index) {
                       final isUsed = _usedIndices.contains(index);
-                      final isDark = Theme.of(context).brightness == Brightness.dark;
+                      final isDark =
+                          Theme.of(context).brightness == Brightness.dark;
                       return GestureDetector(
                         onTap: isUsed ? null : () => _handleLetterTap(index),
                         child: Container(
                           width: letterBoxSize,
                           height: letterBoxSize,
                           decoration: BoxDecoration(
-                            color: isUsed 
+                            color: isUsed
                                 ? (isDark ? Colors.grey[800] : Colors.grey[300])
-                                : (isDark ? const Color(0xFF2D72D2) : const Color(0xFF2D72D2).withOpacity(0.1)),
+                                : (isDark
+                                      ? const Color(0xFF2D72D2)
+                                      : const Color(
+                                          0xFF2D72D2,
+                                        ).withOpacity(0.1)),
                             borderRadius: BorderRadius.circular(14),
                             border: Border.all(
-                              color: isUsed 
-                                  ? (isDark ? Colors.grey[700]! : Colors.grey[400]!)
+                              color: isUsed
+                                  ? (isDark
+                                        ? Colors.grey[700]!
+                                        : Colors.grey[400]!)
                                   : const Color(0xFF2D72D2),
                               width: 2,
                             ),
-                            boxShadow: isUsed ? null : [
-                              BoxShadow(
-                                color: const Color(0xFF2D72D2).withOpacity(isDark ? 0.3 : 0.1),
-                                blurRadius: 8,
-                                offset: const Offset(0, 2),
-                              ),
-                            ],
+                            boxShadow: isUsed
+                                ? null
+                                : [
+                                    BoxShadow(
+                                      color: const Color(
+                                        0xFF2D72D2,
+                                      ).withOpacity(isDark ? 0.3 : 0.1),
+                                      blurRadius: 8,
+                                      offset: const Offset(0, 2),
+                                    ),
+                                  ],
                           ),
                           child: Center(
                             child: Text(
@@ -4872,9 +5416,13 @@ class _FormatWordWidgetState extends State<_FormatWordWidget> {
                               style: TextStyle(
                                 fontSize: letterFontSize,
                                 fontWeight: FontWeight.w700,
-                                color: isUsed 
-                                    ? (isDark ? Colors.grey[600] : Colors.grey[500])
-                                    : (isDark ? Colors.white : const Color(0xFF17406B)),
+                                color: isUsed
+                                    ? (isDark
+                                          ? Colors.grey[600]
+                                          : Colors.grey[500])
+                                    : (isDark
+                                          ? Colors.white
+                                          : const Color(0xFF17406B)),
                               ),
                             ),
                           ),
@@ -4902,9 +5450,13 @@ class _FormatWordWidgetState extends State<_FormatWordWidget> {
                   : [],
             ),
             child: FilledButton(
-              onPressed: (_isCorrect && widget.canFinishLesson) ? _handleNext : null,
+              onPressed: (_isCorrect && widget.canFinishLesson)
+                  ? _handleNext
+                  : null,
               style: FilledButton.styleFrom(
-                backgroundColor: (_isCorrect && widget.canFinishLesson) ? const Color(0xFFEA2233) : Colors.grey[400],
+                backgroundColor: (_isCorrect && widget.canFinishLesson)
+                    ? const Color(0xFFEA2233)
+                    : Colors.grey[400],
                 foregroundColor: Colors.white,
                 minimumSize: const Size.fromHeight(56),
                 shape: RoundedRectangleBorder(
@@ -5007,7 +5559,7 @@ class _InstructionsWidgetState extends State<_InstructionsWidget> {
 
   void _checkIfContentFitsScreen() {
     if (!mounted) return;
-    
+
     // If content fits on screen without scrolling, complete timer immediately
     if (_scrollController.hasClients) {
       final maxScroll = _scrollController.position.maxScrollExtent;
@@ -5029,7 +5581,9 @@ class _InstructionsWidgetState extends State<_InstructionsWidget> {
       final threshold = maxScroll * 0.9; // 90% scrolled
 
       if (currentScroll >= threshold) {
-        debugPrint('📜 User scrolled to bottom of instructions, completing timer');
+        debugPrint(
+          '📜 User scrolled to bottom of instructions, completing timer',
+        );
         setState(() {
           _hasScrolledToBottom = true;
         });
@@ -5097,7 +5651,10 @@ class _InstructionsWidgetState extends State<_InstructionsWidget> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Container(
-                                margin: const EdgeInsets.only(top: 6, right: 12),
+                                margin: const EdgeInsets.only(
+                                  top: 6,
+                                  right: 12,
+                                ),
                                 width: 6,
                                 height: 6,
                                 decoration: const BoxDecoration(
@@ -5108,12 +5665,13 @@ class _InstructionsWidgetState extends State<_InstructionsWidget> {
                               Expanded(
                                 child: Text(
                                   '$e',
-                                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                                    fontSize: 16,
-                                    height: 1.5,
-                                    color: cs.onSurface,
-                                    fontWeight: FontWeight.w500,
-                                  ),
+                                  style: Theme.of(context).textTheme.bodyLarge
+                                      ?.copyWith(
+                                        fontSize: 16,
+                                        height: 1.5,
+                                        color: cs.onSurface,
+                                        fontWeight: FontWeight.w500,
+                                      ),
                                 ),
                               ),
                             ],
@@ -5143,7 +5701,9 @@ class _InstructionsWidgetState extends State<_InstructionsWidget> {
             child: FilledButton(
               onPressed: widget.canFinishLesson ? widget.onFinish : null,
               style: FilledButton.styleFrom(
-                backgroundColor: widget.canFinishLesson ? const Color(0xFFEA2233) : Colors.grey[400],
+                backgroundColor: widget.canFinishLesson
+                    ? const Color(0xFFEA2233)
+                    : Colors.grey[400],
                 foregroundColor: Colors.white,
                 minimumSize: const Size.fromHeight(56),
                 shape: RoundedRectangleBorder(

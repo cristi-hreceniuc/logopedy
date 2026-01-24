@@ -14,11 +14,11 @@ class AuthColors {
 
 class AuthIllustration extends StatelessWidget {
   const AuthIllustration(
-      this.asset, {
-        super.key,
-        this.height = 220,
-        this.rounded = true,
-      });
+    this.asset, {
+    super.key,
+    this.height = 220,
+    this.rounded = true,
+  });
 
   final String asset;
   final double height;
@@ -67,9 +67,9 @@ class AuthSubtitle extends StatelessWidget {
     return Text(
       text,
       textAlign: TextAlign.center,
-      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-        color: cs.onSurface.withOpacity(0.7),
-      ),
+      style: Theme.of(
+        context,
+      ).textTheme.bodyMedium?.copyWith(color: cs.onSurface.withOpacity(0.7)),
     );
   }
 }
@@ -105,10 +105,7 @@ class AuthTextField extends StatelessWidget {
       autofillHints: autofillHints,
       validator: validator,
       scrollPadding: EdgeInsets.only(bottom: kb + 120),
-      decoration: InputDecoration(
-        labelText: label,
-        suffixIcon: suffix,
-      ),
+      decoration: InputDecoration(labelText: label, suffixIcon: suffix),
     );
   }
 }
@@ -129,17 +126,19 @@ class AuthPrimaryButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return FilledButton(
       // IMPORTANT: fără UniqueKey – evităm rebuild-uri forțate
-      onPressed: loading ? null : () {
-        // Play button press feedback
-        GetIt.I<FeedbackService>().buttonPress();
-        onPressed?.call();
-      },
+      onPressed: loading
+          ? null
+          : () {
+              // Play button press feedback
+              GetIt.I<FeedbackService>().buttonPress();
+              onPressed?.call();
+            },
       child: loading
           ? const SizedBox(
-        height: 18,
-        width: 18,
-        child: CircularProgressIndicator(strokeWidth: 2),
-      )
+              height: 18,
+              width: 18,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
           : Text(text),
     );
   }
@@ -176,21 +175,23 @@ class AuthScaffold extends StatelessWidget {
     // Status bar – iOS/Android
     final overlay = isDark
         ? const SystemUiOverlayStyle(
-      statusBarColor: Colors.transparent,
-      statusBarBrightness: Brightness.dark,
-      statusBarIconBrightness: Brightness.light,
-    )
+            statusBarColor: Colors.transparent,
+            statusBarBrightness: Brightness.dark,
+            statusBarIconBrightness: Brightness.light,
+          )
         : const SystemUiOverlayStyle(
-      statusBarColor: Colors.transparent,
-      statusBarBrightness: Brightness.light,
-      statusBarIconBrightness: Brightness.dark,
-    );
+            statusBarColor: Colors.transparent,
+            statusBarBrightness: Brightness.light,
+            statusBarIconBrightness: Brightness.dark,
+          );
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: overlay,
       child: Scaffold(
         resizeToAvoidBottomInset: false,
-        backgroundColor: cs.surfaceContainerLowest,
+        // Avoid Material3 "tinted" container colors here (can look pink/googlish with a red seed).
+        // Use app-level scaffold background for a cleaner, more neutral auth surface.
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         appBar: AppBar(
           elevation: 0,
           scrolledUnderElevation: 0,
@@ -200,16 +201,16 @@ class AuthScaffold extends StatelessWidget {
           toolbarHeight: showBack ? kToolbarHeight : 0,
           leading: showBack
               ? IconButton(
-            icon: const Icon(Icons.arrow_back),
-            onPressed: () {
-              GetIt.I<FeedbackService>().navigateBack();
-              if (onBack != null) {
-                onBack!();
-              } else {
-                Navigator.of(context).maybePop();
-              }
-            },
-          )
+                  icon: const Icon(Icons.arrow_back),
+                  onPressed: () {
+                    GetIt.I<FeedbackService>().navigateBack();
+                    if (onBack != null) {
+                      onBack!();
+                    } else {
+                      Navigator.of(context).maybePop();
+                    }
+                  },
+                )
               : null,
         ),
         body: SafeArea(
@@ -225,11 +226,14 @@ class AuthScaffold extends StatelessWidget {
                     child: SingleChildScrollView(
                       primary: true,
                       physics: const AlwaysScrollableScrollPhysics(),
-                      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+                      keyboardDismissBehavior:
+                          ScrollViewKeyboardDismissBehavior.onDrag,
                       // Ridicăm conținutul cu exact înălțimea tastaturii + spațiu
                       padding: EdgeInsets.fromLTRB(16, 0, 16, bottomInset + 16),
                       child: ConstrainedBox(
-                        constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                        constraints: BoxConstraints(
+                          minHeight: constraints.maxHeight,
+                        ),
                         child: Align(
                           alignment: Alignment.topCenter,
                           child: ConstrainedBox(
@@ -270,11 +274,7 @@ class AuthScaffold extends StatelessWidget {
                 },
               ),
               // Version in bottom-right corner
-              Positioned(
-                bottom: 8,
-                right: 16,
-                child: _AuthVersion(),
-              ),
+              Positioned(bottom: 8, right: 16, child: _AuthVersion()),
             ],
           ),
         ),
@@ -298,7 +298,8 @@ class _AuthVersion extends StatelessWidget {
 
         final version = snapshot.data!.version;
         final buildNumber = snapshot.data!.buildNumber;
-        final versionText = 'v$version${buildNumber != '1' ? '+$buildNumber' : ''}';
+        final versionText =
+            'v$version${buildNumber != '1' ? '+$buildNumber' : ''}';
 
         return Text(
           versionText,

@@ -27,6 +27,18 @@ class KidApi {
         .toList();
   }
 
+  /// Mark homework as complete
+  Future<HomeworkDTO> markHomeworkComplete(int homeworkId) async {
+    final response = await _client.dio.post('/api/v1/kid/homework/$homeworkId/complete');
+    return HomeworkDTO.fromJson(response.data);
+  }
+
+  /// Mark homework as incomplete
+  Future<HomeworkDTO> markHomeworkIncomplete(int homeworkId) async {
+    final response = await _client.dio.post('/api/v1/kid/homework/$homeworkId/incomplete');
+    return HomeworkDTO.fromJson(response.data);
+  }
+
   /// Get kid's progress
   Future<Map<String, dynamic>> getProgress() async {
     final response = await _client.dio.get('/api/v1/kid/progress');

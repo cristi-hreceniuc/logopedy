@@ -26,7 +26,10 @@ class AccountTab extends StatefulWidget {
 class _AccountTabState extends State<AccountTab> {
   bool _isUploadingImage = false;
 
-  Future<void> _uploadProfileImage(File imageFile, UserResponseDto? user) async {
+  Future<void> _uploadProfileImage(
+    File imageFile,
+    UserResponseDto? user,
+  ) async {
     if (user == null) return;
 
     setState(() {
@@ -37,14 +40,19 @@ class _AccountTabState extends State<AccountTab> {
       // Clear the old cached image first
       if (user.profileImageUrl != null && user.profileImageUrl!.isNotEmpty) {
         await CachedNetworkImage.evictFromCache(user.profileImageUrl!);
-        debugPrint('🗑️ Cleared cache for old profile image: ${user.profileImageUrl}');
+        debugPrint(
+          '🗑️ Cleared cache for old profile image: ${user.profileImageUrl}',
+        );
       }
 
       final imageUploadService = ImageUploadService(GetIt.I<DioClient>());
       final s3Key = await imageUploadService.uploadUserProfileImage(imageFile);
 
       if (mounted) {
-        SnackBarUtils.showSuccess(context, 'Imaginea de profil a fost încărcată cu succes');
+        SnackBarUtils.showSuccess(
+          context,
+          'Imaginea de profil a fost încărcată cu succes',
+        );
         // Trigger a rebuild by refreshing the user data
         setState(() {
           _isUploadingImage = false;
@@ -69,23 +77,28 @@ class _AccountTabState extends State<AccountTab> {
       child: Container(
         color: Theme.of(context).scaffoldBackgroundColor,
         child: FutureBuilder<UserResponseDto?>(
-          future: repo.getCurrentUser().then<UserResponseDto?>((user) => user).catchError((e) {
-            debugPrint('Error fetching user: $e');
-            return null;
-          }),
+          future: repo
+              .getCurrentUser()
+              .then<UserResponseDto?>((user) => user)
+              .catchError((e) {
+                debugPrint('Error fetching user: $e');
+                return null;
+              }),
           builder: (context, userSnap) {
             final user = userSnap.data;
             final isLoadingUser = !userSnap.hasData;
 
             return FutureBuilder<SessionInfo?>(
-        future: SessionInfo.fromStorage(),
+              future: SessionInfo.fromStorage(),
               builder: (context, sessionSnap) {
                 final sessionInfo = sessionSnap.data;
 
                 if (isLoadingUser) {
                   return const Center(
                     child: CircularProgressIndicator(
-                      valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFEA2233)),
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        Color(0xFFEA2233),
+                      ),
                     ),
                   );
                 }
@@ -93,79 +106,92 @@ class _AccountTabState extends State<AccountTab> {
                 // Use API data if available, fallback to session info
                 final displayUser = user ?? _mapSessionToUser(sessionInfo);
 
-          return ListView(
+                return ListView(
                   padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
-                    children: [
-                      // Header Section with Avatar
-                      Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: cs.surface,
-                          borderRadius: BorderRadius.circular(20),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.08),
-                              blurRadius: 12,
-                              offset: const Offset(0, 4),
-                            ),
-                          ],
-                        ),
-                        child: Column(
-                          children: [
-                            // Avatar with upload functionality
-                            _isUploadingImage
-                                ? const SizedBox(
-                                    width: 80,
-                                    height: 80,
-                                    child: Center(
-                                      child: CircularProgressIndicator(
-                                        valueColor: AlwaysStoppedAnimation<Color>(
-                                          Color(0xFFEA2233),
-                                        ),
+                  children: [
+                    // Header Section with Avatar
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: cs.surface,
+                        borderRadius: BorderRadius.circular(20),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.08),
+                            blurRadius: 12,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        children: [
+                          // Avatar with upload functionality
+                          _isUploadingImage
+                              ? const SizedBox(
+                                  width: 80,
+                                  height: 80,
+                                  child: Center(
+                                    child: CircularProgressIndicator(
+                                      valueColor: AlwaysStoppedAnimation<Color>(
+                                        Color(0xFFEA2233),
                                       ),
                                     ),
-                                  )
-                                : ProfileAvatar(
-                                    imageUrl: displayUser?.profileImageUrl,
-                                    initials: _getInitials(displayUser),
-                                    size: 80,
-                                    showEditButton: true,
-                                    onImageSelected: (file) => _uploadProfileImage(file, displayUser),
                                   ),
-                            const SizedBox(height: 12),
+                                )
+                              : ProfileAvatar(
+                                  imageUrl: displayUser?.profileImageUrl,
+                                  initials: _getInitials(displayUser),
+                                  size: 80,
+                                  showEditButton: true,
+                                  onImageSelected: (file) =>
+                                      _uploadProfileImage(file, displayUser),
+                                ),
+                          const SizedBox(height: 12),
                           // Name
                           Text(
                             _getDisplayName(displayUser),
-                            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                              fontWeight: FontWeight.w800,
-                              color: cs.onSurface,
-                            ),
+                            style: Theme.of(context).textTheme.titleLarge
+                                ?.copyWith(
+                                  fontWeight: FontWeight.w800,
+                                  color: cs.onSurface,
+                                ),
                           ),
                           const SizedBox(height: 4),
                           // Email
-                          if (displayUser?.email != null && displayUser!.email.isNotEmpty)
+                          if (displayUser?.email != null &&
+                              displayUser!.email.isNotEmpty)
                             Text(
                               displayUser.email,
-                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                color: Colors.grey[600],
-                                fontWeight: FontWeight.w500,
-                              ),
+                              style: Theme.of(context).textTheme.bodySmall
+                                  ?.copyWith(
+                                    color: Colors.grey[600],
+                                    fontWeight: FontWeight.w500,
+                                  ),
                             ),
                           if (displayUser?.isPremium == true) ...[
                             const SizedBox(height: 8),
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 4,
+                              ),
                               decoration: BoxDecoration(
                                 color: const Color(0xFFEA2233).withOpacity(0.1),
                                 borderRadius: BorderRadius.circular(16),
                                 border: Border.all(
-                                  color: const Color(0xFFEA2233).withOpacity(0.3),
+                                  color: const Color(
+                                    0xFFEA2233,
+                                  ).withOpacity(0.3),
                                 ),
                               ),
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
-            children: [
-                                  Icon(Icons.star_rounded, size: 14, color: const Color(0xFFEA2233)),
+                                children: [
+                                  Icon(
+                                    Icons.star_rounded,
+                                    size: 14,
+                                    color: const Color(0xFFEA2233),
+                                  ),
                                   const SizedBox(width: 4),
                                   Text(
                                     'Premium',
@@ -200,7 +226,7 @@ class _AccountTabState extends State<AccountTab> {
                         ],
                       ),
                       child: Row(
-                children: [
+                        children: [
                           Container(
                             padding: const EdgeInsets.all(8),
                             decoration: BoxDecoration(
@@ -210,61 +236,81 @@ class _AccountTabState extends State<AccountTab> {
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: Icon(
-                              (displayUser?.isPremium ?? false) ? Icons.star_rounded : Icons.person_outline_rounded,
+                              (displayUser?.isPremium ?? false)
+                                  ? Icons.star_rounded
+                                  : Icons.person_outline_rounded,
                               size: 22,
-                              color: (displayUser?.isPremium ?? false) ? const Color(0xFFEA2233) : const Color(0xFF2D72D2),
+                              color: (displayUser?.isPremium ?? false)
+                                  ? const Color(0xFFEA2233)
+                                  : const Color(0xFF2D72D2),
                             ),
                           ),
                           const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                                  'Status cont',
-                                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                    color: Colors.grey[600],
-                                    fontWeight: FontWeight.w500,
-                                    fontSize: 11,
-                                  ),
-                        ),
-                        const SizedBox(height: 2),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
                                 Text(
-                                  (displayUser?.isPremium ?? false) ? 'Premium' : 'Standard',
-                                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                    fontWeight: FontWeight.w700,
-                                    color: (displayUser?.isPremium ?? false) ? const Color(0xFFEA2233) : const Color(0xFF2D72D2),
-                                  ),
+                                  'Status cont',
+                                  style: Theme.of(context).textTheme.bodySmall
+                                      ?.copyWith(
+                                        color: Colors.grey[600],
+                                        fontWeight: FontWeight.w500,
+                                        fontSize: 11,
+                                      ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  (displayUser?.isPremium ?? false)
+                                      ? 'Premium'
+                                      : 'Standard',
+                                  style: Theme.of(context).textTheme.titleMedium
+                                      ?.copyWith(
+                                        fontWeight: FontWeight.w700,
+                                        color: (displayUser?.isPremium ?? false)
+                                            ? const Color(0xFFEA2233)
+                                            : const Color(0xFF2D72D2),
+                                      ),
                                 ),
                               ],
                             ),
                           ),
                           if (displayUser?.isPremium == true)
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 4,
+                              ),
                               decoration: BoxDecoration(
                                 gradient: const LinearGradient(
-                                  colors: [Color(0xFFEA2233), Color(0xFFD21828)],
+                                  colors: [
+                                    Color(0xFFEA2233),
+                                    Color(0xFFD21828),
+                                  ],
                                 ),
                                 borderRadius: BorderRadius.circular(16),
                               ),
                               child: const Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Icon(Icons.check_circle_rounded, size: 14, color: Colors.white),
+                                  Icon(
+                                    Icons.check_circle_rounded,
+                                    size: 14,
+                                    color: Colors.white,
+                                  ),
                                   SizedBox(width: 4),
                                   Text(
                                     'Activ',
-                                  style: TextStyle(
+                                    style: TextStyle(
                                       color: Colors.white,
                                       fontWeight: FontWeight.w700,
                                       fontSize: 11,
                                     ),
-                          ),
-                      ],
-                    ),
-                  ),
-                ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                        ],
                       ),
                     ),
 
@@ -277,23 +323,27 @@ class _AccountTabState extends State<AccountTab> {
                       iconColor: const Color(0xFF2D72D2),
                       initiallyExpanded: false,
                       children: [
-                        if (displayUser?.firstName != null && displayUser!.firstName!.isNotEmpty)
+                        if (displayUser?.firstName != null &&
+                            displayUser!.firstName!.isNotEmpty)
                           _DetailRow(
                             icon: Icons.person_outline_rounded,
                             iconColor: const Color(0xFF2D72D2),
                             label: 'Prenume',
                             value: displayUser.firstName!,
                           ),
-                        if (displayUser?.firstName != null && displayUser!.firstName!.isNotEmpty)
+                        if (displayUser?.firstName != null &&
+                            displayUser!.firstName!.isNotEmpty)
                           const SizedBox(height: 10),
-                        if (displayUser?.lastName != null && displayUser!.lastName!.isNotEmpty)
+                        if (displayUser?.lastName != null &&
+                            displayUser!.lastName!.isNotEmpty)
                           _DetailRow(
                             icon: Icons.person_outline_rounded,
                             iconColor: const Color(0xFF2D72D2),
                             label: 'Nume',
                             value: displayUser.lastName!,
                           ),
-                        if (displayUser?.lastName != null && displayUser!.lastName!.isNotEmpty)
+                        if (displayUser?.lastName != null &&
+                            displayUser!.lastName!.isNotEmpty)
                           const SizedBox(height: 10),
                         _DetailRow(
                           icon: Icons.email_outlined,
@@ -301,7 +351,8 @@ class _AccountTabState extends State<AccountTab> {
                           label: 'Email',
                           value: displayUser?.email ?? '—',
                         ),
-                        if (displayUser?.gender != null && displayUser!.gender!.isNotEmpty) ...[
+                        if (displayUser?.gender != null &&
+                            displayUser!.gender!.isNotEmpty) ...[
                           const SizedBox(height: 10),
                           _DetailRow(
                             icon: Icons.wc_rounded,
@@ -319,7 +370,8 @@ class _AccountTabState extends State<AccountTab> {
                             value: _formatDate(displayUser!.createdAt),
                           ),
                         ],
-                        if (displayUser?.role != null && displayUser!.role!.isNotEmpty) ...[
+                        if (displayUser?.role != null &&
+                            displayUser!.role!.isNotEmpty) ...[
                           const SizedBox(height: 10),
                           _DetailRow(
                             icon: Icons.verified_user_outlined,
@@ -336,180 +388,195 @@ class _AccountTabState extends State<AccountTab> {
                     // Tip of the Day Card
                     const _TipOfTheDayCard(),
 
-              const SizedBox(height: 16),
+                    const SizedBox(height: 16),
 
-              // App Settings Section
-              _SettingsSection(
-                title: 'Aspect',
-                children: [
-                  BlocBuilder<ThemeCubit, ThemeMode>(
-                    builder: (context, themeMode) {
-                      final isDark = themeMode == ThemeMode.dark;
-                      return _SettingsTile(
-                        icon: Icons.dark_mode_outlined,
-                        iconColor: const Color(0xFF2D72D2),
-                        title: 'Mod întunecat',
-                        trailing: Switch(
-                          value: isDark,
-                          onChanged: (value) {
-                            context.read<ThemeCubit>().set(
-                                  value ? ThemeMode.dark : ThemeMode.light,
-                                );
+                    // App Settings Section
+                    _SettingsSection(
+                      title: 'Aspect',
+                      children: [
+                        BlocBuilder<ThemeCubit, ThemeMode>(
+                          builder: (context, themeMode) {
+                            final isDark = themeMode == ThemeMode.dark;
+                            return _SettingsTile(
+                              icon: Icons.dark_mode_outlined,
+                              iconColor: const Color(0xFF2D72D2),
+                              title: 'Mod întunecat',
+                              trailing: Switch(
+                                value: isDark,
+                                onChanged: (value) {
+                                  context.read<ThemeCubit>().set(
+                                    value ? ThemeMode.dark : ThemeMode.light,
+                                  );
+                                },
+                                activeThumbColor: const Color(0xFFEA2233),
+                                activeTrackColor: const Color(
+                                  0xFFEA2233,
+                                ).withOpacity(0.5),
+                              ),
+                            );
                           },
-                          activeThumbColor: const Color(0xFFEA2233),
-                          activeTrackColor: const Color(0xFFEA2233).withOpacity(0.5),
                         ),
-                      );
-                    },
-                  ),
-                ],
-              ),
+                      ],
+                    ),
 
-              const SizedBox(height: 12),
+                    const SizedBox(height: 12),
 
-              // Legal & Information Section (Collapsible, collapsed by default)
-              _CollapsibleSettingsSection(
-                title: 'Informații și Legal',
-                icon: Icons.gavel_rounded,
-                iconColor: const Color(0xFF2D72D2),
-                initiallyExpanded: false,
-                children: [
-                  _SettingsTile(
-                    icon: Icons.description_outlined,
-                    iconColor: const Color(0xFF2D72D2),
-                    title: 'Termeni și condiții',
-                    onTap: () => _showTermsAndConditions(context),
-                  ),
-                  _SettingsTile(
-                    icon: Icons.info_outline_rounded,
-                    iconColor: const Color(0xFF2D72D2),
-                    title: 'Despre aplicație',
-                    onTap: () => _showAbout(context),
-                  ),
-                  _SettingsTile(
-                    icon: Icons.help_outline_rounded,
-                    iconColor: const Color(0xFF2D72D2),
-                    title: 'Întrebări frecvente (FAQ)',
-                    onTap: () => _showFAQ(context),
-                  ),
-                  _SettingsTile(
-                    icon: Icons.support_agent_outlined,
-                    iconColor: const Color(0xFF2D72D2),
-                    title: 'Ajutor',
-                    onTap: () => _showHelp(context),
-                  ),
-                  _SettingsTile(
-                    icon: Icons.cookie_outlined,
-                    iconColor: const Color(0xFFEA2233),
-                    title: 'Cookie-uri',
-                    onTap: () => _showCookies(context),
-                  ),
-                  _SettingsTile(
-                    icon: Icons.privacy_tip_outlined,
-                    iconColor: const Color(0xFFEA2233),
-                    title: 'Declarație de confidențialitate',
-                    onTap: () => _showPrivacyPolicy(context),
-                  ),
-                ],
-              ),
+                    // Legal & Information Section (Collapsible, collapsed by default)
+                    _CollapsibleSettingsSection(
+                      title: 'Informații și Legal',
+                      icon: Icons.gavel_rounded,
+                      iconColor: const Color(0xFF2D72D2),
+                      initiallyExpanded: false,
+                      children: [
+                        _SettingsTile(
+                          icon: Icons.description_outlined,
+                          iconColor: const Color(0xFF2D72D2),
+                          title: 'Termeni și condiții',
+                          onTap: () => _showTermsAndConditions(context),
+                        ),
+                        _SettingsTile(
+                          icon: Icons.info_outline_rounded,
+                          iconColor: const Color(0xFF2D72D2),
+                          title: 'Despre aplicație',
+                          onTap: () => _showAbout(context),
+                        ),
+                        _SettingsTile(
+                          icon: Icons.help_outline_rounded,
+                          iconColor: const Color(0xFF2D72D2),
+                          title: 'Întrebări frecvente (FAQ)',
+                          onTap: () => _showFAQ(context),
+                        ),
+                        _SettingsTile(
+                          icon: Icons.support_agent_outlined,
+                          iconColor: const Color(0xFF2D72D2),
+                          title: 'Ajutor',
+                          onTap: () => _showHelp(context),
+                        ),
+                        _SettingsTile(
+                          icon: Icons.cookie_outlined,
+                          iconColor: const Color(0xFFEA2233),
+                          title: 'Cookie-uri',
+                          onTap: () => _showCookies(context),
+                        ),
+                        _SettingsTile(
+                          icon: Icons.privacy_tip_outlined,
+                          iconColor: const Color(0xFFEA2233),
+                          title: 'Declarație de confidențialitate',
+                          onTap: () => _showPrivacyPolicy(context),
+                        ),
+                      ],
+                    ),
 
-              const SizedBox(height: 16),
-              BlocBuilder<AuthCubit, AuthState>(
-                builder: (context, st) {
-                    return Container(
-                      child: OutlinedButton(
-                        onPressed: st.loading
-                            ? null
-                            : () => _deleteAccount(context),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: cs.error,
-                          side: BorderSide(color: cs.error.withOpacity(0.5)),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
+                    const SizedBox(height: 16),
+                    // Primary action first: Logout
+                    BlocBuilder<AuthCubit, AuthState>(
+                      builder: (context, st) {
+                        return FilledButton(
+                          onPressed: st.loading
+                              ? null
+                              : () => context.read<AuthCubit>().logout(),
+                          style: FilledButton.styleFrom(
+                            backgroundColor: cs.primary,
+                            foregroundColor: cs.onPrimary,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            padding: const EdgeInsets.symmetric(vertical: 14),
                           ),
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.delete_outline_rounded, size: 18, color: cs.error),
-                            const SizedBox(width: 8),
-                            Text(
-                              'Șterge contul',
-                              style: TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w500,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              st.loading
+                                  ? SizedBox(
+                                      width: 18,
+                                      height: 18,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        valueColor:
+                                            AlwaysStoppedAnimation<Color>(
+                                              cs.onPrimary,
+                                            ),
+                                      ),
+                                    )
+                                  : Icon(
+                                      Icons.logout_rounded,
+                                      size: 18,
+                                      color: cs.onPrimary,
+                                    ),
+                              const SizedBox(width: 8),
+                              Text(
+                                st.loading
+                                    ? 'Se deconectează...'
+                                    : 'Deconectează-te',
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w500,
+                                  color: cs.onPrimary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 10),
+                    // Destructive action last: Delete account
+                    BlocBuilder<AuthCubit, AuthState>(
+                      builder: (context, st) {
+                        return OutlinedButton(
+                          onPressed: st.loading
+                              ? null
+                              : () => _deleteAccount(context),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: cs.error,
+                            side: BorderSide(color: cs.error.withOpacity(0.5)),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.delete_outline_rounded,
+                                size: 18,
                                 color: cs.error,
                               ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
-                  },
-                ),
-                const SizedBox(height: 10),
-                BlocBuilder<AuthCubit, AuthState>(
-                  builder: (context, st) {
-                    return FilledButton(
-                      onPressed: st.loading
-                          ? null
-                          : () => context.read<AuthCubit>().logout(),
-                      style: FilledButton.styleFrom(
-                        backgroundColor: cs.primary,
-                        foregroundColor: cs.onPrimary,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          st.loading
-                              ? SizedBox(
-                                  width: 18,
-                                  height: 18,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    valueColor: AlwaysStoppedAnimation<Color>(cs.onPrimary),
-                                  ),
-                                )
-                              : Icon(Icons.logout_rounded, size: 18, color: cs.onPrimary),
-                          const SizedBox(width: 8),
-                          Text(
-                            st.loading ? 'Se deconectează...' : 'Deconectează-te',
-                            style: TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w500,
-                              color: cs.onPrimary,
-                            ),
+                              const SizedBox(width: 8),
+                              Text(
+                                'Șterge contul',
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w500,
+                                  color: cs.error,
+                                ),
+                              ),
+                            ],
                           ),
-                        ],
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    // App Version in bottom-right corner
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: AppVersion(
+                        style: TextStyle(
+                          color: Colors.grey[600],
+                          fontSize: 11,
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
-                    );
-                },
-              ),
-              const SizedBox(height: 16),
-              // App Version in bottom-right corner
-              Align(
-                alignment: Alignment.centerRight,
-                child: AppVersion(
-                  style: TextStyle(
-                    color: Colors.grey[600],
-                    fontSize: 11,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
-            ],
-          );
-        },
-              );
-            },
-          ),
+                    ),
+                  ],
+                );
+              },
+            );
+          },
         ),
-      );
+      ),
+    );
   }
 
   Future<void> _deleteAccount(BuildContext context) async {
@@ -517,9 +584,7 @@ class _AccountTabState extends State<AccountTab> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(24),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
         title: const Text(
           'Șterge cont',
           style: TextStyle(
@@ -569,46 +634,55 @@ class _AccountTabState extends State<AccountTab> {
     final repo = GetIt.I<AuthRepository>();
     final sessionInfo = await SessionInfo.fromStorage();
     final email = sessionInfo?.email;
-    
+
     if (email == null || email.isEmpty) {
       if (context.mounted) {
-        SnackBarUtils.showError(context, 'Nu s-a putut obține email-ul contului.');
+        SnackBarUtils.showError(
+          context,
+          'Nu s-a putut obține email-ul contului.',
+        );
       }
       return;
     }
-    
+
     try {
       await repo.requestDeleteAccountOtp(email);
     } catch (e) {
       if (context.mounted) {
-        SnackBarUtils.showError(context, 'Nu s-a putut trimite codul de verificare: $e');
+        SnackBarUtils.showError(
+          context,
+          'Nu s-a putut trimite codul de verificare: $e',
+        );
       }
       return;
     }
-    
+
     if (!context.mounted) return;
-    
+
     // Show info that OTP was sent
-    SnackBarUtils.showSuccess(context, 'Codul de verificare a fost trimis pe email.');
+    SnackBarUtils.showSuccess(
+      context,
+      'Codul de verificare a fost trimis pe email.',
+    );
 
     // Step 3: Show OTP input dialog
     final otp = await _showOtpInputDialog(context);
-    
+
     if (otp == null || otp.isEmpty || !context.mounted) return;
 
     // Step 4: Confirm deletion with OTP
     try {
       await repo.confirmDeleteAccount(email: email, otp: otp);
-      
-        if (context.mounted) {
-          SnackBarUtils.showSuccess(context, 'Cont șters cu succes');
+
+      if (context.mounted) {
+        SnackBarUtils.showSuccess(context, 'Cont șters cu succes');
         // Clear onboarding status
         await GetIt.I<SecureStore>().deleteKey('onboarding_completed');
         // Trigger logout to update UI state
         context.read<AuthCubit>().logout();
-        }
-      } catch (e) {
-        if (context.mounted) {
+      }
+    } catch (e) {
+      if (context.mounted) {
         // Extract error message from exception
         String errorMsg = 'Eroare la ștergerea contului';
         if (e.toString().contains('Cod invalid')) {
@@ -616,7 +690,8 @@ class _AccountTabState extends State<AccountTab> {
         } else if (e.toString().contains('expirat')) {
           errorMsg = 'Codul a expirat. Te rog solicită un cod nou.';
         } else if (e.toString().contains('Prea multe încercări')) {
-          errorMsg = 'Prea multe încercări. Te rog așteaptă și încearcă din nou.';
+          errorMsg =
+              'Prea multe încercări. Te rog așteaptă și încearcă din nou.';
         }
         SnackBarUtils.showError(context, errorMsg);
       }
@@ -626,7 +701,7 @@ class _AccountTabState extends State<AccountTab> {
   Future<String?> _showOtpInputDialog(BuildContext context) async {
     final otpController = TextEditingController();
     final formKey = GlobalKey<FormState>();
-    
+
     return showDialog<String>(
       context: context,
       barrierDismissible: false,
@@ -670,10 +745,7 @@ class _AccountTabState extends State<AccountTab> {
               children: [
                 const Text(
                   'Am trimis un cod de 6 cifre pe adresa ta de email. Introdu codul pentru a confirma ștergerea contului.',
-                  style: TextStyle(
-                    color: Color(0xFF17406B),
-                    fontSize: 14,
-                  ),
+                  style: TextStyle(color: Color(0xFF17406B), fontSize: 14),
                 ),
                 const SizedBox(height: 20),
                 TextFormField(
@@ -814,9 +886,9 @@ class _AccountTabState extends State<AccountTab> {
       return user!.lastName!;
     } else if (user?.email != null && user!.email.isNotEmpty) {
       return user.email.split('@').first;
+    }
+    return 'Utilizator';
   }
-  return 'Utilizator';
-}
 
   String _getInitials(UserResponseDto? user) {
     if (user?.firstName != null && user?.lastName != null) {
@@ -842,16 +914,22 @@ class _AccountTabState extends State<AccountTab> {
     }
   }
 
-String _getGenderLabel(String gender) {
-  final lowerGender = gender.toLowerCase();
-  if (lowerGender == 'male' || lowerGender == 'm' || lowerGender == 'masculin') {
-    return 'Masculin';
-  } else if (lowerGender == 'female' || lowerGender == 'f' || lowerGender == 'feminin') {
-    return 'Feminin';
-  } else if (lowerGender == 'other' || lowerGender == 'o' || lowerGender == 'altul') {
-    return 'Altul';
-  }
-  return gender;
+  String _getGenderLabel(String gender) {
+    final lowerGender = gender.toLowerCase();
+    if (lowerGender == 'male' ||
+        lowerGender == 'm' ||
+        lowerGender == 'masculin') {
+      return 'Masculin';
+    } else if (lowerGender == 'female' ||
+        lowerGender == 'f' ||
+        lowerGender == 'feminin') {
+      return 'Feminin';
+    } else if (lowerGender == 'other' ||
+        lowerGender == 'o' ||
+        lowerGender == 'altul') {
+      return 'Altul';
+    }
+    return gender;
   }
 
   String _capitalizeFirst(String text) {
@@ -876,10 +954,8 @@ String _getGenderLabel(String gender) {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => _InfoBottomSheet(
-        title: 'Despre aplicație',
-        content: _aboutContent,
-      ),
+      builder: (context) =>
+          _InfoBottomSheet(title: 'Despre aplicație', content: _aboutContent),
     );
   }
 
@@ -897,10 +973,8 @@ String _getGenderLabel(String gender) {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => _InfoBottomSheet(
-        title: 'Ajutor',
-        content: _helpContent,
-      ),
+      builder: (context) =>
+          _InfoBottomSheet(title: 'Ajutor', content: _helpContent),
     );
   }
 
@@ -1037,7 +1111,8 @@ Unele servicii terțe folosite în aplicație pot folosi propriile cookie-uri. A
 Ne rezervăm dreptul de a actualiza această politică. Modificările vor fi publicate în această secțiune.
 ''';
 
-  static String get _privacyContent => '''
+  static String get _privacyContent =>
+      '''
 DECLARAȚIE DE CONFIDENȚIALITATE
 
 1. PRELUCRAREA DATELOR
@@ -1144,10 +1219,10 @@ class _TipOfTheDayCard extends StatelessWidget {
   const _TipOfTheDayCard();
 
   String _getTipOfTheDay() {
-    final dayOfYear = DateTime.now().difference(
-      DateTime(DateTime.now().year, 1, 1),
-    ).inDays;
-    
+    final dayOfYear = DateTime.now()
+        .difference(DateTime(DateTime.now().year, 1, 1))
+        .inDays;
+
     final tips = [
       'Practică zilnică! Exersarea regulată a exercițiilor logopedice este esențială pentru progres.',
       'Vorbește clar și lent când practici sunetele dificile. Nu te grăbi!',
@@ -1180,7 +1255,7 @@ class _TipOfTheDayCard extends StatelessWidget {
       'Încurajează-te pe tine! Încrederea în sine este esențială pentru succes.',
       'Experimentează cu diferite tehnici până găsești ce funcționează pentru tine.',
     ];
-    
+
     return tips[dayOfYear % tips.length];
   }
 
@@ -1192,10 +1267,7 @@ class _TipOfTheDayCard extends StatelessWidget {
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [
-            Color(0xFF2D72D2),
-            Color(0xFFEA2233),
-          ],
+          colors: [Color(0xFF2D72D2), Color(0xFFEA2233)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -1256,10 +1328,7 @@ class _SettingsSection extends StatelessWidget {
   final String title;
   final List<Widget> children;
 
-  const _SettingsSection({
-    required this.title,
-    required this.children,
-  });
+  const _SettingsSection({required this.title, required this.children});
 
   @override
   Widget build(BuildContext context) {
@@ -1337,10 +1406,14 @@ class _CollapsibleSectionState extends State<_CollapsibleSection>
       duration: const Duration(milliseconds: 200),
       vsync: this,
     );
-    _iconTurns = Tween<double>(begin: 0.0, end: 0.5).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+    _iconTurns = Tween<double>(
+      begin: 0.0,
+      end: 0.5,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
+    _heightFactor = CurvedAnimation(
+      parent: _controller,
+      curve: Curves.easeInOut,
     );
-    _heightFactor = CurvedAnimation(parent: _controller, curve: Curves.easeInOut);
     if (_isExpanded) {
       _controller.value = 1.0;
     }
@@ -1422,10 +1495,7 @@ class _CollapsibleSectionState extends State<_CollapsibleSection>
               },
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const SizedBox(height: 12),
-                  ...widget.children,
-                ],
+                children: [const SizedBox(height: 12), ...widget.children],
               ),
             ),
           ),
@@ -1455,7 +1525,8 @@ class _CollapsibleSettingsSection extends StatefulWidget {
       _CollapsibleSettingsSectionState();
 }
 
-class _CollapsibleSettingsSectionState extends State<_CollapsibleSettingsSection>
+class _CollapsibleSettingsSectionState
+    extends State<_CollapsibleSettingsSection>
     with SingleTickerProviderStateMixin {
   late bool _isExpanded;
   late AnimationController _controller;
@@ -1470,10 +1541,14 @@ class _CollapsibleSettingsSectionState extends State<_CollapsibleSettingsSection
       duration: const Duration(milliseconds: 200),
       vsync: this,
     );
-    _iconTurns = Tween<double>(begin: 0.0, end: 0.5).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+    _iconTurns = Tween<double>(
+      begin: 0.0,
+      end: 0.5,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
+    _heightFactor = CurvedAnimation(
+      parent: _controller,
+      curve: Curves.easeInOut,
     );
-    _heightFactor = CurvedAnimation(parent: _controller, curve: Curves.easeInOut);
     if (_isExpanded) {
       _controller.value = 1.0;
     }
@@ -1643,10 +1718,7 @@ class _InfoBottomSheet extends StatelessWidget {
   final String title;
   final String content;
 
-  const _InfoBottomSheet({
-    required this.title,
-    required this.content,
-  });
+  const _InfoBottomSheet({required this.title, required this.content});
 
   @override
   Widget build(BuildContext context) {
@@ -1834,10 +1906,7 @@ class _FAQItem extends StatefulWidget {
   final String question;
   final String answer;
 
-  const _FAQItem({
-    required this.question,
-    required this.answer,
-  });
+  const _FAQItem({required this.question, required this.answer});
 
   @override
   State<_FAQItem> createState() => _FAQItemState();

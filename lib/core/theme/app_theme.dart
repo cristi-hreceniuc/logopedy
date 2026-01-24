@@ -123,6 +123,20 @@ class AppTheme {
       colorScheme: scheme,
       textTheme: text,
       scaffoldBackgroundColor: Brand.lightBg,
+      // Remove Material3 "tonal tint" (often pinkish with a red seed) from dialogs & navigation bars.
+      dialogTheme: DialogThemeData(
+        backgroundColor: scheme.surface,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      ),
+      navigationBarTheme: NavigationBarThemeData(
+        backgroundColor: scheme.surface,
+        surfaceTintColor: Colors.transparent,
+        indicatorColor: scheme.primary.withOpacity(0.12),
+        labelTextStyle: MaterialStatePropertyAll(
+          GoogleFonts.manrope(fontWeight: FontWeight.w600, fontSize: 12),
+        ),
+      ),
       appBarTheme: AppBarTheme(
         backgroundColor: Brand.lightBg,
         foregroundColor: scheme.onSurface,
@@ -204,10 +218,12 @@ class AppTheme {
         ),
       ),
 
-      cardTheme: const CardThemeData(
+      cardTheme: CardThemeData(
+        color: Brand.lightSurface,
+        surfaceTintColor: Colors.transparent,
         elevation: 0.5,
         margin: EdgeInsets.zero,
-        shape: RoundedRectangleBorder(
+        shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.all(Radius.circular(24)),
         ),
       ),
@@ -276,9 +292,25 @@ class AppTheme {
       // fundal general – mai deschis
       scaffoldBackgroundColor: Brand.darkBgSoft,
 
+      // Remove Material3 tonal tint from dialogs & navigation bars (can look colored/washed).
+      dialogTheme: DialogThemeData(
+        backgroundColor: scheme.surface,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      ),
+      navigationBarTheme: NavigationBarThemeData(
+        backgroundColor: scheme.surface,
+        surfaceTintColor: Colors.transparent,
+        indicatorColor: scheme.primary.withOpacity(0.18),
+        labelTextStyle: MaterialStatePropertyAll(
+          GoogleFonts.manrope(fontWeight: FontWeight.w600, fontSize: 12),
+        ),
+      ),
+
       // carduri/sheet-uri – cu o treaptă mai deschise
       cardTheme: CardThemeData(
         color: Brand.darkSurfaceSoft,
+        surfaceTintColor: Colors.transparent,
         elevation: 0.5,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
       ),
@@ -318,7 +350,7 @@ class AppTheme {
         centerTitle: true,
         systemOverlayStyle: SystemUiOverlayStyle(
           statusBarColor: Colors.transparent,
-          statusBarBrightness: Brightness.dark,      // iOS
+          statusBarBrightness: Brightness.dark, // iOS
           statusBarIconBrightness: Brightness.light, // Android
         ),
       ),

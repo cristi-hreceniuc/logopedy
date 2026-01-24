@@ -20,17 +20,20 @@ class _RegisterPageState extends State<RegisterPage> {
   final _confirmPass = TextEditingController();
   final _first = TextEditingController();
   final _last = TextEditingController();
-  
+
   // OTP controllers - 6 individual fields
-  final List<TextEditingController> _otpControllers = List.generate(6, (_) => TextEditingController());
+  final List<TextEditingController> _otpControllers = List.generate(
+    6,
+    (_) => TextEditingController(),
+  );
   final List<FocusNode> _otpFocusNodes = List.generate(6, (_) => FocusNode());
-  
+
   String _gender = 'male';
   bool _isSpecialist = false;
   bool _obscurePass = true;
   bool _obscureConfirm = true;
   String? _errorMessage;
-  
+
   // Track if we're in OTP verification step
   bool _isOtpStep = false;
   String? _pendingEmail;
@@ -99,7 +102,7 @@ class _RegisterPageState extends State<RegisterPage> {
 
   Widget _buildRegistrationStep(BuildContext ctx, AuthState st) {
     final cs = Theme.of(context).colorScheme;
-    
+
     return AuthScaffold(
       illustrationAsset: 'assets/images/signup_image.png',
       title: 'Înregistrează-te',
@@ -138,54 +141,60 @@ class _RegisterPageState extends State<RegisterPage> {
               ),
               const SizedBox(height: 16),
             ],
-            
+
             // First name
             _buildTextField(
               controller: _first,
               label: 'Prenume',
-              validator: (v) => (v == null || v.isEmpty) ? 'Câmp obligatoriu' : null,
+              validator: (v) =>
+                  (v == null || v.isEmpty) ? 'Câmp obligatoriu' : null,
             ),
             const SizedBox(height: 14),
-            
+
             // Last name
             _buildTextField(
               controller: _last,
               label: 'Nume',
-              validator: (v) => (v == null || v.isEmpty) ? 'Câmp obligatoriu' : null,
+              validator: (v) =>
+                  (v == null || v.isEmpty) ? 'Câmp obligatoriu' : null,
             ),
             const SizedBox(height: 14),
-            
+
             // Gender selector
             _buildGenderSelector(),
             const SizedBox(height: 14),
-            
+
             // Email
             _buildTextField(
               controller: _email,
               label: 'Email',
               keyboardType: TextInputType.emailAddress,
               autofillHints: const [AutofillHints.email],
-              validator: (v) => (v == null || !v.contains('@')) ? 'Email invalid' : null,
+              validator: (v) =>
+                  (v == null || !v.contains('@')) ? 'Email invalid' : null,
             ),
             const SizedBox(height: 14),
-            
+
             // Password
             _buildTextField(
               controller: _pass,
               label: 'Parolă',
               obscure: _obscurePass,
               autofillHints: const [AutofillHints.newPassword],
-              validator: (v) => (v == null || v.length < 8) ? 'Minim 8 caractere' : null,
+              validator: (v) =>
+                  (v == null || v.length < 8) ? 'Minim 8 caractere' : null,
               suffixIcon: IconButton(
                 icon: Icon(
-                  _obscurePass ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                  _obscurePass
+                      ? Icons.visibility_outlined
+                      : Icons.visibility_off_outlined,
                   color: cs.onSurfaceVariant,
                 ),
                 onPressed: () => setState(() => _obscurePass = !_obscurePass),
               ),
             ),
             const SizedBox(height: 14),
-            
+
             // Confirm password
             _buildTextField(
               controller: _confirmPass,
@@ -199,14 +208,17 @@ class _RegisterPageState extends State<RegisterPage> {
               },
               suffixIcon: IconButton(
                 icon: Icon(
-                  _obscureConfirm ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                  _obscureConfirm
+                      ? Icons.visibility_outlined
+                      : Icons.visibility_off_outlined,
                   color: cs.onSurfaceVariant,
                 ),
-                onPressed: () => setState(() => _obscureConfirm = !_obscureConfirm),
+                onPressed: () =>
+                    setState(() => _obscureConfirm = !_obscureConfirm),
               ),
             ),
             const SizedBox(height: 16),
-            
+
             // Specialist checkbox
             InkWell(
               onTap: () => setState(() => _isSpecialist = !_isSpecialist),
@@ -220,7 +232,8 @@ class _RegisterPageState extends State<RegisterPage> {
                       height: 24,
                       child: Checkbox(
                         value: _isSpecialist,
-                        onChanged: (v) => setState(() => _isSpecialist = v ?? false),
+                        onChanged: (v) =>
+                            setState(() => _isSpecialist = v ?? false),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(4),
                         ),
@@ -230,10 +243,7 @@ class _RegisterPageState extends State<RegisterPage> {
                     Expanded(
                       child: Text(
                         'Sunt specialist în logopedie',
-                        style: TextStyle(
-                          fontSize: 15,
-                          color: cs.onSurface,
-                        ),
+                        style: TextStyle(fontSize: 15, color: cs.onSurface),
                       ),
                     ),
                   ],
@@ -241,7 +251,7 @@ class _RegisterPageState extends State<RegisterPage> {
               ),
             ),
             const SizedBox(height: 20),
-            
+
             AuthPrimaryButton(
               text: 'Continuă',
               loading: st.loading,
@@ -280,29 +290,26 @@ class _RegisterPageState extends State<RegisterPage> {
     String? Function(String?)? validator,
   }) {
     final cs = Theme.of(context).colorScheme;
-    
+    final fill =
+        Theme.of(context).inputDecorationTheme.fillColor ??
+        const Color(0xFFF2F3F6);
+
     return TextFormField(
       controller: controller,
       keyboardType: keyboardType,
       obscureText: obscure,
       autofillHints: autofillHints,
       validator: validator,
-      style: TextStyle(
-        fontSize: 16,
-        color: cs.onSurface,
-      ),
+      style: TextStyle(fontSize: 16, color: cs.onSurface),
       decoration: InputDecoration(
         labelText: label,
-        labelStyle: TextStyle(
-          color: cs.onSurfaceVariant,
-          fontSize: 14,
-        ),
-        floatingLabelStyle: TextStyle(
-          color: cs.primary,
-          fontSize: 14,
-        ),
+        labelStyle: TextStyle(color: cs.onSurfaceVariant, fontSize: 14),
+        floatingLabelStyle: TextStyle(color: cs.primary, fontSize: 14),
         suffixIcon: suffixIcon,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 14,
+        ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide(color: cs.outline),
@@ -324,7 +331,7 @@ class _RegisterPageState extends State<RegisterPage> {
           borderSide: BorderSide(color: cs.error, width: 1.5),
         ),
         filled: true,
-        fillColor: cs.surfaceContainerLowest,
+        fillColor: fill,
       ),
     );
   }
@@ -342,13 +349,16 @@ class _RegisterPageState extends State<RegisterPage> {
 
   Widget _buildGenderSelector() {
     final cs = Theme.of(context).colorScheme;
-    
+    final fill =
+        Theme.of(context).inputDecorationTheme.fillColor ??
+        const Color(0xFFF2F3F6);
+
     return GestureDetector(
       onTap: () => _showGenderPicker(),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
         decoration: BoxDecoration(
-          color: cs.surfaceContainerLowest,
+          color: fill,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: cs.outline.withOpacity(0.5)),
         ),
@@ -360,26 +370,17 @@ class _RegisterPageState extends State<RegisterPage> {
                 children: [
                   Text(
                     'Gen',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: cs.onSurfaceVariant,
-                    ),
+                    style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
                   ),
                   const SizedBox(height: 4),
                   Text(
                     _getGenderLabel(_gender),
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: cs.onSurface,
-                    ),
+                    style: TextStyle(fontSize: 16, color: cs.onSurface),
                   ),
                 ],
               ),
             ),
-            Icon(
-              Icons.keyboard_arrow_down_rounded,
-              color: cs.onSurfaceVariant,
-            ),
+            Icon(Icons.keyboard_arrow_down_rounded, color: cs.onSurfaceVariant),
           ],
         ),
       ),
@@ -388,7 +389,7 @@ class _RegisterPageState extends State<RegisterPage> {
 
   void _showGenderPicker() {
     final cs = Theme.of(context).colorScheme;
-    
+
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -439,7 +440,7 @@ class _RegisterPageState extends State<RegisterPage> {
   Widget _buildGenderOption(String value, String label) {
     final cs = Theme.of(context).colorScheme;
     final isSelected = _gender == value;
-    
+
     return InkWell(
       onTap: () {
         setState(() => _gender = value);
@@ -460,11 +461,7 @@ class _RegisterPageState extends State<RegisterPage> {
               ),
             ),
             if (isSelected)
-              Icon(
-                Icons.check_rounded,
-                color: cs.primary,
-                size: 22,
-              ),
+              Icon(Icons.check_rounded, color: cs.primary, size: 22),
           ],
         ),
       ),
@@ -473,11 +470,12 @@ class _RegisterPageState extends State<RegisterPage> {
 
   Widget _buildOtpVerificationStep(BuildContext ctx, AuthState st) {
     final cs = Theme.of(context).colorScheme;
-    
+
     return AuthScaffold(
       illustrationAsset: 'assets/images/signup_image.png',
       title: 'Verifică email-ul',
-      subtitle: 'Am trimis un cod de verificare la\n${_pendingEmail ?? _email.text}',
+      subtitle:
+          'Am trimis un cod de verificare la\n${_pendingEmail ?? _email.text}',
       showBack: true,
       onBack: () {
         setState(() {
@@ -518,7 +516,7 @@ class _RegisterPageState extends State<RegisterPage> {
               ),
               const SizedBox(height: 16),
             ],
-            
+
             // Info box
             Container(
               padding: const EdgeInsets.all(12),
@@ -534,24 +532,21 @@ class _RegisterPageState extends State<RegisterPage> {
                   Expanded(
                     child: Text(
                       'Verifică inbox-ul și introdu codul din 6 cifre.',
-                      style: TextStyle(
-                        color: cs.primary,
-                        fontSize: 14,
-                      ),
+                      style: TextStyle(color: cs.primary, fontSize: 14),
                     ),
                   ),
                 ],
               ),
             ),
             const SizedBox(height: 24),
-            
+
             // OTP input fields
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: List.generate(6, (index) => _buildOtpField(index)),
             ),
             const SizedBox(height: 24),
-            
+
             AuthPrimaryButton(
               text: 'Verifică codul',
               loading: st.loading,
@@ -572,18 +567,20 @@ class _RegisterPageState extends State<RegisterPage> {
               },
             ),
             const SizedBox(height: 16),
-            
+
             // Resend code button
             TextButton(
-              onPressed: st.loading ? null : () {
-                setState(() {
-                  _errorMessage = null;
-                  _clearOtp();
-                });
-                context.read<AuthCubit>().resendRegistrationOtp(
-                  _pendingEmail ?? _email.text.trim(),
-                );
-              },
+              onPressed: st.loading
+                  ? null
+                  : () {
+                      setState(() {
+                        _errorMessage = null;
+                        _clearOtp();
+                      });
+                      context.read<AuthCubit>().resendRegistrationOtp(
+                        _pendingEmail ?? _email.text.trim(),
+                      );
+                    },
               child: Text(
                 'Nu ai primit codul? Retrimite',
                 style: TextStyle(
@@ -601,7 +598,10 @@ class _RegisterPageState extends State<RegisterPage> {
 
   Widget _buildOtpField(int index) {
     final cs = Theme.of(context).colorScheme;
-    
+    final fill =
+        Theme.of(context).inputDecorationTheme.fillColor ??
+        const Color(0xFFF2F3F6);
+
     return SizedBox(
       width: 45,
       height: 55,
@@ -611,10 +611,7 @@ class _RegisterPageState extends State<RegisterPage> {
         textAlign: TextAlign.center,
         keyboardType: TextInputType.number,
         maxLength: 1,
-        style: const TextStyle(
-          fontSize: 24,
-          fontWeight: FontWeight.bold,
-        ),
+        style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
         decoration: InputDecoration(
           counterText: '',
           contentPadding: const EdgeInsets.symmetric(vertical: 12),
@@ -631,18 +628,16 @@ class _RegisterPageState extends State<RegisterPage> {
             borderSide: BorderSide(color: cs.primary, width: 1.5),
           ),
           filled: true,
-          fillColor: cs.surfaceContainerLowest,
+          fillColor: fill,
         ),
-        inputFormatters: [
-          FilteringTextInputFormatter.digitsOnly,
-        ],
+        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
         onChanged: (value) {
           if (value.isNotEmpty && index < 5) {
             _otpFocusNodes[index + 1].requestFocus();
           } else if (value.isEmpty && index > 0) {
             _otpFocusNodes[index - 1].requestFocus();
           }
-          
+
           // Auto-submit when all 6 digits are entered
           if (_otpCode.length == 6) {
             FocusScope.of(context).unfocus();

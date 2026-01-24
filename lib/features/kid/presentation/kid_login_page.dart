@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:get_it/get_it.dart';
 import '../../../core/network/dio_client.dart';
 import '../../../core/storage/secure_storage.dart';
+import '../../auth/data/presentation/cubit/auth_cubit.dart';
 import '../../auth/presentation/widgets/auth_ui.dart';
 import '../data/kid_api.dart';
-import 'kid_home_shell.dart';
 
 class KidLoginPage extends StatefulWidget {
   const KidLoginPage({super.key});
@@ -17,7 +18,31 @@ class _KidLoginPageState extends State<KidLoginPage> {
   final _formKey = GlobalKey<FormState>();
   final _keyController = TextEditingController();
   bool _isLoading = false;
+  bool _isLoadingKey = true;
+  bool _rememberKey = false;
   String? _errorMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadRememberedKey();
+  }
+
+  Future<void> _loadRememberedKey() async {
+    final store = GetIt.I<SecureStore>();
+    final rememberedKey = await store.readRememberedKidKey();
+    if (rememberedKey != null && rememberedKey.isNotEmpty) {
+      _keyController.text = rememberedKey;
+      setState(() {
+        _rememberKey = true;
+      });
+    }
+    if (mounted) {
+      setState(() {
+        _isLoadingKey = false;
+      });
+    }
+  }
 
   @override
   void dispose() {
@@ -52,19 +77,23 @@ class _KidLoginPageState extends State<KidLoginPage> {
       await store.writeKey('kid_profile_id', response.profileId.toString());
       await store.writeKey('kid_profile_name', response.profileName);
       await store.writeKey('kid_is_premium', response.isPremium.toString());
+      
+      // Save the key if remember checkbox is checked
+      if (_rememberKey) {
+        await store.saveRememberedKidKey(_keyController.text.trim());
+      }
 
       if (mounted) {
-        // Navigate to kid home shell
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(
-            builder: (_) => KidHomeShell(
-              profileId: response.profileId,
-              profileName: response.profileName,
-              isPremium: response.isPremium,
-            ),
-          ),
-          (route) => false,
+        // Update auth state - app.dart will handle navigation automatically
+        context.read<AuthCubit>().setKidAuthenticated(
+          profileId: response.profileId,
+          profileName: response.profileName,
+          isPremium: response.isPremium,
         );
+        // Pop this page so app.dart's BlocBuilder shows KidHomeShell
+        if (mounted) {
+          Navigator.of(context).pop();
+        }
       }
     } catch (e) {
       setState(() {
@@ -93,9 +122,15 @@ class _KidLoginPageState extends State<KidLoginPage> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     
+    if (_isLoadingKey) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+    
     return AuthScaffold(
       illustrationAsset: 'assets/images/login_image.png',
-      title: 'Intră cu cheia',
+      title: 'Folosește o cheie',
       subtitle: 'Introdu cheia primită de la specialist',
       showBack: true,
       onBack: () => Navigator.of(context).pop(),
@@ -152,14 +187,58 @@ class _KidLoginPageState extends State<KidLoginPage> {
             const SizedBox(height: 8),
             
             Text(
-              'Cheia este un cod unic primit de la specialist. '
-              'O găsești în aplicația specialistului sau pe un card.',
+              'Cheia este un cod unic primit de la specialist.\n'
+              'Dacă nu ai o cheie, cere-o de la specialistul tău\n'
+              'sau autentifică-te ca utilizator normal.',
+              textAlign: TextAlign.center,
               style: TextStyle(
                 color: cs.onSurface.withOpacity(0.6),
                 fontSize: 13,
+                height: 1.4,
               ),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 8),
+            
+            // Remember key checkbox
+            GestureDetector(
+              onTap: () {
+                final newValue = !_rememberKey;
+                setState(() {
+                  _rememberKey = newValue;
+                });
+                // If unchecked, clear the remembered key
+                if (!newValue) {
+                  final store = GetIt.I<SecureStore>();
+                  store.clearRememberedKidKey();
+                }
+              },
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: Checkbox(
+                      value: _rememberKey,
+                      onChanged: (value) {
+                        final newValue = value ?? false;
+                        setState(() {
+                          _rememberKey = newValue;
+                        });
+                        if (!newValue) {
+                          final store = GetIt.I<SecureStore>();
+                          store.clearRememberedKidKey();
+                        }
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  const Text('Ține minte cheia'),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
 
             // Login button
             AuthPrimaryButton(

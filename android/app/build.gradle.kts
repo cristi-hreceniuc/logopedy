@@ -38,7 +38,7 @@ android {
 
     signingConfigs {
         create("release") {
-            storeFile = file("/Users/cristianhreceniuc/release-keystore.jks")
+            storeFile = file("/Users/macbook/release-keystore.jks")
             storePassword = "recell123.A."
             keyAlias = "upload"
             keyPassword = "recell123.A."
