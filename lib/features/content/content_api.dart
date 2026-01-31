@@ -47,6 +47,14 @@ class ContentApi {
     return r.data;
   }
 
+  /// Get all asset URLs for a part (for prefetching).
+  Future<Map<String, dynamic>> getPartAssets(int profileId, int partId) async {
+    final url = AppConfig.partAssetsPath(profileId, partId);
+    final r = await _dio.get(url);
+    print('[GET] $url');
+    return r.data;
+  }
+
   Future<Map<String,dynamic>> currentProgress(int profileId) async {
     final r = await _dio.get(AppConfig.progressPath(profileId));
     return r.data;

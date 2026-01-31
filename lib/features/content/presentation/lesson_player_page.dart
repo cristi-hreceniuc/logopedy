@@ -11,6 +11,7 @@ import 'package:get_it/get_it.dart';
 import '../../../core/network/dio_client.dart';
 import '../../../core/services/audio_cache_service.dart';
 import '../../../core/services/feedback_service.dart';
+import '../../../core/services/part_asset_cache_service.dart';
 import '../../../core/services/s3_service.dart';
 import '../../../core/utils/snackbar_utils.dart';
 import '../../kid/data/kid_api.dart';
@@ -313,6 +314,7 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
   late final S3Service _s3 = GetIt.I<S3Service>();
   late final AudioCacheService _audioCache = GetIt.I<AudioCacheService>();
   late final FeedbackService _feedback = GetIt.I<FeedbackService>();
+  late final PartAssetCacheService _assetCache = GetIt.I<PartAssetCacheService>();
   final _player = AudioPlayer();
 
   LessonDto? _data;
@@ -576,6 +578,40 @@ class _LessonPlayerPageState extends State<LessonPlayerPage> {
     }
 
     if (url.startsWith('http://') || url.startsWith('https://')) {
+      // Check if we have this URL cached locally from prefetch
+      final localPath = _assetCache.getLocalPathOrUrl(url);
+      
+      if (localPath != url) {
+        // Load from local temp file (prefetched)
+        return Image.file(
+          File(localPath),
+          width: width,
+          height: height,
+          fit: fit,
+          errorBuilder: (_, __, ___) {
+            // Fallback to network if local file fails
+            return CachedNetworkImage(
+              imageUrl: url,
+              width: width,
+              height: height,
+              fit: fit,
+              placeholder: (context, url) => Container(
+                width: width ?? 240,
+                height: height ?? 240,
+                color: Colors.grey[100],
+                child: const Center(child: CircularProgressIndicator()),
+              ),
+              errorWidget: (context, url, error) => Container(
+                width: width ?? 240,
+                height: height ?? 240,
+                color: Colors.grey[200],
+                child: Icon(Icons.broken_image, size: 64, color: Colors.grey[400]),
+              ),
+            );
+          },
+        );
+      }
+      
       // Load from network (S3) with caching
       return CachedNetworkImage(
         imageUrl: url,

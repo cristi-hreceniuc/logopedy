@@ -4,6 +4,7 @@ import 'package:get_it/get_it.dart';
 
 import '../../../core/network/dio_client.dart';
 import '../../../core/services/feedback_service.dart';
+import '../../../core/services/part_asset_cache_service.dart';
 import '../../../core/utils/snackbar_utils.dart';
 import '../../auth/data/presentation/cubit/auth_cubit.dart';
 import '../../kid/data/kid_api.dart';
@@ -33,8 +34,10 @@ class PartPage extends StatefulWidget {
 class _PartPageState extends State<PartPage> {
   late final repo = ContentRepository(GetIt.I<DioClient>());
   late final kidApi = KidApi(GetIt.I<DioClient>());
+  late final assetCache = GetIt.I<PartAssetCacheService>();
   PartDto? _data;
   bool _isLoading = true;
+  bool _isPrefetching = false;
   
   // Track if any progress was made during this session (for back navigation)
   bool _progressMade = false;
@@ -43,6 +46,13 @@ class _PartPageState extends State<PartPage> {
   void initState() {
     super.initState();
     _loadData();
+  }
+  
+  @override
+  void dispose() {
+    // Note: We don't clear cache here to allow assets to persist
+    // while user navigates between lessons in the same part
+    super.dispose();
   }
 
   @override
@@ -78,6 +88,9 @@ class _PartPageState extends State<PartPage> {
           _data = data;
           _isLoading = false;
         });
+        
+        // Start prefetching assets in background after data loads
+        _prefetchAssets(pid);
       }
     } catch (e) {
       debugPrint('🔄 Error loading part: $e');
@@ -86,6 +99,24 @@ class _PartPageState extends State<PartPage> {
           _isLoading = false;
         });
       }
+    }
+  }
+  
+  /// Prefetch all assets for this part in the background.
+  Future<void> _prefetchAssets(int profileId) async {
+    if (!mounted) return;
+    
+    setState(() => _isPrefetching = true);
+    
+    try {
+      await assetCache.loadPartAssets(profileId, widget.partId);
+      debugPrint('✅ Prefetched ${assetCache.cachedAssetCount} assets for part ${widget.partId}');
+    } catch (e) {
+      debugPrint('⚠️ Asset prefetch failed (non-critical): $e');
+    }
+    
+    if (mounted) {
+      setState(() => _isPrefetching = false);
     }
   }
 
@@ -119,6 +150,21 @@ class _PartPageState extends State<PartPage> {
               color: cs.onSurface,
             ),
           ),
+          actions: [
+            // Show prefetch indicator
+            if (_isPrefetching)
+              const Padding(
+                padding: EdgeInsets.only(right: 16),
+                child: SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF2D72D2)),
+                  ),
+                ),
+              ),
+          ],
         ),
         body: SafeArea(
         top: true,

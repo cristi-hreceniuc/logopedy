@@ -23,6 +23,8 @@ class AppConfig {
       '/api/profiles/$profileId/submodules/$submoduleId';
   static String partPath(int profileId, int partId) =>
       '/api/profiles/$profileId/parts/$partId';
+  static String partAssetsPath(int profileId, int partId) =>
+      '/api/profiles/$profileId/parts/$partId/assets';
   static String lessonPath(int profileId, int lessonId) =>
       '/api/profiles/$profileId/lessons/$lessonId';
 

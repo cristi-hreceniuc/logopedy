@@ -7,6 +7,7 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'core/network/dio_client.dart';
 import 'core/services/audio_cache_service.dart';
 import 'core/services/feedback_service.dart';
+import 'core/services/part_asset_cache_service.dart';
 import 'core/services/push_notification_service.dart';
 import 'core/services/s3_service.dart';
 import 'core/state/active_profile.dart';
@@ -36,6 +37,7 @@ Future<void> _setupDI() async {
   sl.registerLazySingleton<FeedbackService>(() => feedbackService);
   
   sl.registerLazySingleton<S3Service>(() => S3Service(sl<DioClient>()));
+  sl.registerLazySingleton<PartAssetCacheService>(() => PartAssetCacheService(sl<DioClient>().dio));
   sl.registerLazySingleton<AuthApi>(() => AuthApi(sl<DioClient>().dio));
   sl.registerLazySingleton<AuthRepository>(() => AuthRepository(sl<AuthApi>(), sl<SecureStore>()));
   sl.registerFactory<AuthCubit>(() => AuthCubit(sl<AuthRepository>()));
